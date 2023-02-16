@@ -1,0 +1,17 @@
+
+; >-------------------------------------------------------------<
+
+.DT_L                                  ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BEQ      DT_LDC_LDF_LDM_LDR
+   CMP      R8,#'F'
+   BEQ      DT_LFM
+   CMP      R8,#'G'
+   BEQ      DT_LGN
+   CMP      R8,#'O'
+   BEQ      DT_LOCK_LOG
+   CMP      R8,#'S'
+   BEQ      DT_LSL_LSR
+   B        DT_Unknown

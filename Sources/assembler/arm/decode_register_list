@@ -1,0 +1,169 @@
+
+; >-------------------------------------------------------------<
+
+.Decode_Bracketed_Register_List        ;_R0 -> Decode register subroutine, _R8 = "{" or Blank
+   STMFD    R13!,{R4,R14}              ;~R0 = List-register bits, ~R8 = Next char
+   MOV      R4,R0                      ;~R1 = Type, "R", "S", "D" or "Q"
+   BL       Skip_Blanks
+   CMP      R8,#'{'
+   MOVNE    R0,#&21                    ; Asm_Error #&21 = Missing "{"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   MOV      R0,R4
+   BL       Decode_Register_List
+   BL       Skip_Blanks
+   CMP      R8,#'}'
+   MOVNE    R0,#&22                    ; Asm_Error #&22 = Missing "}"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   LDMFD    R13!,{R4,R15}
+
+; >-------------------------------------------------------------<
+
+.Decode_Register_List                  ;_R0 -> Decode register subroutine, _R8 = First char or Blank
+   STMFD    R13!,{R4-R7,R14}           ;~R0 = List-register bits, ~R8 = Next char
+   MOV      R6,R0                      ;~R1 = Type, "R", "S", "D" or "Q"
+   MOV      R4,#0
+   MOV      R7,#0
+
+.DL_Read
+   BL       Skip_Blanks
+   Call     R6
+   CMP      R7,#0
+   MOVEQ    R7,R1
+   CMP      R1,R7
+   BNE      DL_Register_Mismatch
+   MOV      R1,#1
+   ORR      R4,R4,R1,LSL R0            ; Set reg. in list
+   BL       Skip_Blanks
+   ;------> Can be "," or "-" or "}"
+   CMP      R8,#','                    ; Single register ?
+   LDREQB   R8,[R10],#1
+   BEQ      DL_Read                    ; Then do the next
+   CMP      R8,#'-'                    ; Register range ?
+   MOVNE    R0,R4
+   MOVNE    R1,R7
+   LDMNEFD  R13!,{R4-R7,R15}           ; Then get out
+   MOV      R5,R0
+   ;------> Register range, R8 = "-", R5 = Low Reg
+   LDRB     R8,[R10],#1
+   Call     R6                         ; R0 = High reg
+   CMP      R1,R7
+   BNE      DL_Register_Mismatch
+   MOV      R1,#1
+   ORR      R4,R4,R1,LSL R0            ; Set reg. in list
+   CMP      R5,R0                      ; Low reg > High reg?
+   EXGGT    R0,R5                      ; Swap Low reg and High reg
+   ADD      R5,R5,#1
+   CMP      R5,R0
+   BGE      DL_Range_End
+
+._Loop
+   ORR      R4,R4,R1,LSL R5            ; Set register in list
+   ADD      R5,R5,#1
+   CMP      R5,R0
+   BLT      _Loop
+
+.DL_Range_End
+   BL       Skip_Blanks
+   CMP      R8,#','
+   LDREQB   R8,[R10],#1
+   BEQ      DL_Read                    ; Retry next
+   MOV      R0,R4
+   MOV      R1,R7
+   LDMFD    R13!,{R4-R7,R15}
+
+.DL_Register_Mismatch
+   MOV      R0,#&16                    ; Asm_Error #&16 = Target registers must be the same type
+   B        Asm_Error
+
+; >-------------------------------------------------------------<
+
+.Analyse_Register_List                 ;_R0 = List-register bits
+   STMFD    R13!,{R14}                 ;~R0 = First register
+   MOV      R3,R0                      ;~R1 = Number of registers
+   MOV      R2,#1
+   MOV      R0,#0
+
+._Loop1                                ; Find first register
+   TST      R3,R2,LSL R0
+   ADDEQ    R0,R0,#1
+   BEQ      _Loop1
+   MOV      R1,#31
+
+._Loop2                                ; Find last register
+   TST      R3,R2,LSL R1
+   SUBEQ    R1,R1,#1
+   BEQ      _Loop2
+   MOV      R14,R0
+
+._Loop3                                ; Check that register list is continuous
+   TST      R3,R2,LSL R14
+   MOVEQ    R0,#&A4                    ; Asm_Error #&A4 = Register list must be continuous
+   BEQ      Asm_Error
+   ADD      R14,R14,#1
+   CMP      R14,R1
+   BLE      _Loop3
+   SUB      R1,R1,R0
+   ADD      R1,R1,#1
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+;
+; R4 - Size
+; R5 -> Register list
+; R6 - Current register
+; R7 - Index
+
+.Decode_Structure_Register_List        ;_R0 = Size, _R8 = "{" or Blank
+   STMFD    R13!,{R4-R6,R14}           ;~R0 - R4 = Registers in list (bit 24-31 - element type), ~R8 = Next char, ~R14 = Number of registers
+   MOV      R4,R0
+   ADR      R5,DSRL_Registers
+   MOV      R7,#-1
+   BL       Skip_Blanks
+   CMP      R8,#'{'
+   MOVNE    R0,#&21                    ; Asm_Error #&21 = Missing "{"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+
+.DSRL_Loop
+   BL       Decode_VFP_D_Register
+   MOV      R6,R0
+   CMP      R8,#'['
+   BNE      DSRL_Register_Done
+   LDRB     R8,[R10],#1
+   CMP      R8,#']'
+   ORREQ    R6,R6,#Register_List_All_Lanes
+   LDREQB   R8,[R10],#1
+   BEQ      DSRL_Register_Done
+   MOV      R0,R4
+   BL       Decode_VFP_Scalar
+   ORR      R6,R6,R0,LSL #24
+   ORR      R6,R6,#Register_List_Single_Lane
+
+.DSRL_Register_Done
+   BIC      R0,R6,#&FF
+   CMP      R7,#-1
+   MOVEQ    R7,R0
+   CMP      R0,R7
+   BNE      DT_Bad_Register_List
+   STR      R6,[R5],#4
+   BL       Skip_Blanks
+   CMP      R8,#','
+   LDREQB   R8,[R10],#1
+   BEQ      DSRL_Loop
+
+   CMP      R8,#'}'
+   MOVNE    R0,#&22                    ; Asm_Error #&22 = Missing "}"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   ADR      R6,DSRL_Registers
+   LDMIA    R6,{R0-R4}
+   SUB      R14,R5,R6
+   MOV      R14,R14,LSR #2
+   CMP      R14,#4
+   BGT      DT_Bad_Register_List
+   LDMFD    R13!,{R4-R6,R15}
+
+.DSRL_Registers
+   DBD      4

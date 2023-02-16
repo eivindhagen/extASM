@@ -1,0 +1,23 @@
+
+#name <Tmp$Dir>.^.^.test_exception_instructions
+
+#area test,code
+
+; BKPT
+
+BKPT    &AA       ; Set breakpoint
+BKPT    #&AA
+
+; SWI/SVC
+
+SWI     OS_WriteC ; Call OS routine
+SWI     &123456
+SWI     #&123456
+SWIEQ   0
+
+SVC     OS_WriteC ; Call OS routine
+SVC     &123456
+SVC     #&123456
+SVCEQ   0
+
+#end

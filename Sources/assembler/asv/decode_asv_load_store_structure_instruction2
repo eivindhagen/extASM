@@ -1,0 +1,161 @@
+
+; >-------------------------------------------------------------<
+; VLD2/VST2
+; >-------------------------------------------------------------<
+;
+; R4 - Size
+; R5 - Number of registers
+; R6 - Vd / spacing
+; R7 - Index
+
+.DT_VLD2_VST2                          ;_R8 = "1"
+   LDRB     R8,[R10],#1
+   BL       Decode_VFP_Operand_Type
+   CMP      R0,#VFP_Operand_64
+   BEQ      DT_Illegal_Operand_Type
+   MOV      R4,R0
+   BL       Ensure_Blank
+   BL       Decode_Structure_Register_List
+   MOV      R5,R14
+   AND      R6,R0,#&1F
+   MOV      R7,R0,LSR #24
+   AND      R7,R7,#&F
+   AND      R14,R6,#&F
+   ORR      R9,R9,R14,LSL #Rd_Pos
+   TST      R0,#1 << 4
+   ORRNE    R9,R9,#1 << VFP_D_Pos
+   AND      R14,R0,#&F0000000
+   CMP      R14,#Register_List_Single_Lane
+   BEQ      DT_VLS2_Single_Lane
+   CMP      R14,#Register_List_All_Lanes
+   BEQ      DT_VLS2_All_Lanes
+   ;                                        size
+   ;------> xxx1 (multiple)  DL [Rn][Vd]type  al[Rm]
+   ORR      R9,R9,#%11110100000000000000000000000000
+   ORR      R9,R9,R4,LSL #6
+   ADD      R14,R0,#1
+   CMP      R5,#2
+   CMPEQ    R1,R14
+   ORREQ    R9,R9,#%1000 << 8
+   BEQ      DT_VLS2_Multiple_List_Done
+   ADD      R14,R0,#2
+   CMP      R5,#2
+   CMPEQ    R1,R14
+   ORREQ    R9,R9,#%1001 << 8
+   BEQ      DT_VLS2_Multiple_List_Done
+   SUB      R1,R1,#1
+   SUB      R2,R2,#2
+   SUB      R3,R3,#3
+   CMP      R5,#4
+   CMPEQ    R0,R1
+   CMPEQ    R0,R2
+   CMPEQ    R0,R3
+   BNE      DT_Bad_Register_List
+   ORR      R9,R9,#%0011 << 8
+
+.DT_VLS2_Multiple_List_Done
+   BL       Ensure_Comma
+   BL       Ensure_Open_Bracket
+   BL       Decode_Rn_Register
+   CMP      R8,#'@'
+   BNE      DT_VLSx_End
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMP      R0,#64
+   ORREQ    R9,R9,#%01 << 4
+   BEQ      DT_VLSx_End
+   CMP      R0,#128
+   ORREQ    R9,R9,#%10 << 4
+   BEQ      DT_VLSx_End
+   CMP      R5,#4
+   CMPEQ    R0,#256
+   ORREQ    R9,R9,#%11 << 4
+   BNE      DT_Bad_Alignment
+   B        DT_VLSx_End
+
+; >-------------------------------------------------------------<
+
+.DT_VLS2_Single_Lane
+   CMP      R4,#VFP_Operand_64
+   BEQ      DT_Illegal_Operand_Type
+   ;------> xxx1 (single)    DL [Rn][Vd]sz  type[Rm]
+   ORR      R9,R9,#%11110100100000000000000100000000
+   ORR      R9,R9,R4,LSL #10
+   AND      R14,R1,#&F0000000
+   CMP      R5,#2
+   CMPEQ    R14,#Register_List_Single_Lane
+   BNE      DT_Bad_Register_List
+   AND      R1,R1,#&1F
+   SUB      R6,R1,R6
+   CMP      R6,#1
+   CMPNE    R6,#2
+   BNE      DT_Bad_Register_List
+   CMP      R4,#VFP_Operand_8
+   CMPEQ    R6,#2
+   BEQ      DT_Bad_Register_List
+   BL       Ensure_Comma
+   BL       Ensure_Open_Bracket
+   BL       Decode_Rn_Register
+   CMP      R8,#'@'
+   MOVNE    R0,#0
+   BNE      DT_VLS2_Single_Alignment_Done
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R1,#16
+   CMP      R0,R1,LSL R4
+   BNE      DT_Bad_Alignment
+
+.DT_VLS2_Single_Alignment_Done
+   CMP      R4,#VFP_Operand_8
+   ORREQ    R9,R9,R7,LSL #5
+   ORREQ    R9,R9,R0
+   BEQ      DT_VLSx_End
+   SUB      R6,R6,#1
+   CMP      R4,#VFP_Operand_16
+   ORREQ    R9,R9,R7,LSL #6
+   ORREQ    R9,R9,R0,LSR #1
+   ORREQ    R9,R9,R6,LSL #5
+   BEQ      DT_VLSx_End
+   ORR      R9,R9,R7,LSL #7
+   ORR      R9,R9,R0,LSR #2
+   ORR      R9,R9,R6,LSL #6
+   B        DT_VLSx_End
+
+; >-------------------------------------------------------------<
+
+.DT_VLS2_All_Lanes
+   CMP      R4,#VFP_Operand_64
+   BEQ      DT_Illegal_Operand_Type
+   ;------> xxx1 (all)       DL [Rn][Vd]    szTa[Rm]
+   ORR      R9,R9,#%11110100100000000000110100000000
+   ORR      R9,R9,R4,LSL #6
+   AND      R14,R1,#&F0000000
+   AND      R1,R1,#&1F
+   SUB      R6,R1,R6
+   CMP      R5,#2
+   CMPEQ    R6,#2
+   ORREQ    R9,R9,#1 << 5
+   CMPNE    R6,#1
+   BNE      DT_Bad_Register_List
+   BL       Ensure_Comma
+   BL       Ensure_Open_Bracket
+   BL       Decode_Rn_Register
+   CMP      R8,#'@'
+   MOVNE    R0,#0
+   BNE      DT_VLSx_End
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R1,#16
+   CMP      R0,R1,LSL R4
+   BNE      DT_Bad_Alignment
+   ORR      R9,R9,#1 << 4
+   B        DT_VLSx_End

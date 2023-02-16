@@ -1,0 +1,24 @@
+
+; >-------------------------------------------------------------<
+
+.Read_Screen_Size
+   STMFD    R13!,{R4,R5,R14}
+   ADR      R0,StrBuffer
+   MOV      R1,#4
+   MOV      R2,#5
+   MOV      R3,#130
+   MOV      R4,#131
+   MVN      R5,#0
+   STMIA    R0,{R1-R5}
+   ADD      R1,R0,#&100
+   SWI      OS_ReadVduVariables
+   LDMIA    R1,{R2-R5}
+   ADD      R4,R4,#1
+   ADD      R5,R5,#1
+   MOV      R4,R4,LSL R2
+   MOV      R5,R5,LSL R3
+   SUB      R4,R4,#1                   ; Max x=(Max x+1 << X Shift factor)-1
+   SUB      R5,R5,#1                   ; Max y=(Max y+1 << Y Shift factor)-1
+   STR      R4,Max_ScreenX
+   STR      R5,Max_ScreenY
+   LDMFD    R13!,{R4,R5,R15}

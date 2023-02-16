@@ -1,0 +1,212 @@
+
+#name <Tmp$Dir>.^.^.test_asv_logical_instructions
+
+#area test,code
+
+; VAND
+
+VAND     Q1,Q2,Q3 ; Q1=Q2 & Q3 (SIMD)
+VAND     D1,D2,D3 ; D1=D2 & D3 (SIMD)
+
+;VAND.I8  Q1,#&AA       ; Q1&=&AAAAAAAA * 4         (SIMD, 16*8)
+VAND.I16 Q1,#&AA       ; Q1&=&00AA00AA * 4         (SIMD, 8*16)
+VAND.I16 Q1,#&AA00     ; Q1&=&AA00AA00 * 4         (SIMD, 8*16)
+VAND.I32 Q1,#&AA       ; Q1&=&000000AA * 4         (SIMD, 4*32)
+VAND.I32 Q1,#&AA00     ; Q1&=&0000AA00 * 4         (SIMD, 4*32)
+VAND.I32 Q1,#&AA0000   ; Q1&=&00AA0000 * 4         (SIMD, 4*32)
+VAND.I32 Q1,#&AA000000 ; Q1&=&AA000000 * 4         (SIMD, 4*32)
+;VAND.I64 Q1,#&AA       ; Q1&=&FF00FF00FF00FF00 * 2 (SIMD, 2*64)
+;VAND.F32 Q1,#&AA       ; Q1&=x                     (SIMD, 4*32)
+
+;VAND.I8  D1,#&AA       ; D1&=&AAAAAAAA * 2     (SIMD, 8*8)
+VAND.I16 D1,#&AA       ; D1&=&00AA00AA * 2     (SIMD, 4*16)
+VAND.I16 D1,#&AA00     ; D1&=&AA00AA00 * 2     (SIMD, 4*16)
+VAND.I32 D1,#&AA       ; D1&=&000000AA * 2     (SIMD, 2*32)
+VAND.I32 D1,#&AA00     ; D1&=&0000AA00 * 2     (SIMD, 2*32)
+VAND.I32 D1,#&AA0000   ; D1&=&00AA0000 * 2     (SIMD, 2*32)
+VAND.I32 D1,#&AA000000 ; D1&=&AA000000 * 2     (SIMD, 2*32)
+;VAND.I64 D1,#&AA       ; D1&=&FF00FF00FF00FF00 (SIMD, 1*64)
+;VAND.F32 D1,#&AA       ; D1&=x                 (SIMD, 2*32)
+
+; VBIC
+
+VBIC     Q1,Q2,Q3 ; Q1=Q2 & ~Q3 (SIMD)
+VBIC     D1,D2,D3 ; D1=D2 & ~D3 (SIMD)
+
+;VBIC.I8  Q1,#&AA       ; Q1&=~&AAAAAAAA * 4         (SIMD, 16*8)
+VBIC.I16 Q1,#&AA       ; Q1&=~&00AA00AA * 4         (SIMD, 8*16)
+VBIC.I16 Q1,#&AA00     ; Q1&=~&AA00AA00 * 4         (SIMD, 8*16)
+VBIC.I32 Q1,#&AA       ; Q1&=~&000000AA * 4         (SIMD, 4*32)
+VBIC.I32 Q1,#&AA00     ; Q1&=~&0000AA00 * 4         (SIMD, 4*32)
+VBIC.I32 Q1,#&AA0000   ; Q1&=~&00AA0000 * 4         (SIMD, 4*32)
+VBIC.I32 Q1,#&AA000000 ; Q1&=~&AA000000 * 4         (SIMD, 4*32)
+;VBIC.I64 Q1,#&AA       ; Q1&=~&FF00FF00FF00FF00 * 2 (SIMD, 2*64)
+;VBIC.F32 Q1,#&AA       ; Q1&=~x                     (SIMD, 4*32)
+
+;VBIC.I8  D1,#&AA       ; D1&=~&AAAAAAAA * 2     (SIMD, 8*8)
+VBIC.I16 D1,#&AA       ; D1&=~&00AA00AA * 2     (SIMD, 4*16)
+VBIC.I16 D1,#&AA00     ; D1&=~&AA00AA00 * 2     (SIMD, 4*16)
+VBIC.I32 D1,#&AA       ; D1&=~&000000AA * 2     (SIMD, 2*32)
+VBIC.I32 D1,#&AA00     ; D1&=~&0000AA00 * 2     (SIMD, 2*32)
+VBIC.I32 D1,#&AA0000   ; D1&=~&00AA0000 * 2     (SIMD, 2*32)
+VBIC.I32 D1,#&AA000000 ; D1&=~&AA000000 * 2     (SIMD, 2*32)
+;VBIC.I64 D1,#&AA       ; D1&=~&FF00FF00FF00FF00 (SIMD, 1*64)
+;VBIC.F32 D1,#&AA       ; D1&=~x                 (SIMD, 2*32)
+
+; VEOR
+
+VEOR     Q1,Q2,Q3 ; Q1=Q2 ^ Q3 (SIMD)
+VEOR     D1,D2,D3 ; D1=D2 ^ D3 (SIMD)
+
+; VBIF
+
+VBIF     Q1,Q2,Q3 ; Q1=bitwise_insert_if_false(Q2,Q3) (SIMD)
+VBIF     D1,D2,D3 ; D1=bitwise_insert_if_false(D2,D3) (SIMD)
+
+; VBIT
+
+VBIT     Q1,Q2,Q3 ; Q1=bitwise_insert_if_true(Q2,Q3) (SIMD)
+VBIT     D1,D2,D3 ; D1=bitwise_insert_if_true(D2,D3) (SIMD)
+
+; VBSL
+
+VBSL     Q1,Q2,Q3 ; Q1=bitwise_select(Q2,Q3) (SIMD)
+VBSL     D1,D2,D3 ; D1=bitwise_select(D2,D3) (SIMD)
+
+; VMOV
+
+VMOV.I8  Q1,#&AA       ; Q1=&AAAAAAAA * 4         (SIMD, 16*8)
+VMOV.I16 Q1,#&AA       ; Q1=&00AA00AA * 4         (SIMD, 8*16)
+VMOV.I16 Q1,#&AA00     ; Q1=&AA00AA00 * 4         (SIMD, 8*16)
+VMOV.I32 Q1,#&AA       ; Q1=&000000AA * 4         (SIMD, 4*32)
+VMOV.I32 Q1,#&AA00     ; Q1=&0000AA00 * 4         (SIMD, 4*32)
+VMOV.I32 Q1,#&AA0000   ; Q1=&00AA0000 * 4         (SIMD, 4*32)
+VMOV.I32 Q1,#&AA000000 ; Q1=&AA000000 * 4         (SIMD, 4*32)
+;VMOV.I64 Q1,#&AA       ; Q1=&FF00FF00FF00FF00 * 2 (SIMD, 2*64)
+;VMOV.F32 Q1,#&AA       ; Q1=x                     (SIMD, 4*32)
+
+VMOV.I8  D1,#&AA       ; D1=&AAAAAAAA * 2     (SIMD, 8*8)
+VMOV.I16 D1,#&AA       ; D1=&00AA00AA * 2     (SIMD, 4*16)
+VMOV.I16 D1,#&AA00     ; D1=&AA00AA00 * 2     (SIMD, 4*16)
+VMOV.I32 D1,#&AA       ; D1=&000000AA * 2     (SIMD, 2*32)
+VMOV.I32 D1,#&AA00     ; D1=&0000AA00 * 2     (SIMD, 2*32)
+VMOV.I32 D1,#&AA0000   ; D1=&00AA0000 * 2     (SIMD, 2*32)
+VMOV.I32 D1,#&AA000000 ; D1=&AA000000 * 2     (SIMD, 2*32)
+;VMOV.I64 D1,#&AA       ; D1=&FF00FF00FF00FF00 (SIMD, 1*64)
+;VMOV.F32 D1,#&AA       ; D1=x                 (SIMD, 2*32)
+
+VMOV.F32   S1,#&FF ; S1=&FF (VFP)
+VMOVEQ.F32 S1,#&FF ; S1=&FF (VFP)
+
+VMOV.F64   D1,#&FF ; D1=&FF (VFP)
+VMOVEQ.F64 D1,#&FF ; D1=&FF (VFP)
+
+VMOV       Q1,Q2   ; Q1=Q2 (SIMD)
+VMOV       D1,D2   ; D1=D2 (SIMD)
+
+VMOV.F32   S1,S2   ; S1=S2 (VFP)
+VMOVEQ.F32 S1,S2   ; S1=S2 (VFP)
+
+VMOV.F64   D1,D2   ; D1=D2 (VFP)
+VMOVEQ.F64 D1,D2   ; D1=D2 (VFP)
+
+; VMOVL
+
+VMOVL.S8   Q1,D2   ; Q1=D2 (SIMD, 8*8)
+VMOVL.S16  Q1,D2   ; Q1=D2 (SIMD, 4*16)
+VMOVL.S32  Q1,D2   ; Q1=D2 (SIMD, 2*32)
+VMOVL.U8   Q1,D2   ; Q1=D2 (SIMD, 8*8)
+VMOVL.U16  Q1,D2   ; Q1=D2 (SIMD, 4*16)
+VMOVL.U32  Q1,D2   ; Q1=D2 (SIMD, 2*32)
+
+; VMOVN
+
+VMOVN.I16  D1,Q2   ; D1=Q2 (SIMD, 8*16)
+VMOVN.I32  D1,Q2   ; D1=Q2 (SIMD, 4*32)
+VMOVN.I64  D1,Q2   ; D1=Q2 (SIMD, 2*64)
+
+; VDUP
+
+VDUP.8     Q1,R2   ; Q1=R2
+VDUPEQ.8   Q1,R2   ; Q1=R2
+
+VDUP.16    Q1,R2   ; Q1=R2
+VDUPEQ.16  Q1,R2   ; Q1=R2
+
+VDUP.32    Q1,R2   ; Q1=R2
+VDUPEQ.32  Q1,R2   ; Q1=R2
+
+VDUP.8     Q0,D2[1] ; Q1=D2[1]
+VDUP.16    Q0,D2[1] ; Q1=D2[1]
+VDUP.32    Q0,D2[1] ; Q1=D2[1]
+
+; VMVN
+
+VMVN       Q1,Q2   ; Q1=~Q2
+VMVN       D1,D2   ; D1=~D2
+
+VMVN.I16 Q1,#&AA       ; Q1=~&00AA00AA * 4 (SIMD, 8*16)
+VMVN.I16 Q1,#&AA00     ; Q1=~&AA00AA00 * 4 (SIMD, 8*16)
+VMVN.I32 Q1,#&AA       ; Q1=~&000000AA * 4 (SIMD, 4*32)
+VMVN.I32 Q1,#&AA00     ; Q1=~&0000AA00 * 4 (SIMD, 4*32)
+VMVN.I32 Q1,#&AA0000   ; Q1=~&00AA0000 * 4 (SIMD, 4*32)
+VMVN.I32 Q1,#&AA000000 ; Q1=~&AA000000 * 4 (SIMD, 4*32)
+
+VMVN.I16 D1,#&AA       ; D1=~&00AA00AA * 2 (SIMD, 4*16)
+VMVN.I16 D1,#&AA00     ; D1=~&AA00AA00 * 2 (SIMD, 4*16)
+VMVN.I32 D1,#&AA       ; D1=~&000000AA * 2 (SIMD, 2*32)
+VMVN.I32 D1,#&AA00     ; D1=~&0000AA00 * 2 (SIMD, 2*32)
+VMVN.I32 D1,#&AA0000   ; D1=~&00AA0000 * 2 (SIMD, 2*32)
+VMVN.I32 D1,#&AA000000 ; D1=~&AA000000 * 2 (SIMD, 2*32)
+
+; VORR
+
+VORR     Q1,Q2,Q3 ; Q1=Q2 | Q3 (SIMD)
+VORR     D1,D2,D3 ; D1=D2 | D3 (SIMD)
+
+;VORR.I8  Q1,#&AA       ; Q1|=&AAAAAAAA * 4         (SIMD, 16*8)
+VORR.I16 Q1,#&AA       ; Q1|=&00AA00AA * 4         (SIMD, 8*16)
+VORR.I16 Q1,#&AA00     ; Q1|=&AA00AA00 * 4         (SIMD, 8*16)
+VORR.I32 Q1,#&AA       ; Q1|=&000000AA * 4         (SIMD, 4*32)
+VORR.I32 Q1,#&AA00     ; Q1|=&0000AA00 * 4         (SIMD, 4*32)
+VORR.I32 Q1,#&AA0000   ; Q1|=&00AA0000 * 4         (SIMD, 4*32)
+VORR.I32 Q1,#&AA000000 ; Q1|=&AA000000 * 4         (SIMD, 4*32)
+;VORR.I64 Q1,#&AA       ; Q1|=&FF00FF00FF00FF00 * 2 (SIMD, 2*64)
+;VORR.F32 Q1,#&AA       ; Q1|=x                     (SIMD, 4*32)
+
+;VORR.I8  D1,#&AA       ; D1|=&AAAAAAAA * 2     (SIMD, 8*8)
+VORR.I16 D1,#&AA       ; D1|=&00AA00AA * 2     (SIMD, 4*16)
+VORR.I16 D1,#&AA00     ; D1|=&AA00AA00 * 2     (SIMD, 4*16)
+VORR.I32 D1,#&AA       ; D1|=&000000AA * 2     (SIMD, 2*32)
+VORR.I32 D1,#&AA00     ; D1|=&0000AA00 * 2     (SIMD, 2*32)
+VORR.I32 D1,#&AA0000   ; D1|=&00AA0000 * 2     (SIMD, 2*32)
+VORR.I32 D1,#&AA000000 ; D1|=&AA000000 * 2     (SIMD, 2*32)
+;VORR.I64 D1,#&AA       ; D1|=&FF00FF00FF00FF00 (SIMD, 1*64)
+;VORR.F32 D1,#&AA       ; D1|=x                 (SIMD, 2*32)
+
+; VORN
+
+VORN     Q1,Q2,Q3 ; Q1=Q2 | ~Q3 (SIMD)
+VORN     D1,D2,D3 ; D1=D2 | ~D3 (SIMD)
+
+;VORN.I8  Q1,#&AA       ; Q1|=~&AAAAAAAA * 4         (SIMD, 16*8)
+VORN.I16 Q1,#&AA       ; Q1|=~&00AA00AA * 4         (SIMD, 8*16)
+VORN.I16 Q1,#&AA00     ; Q1|=~&AA00AA00 * 4         (SIMD, 8*16)
+VORN.I32 Q1,#&AA       ; Q1|=~&000000AA * 4         (SIMD, 4*32)
+VORN.I32 Q1,#&AA00     ; Q1|=~&0000AA00 * 4         (SIMD, 4*32)
+VORN.I32 Q1,#&AA0000   ; Q1|=~&00AA0000 * 4         (SIMD, 4*32)
+VORN.I32 Q1,#&AA000000 ; Q1|=~&AA000000 * 4         (SIMD, 4*32)
+;VORN.I64 Q1,#&AA       ; Q1|=~&FF00FF00FF00FF00 * 2 (SIMD, 2*64)
+;VORN.F32 Q1,#&AA       ; Q1|=~x                     (SIMD, 4*32)
+
+;VORN.I8  D1,#&AA       ; D1|=~&AAAAAAAA * 2     (SIMD, 8*8)
+VORN.I16 D1,#&AA       ; D1|=~&00AA00AA * 2     (SIMD, 4*16)
+VORN.I16 D1,#&AA00     ; D1|=~&AA00AA00 * 2     (SIMD, 4*16)
+VORN.I32 D1,#&AA       ; D1|=~&000000AA * 2     (SIMD, 2*32)
+VORN.I32 D1,#&AA00     ; D1|=~&0000AA00 * 2     (SIMD, 2*32)
+VORN.I32 D1,#&AA0000   ; D1|=~&00AA0000 * 2     (SIMD, 2*32)
+VORN.I32 D1,#&AA000000 ; D1|=~&AA000000 * 2     (SIMD, 2*32)
+;VORN.I64 D1,#&AA       ; D1|=~&FF00FF00FF00FF00 (SIMD, 1*64)
+;VORN.F32 D1,#&AA       ; D1|=~x                 (SIMD, 2*32)
+
+#end

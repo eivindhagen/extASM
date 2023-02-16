@@ -1,0 +1,64 @@
+
+#name <Tmp$Dir>.^.^.test_asv_register_transfer_instructions
+
+#area test,code
+
+; VMOV (ARM to scalar) (VFP)
+
+VMOV       D1[1],R2
+VMOVEQ     D1[1],R2
+
+VMOV.8     D1[1],R2
+VMOVEQ.8   D1[1],R2
+
+VMOV.16    D1[1],R2
+VMOVEQ.16  D1[1],R2
+
+VMOV.32    D1[1],R2
+VMOVEQ.32  D1[1],R2
+
+; VMOV (scalar to ARM) (VFP)
+
+VMOV       R1,D2[1]
+VMOVEQ     R1,D2[1]
+
+VMOV.S8    R1,D2[1]
+VMOVEQ.S8  R1,D2[1]
+
+VMOV.S16   R1,D2[1]
+VMOVEQ.S16 R1,D2[1]
+
+VMOV.U8    R1,D2[1]
+VMOVEQ.U8  R1,D2[1]
+
+VMOV.U16   R1,D2[1]
+VMOVEQ.U16 R1,D2[1]
+
+VMOV.32    R1,D2[1]
+VMOVEQ.32  R1,D2[1]
+
+; VMOV (between ARM and single precision register) (VFP)
+
+VMOV       S1,R2
+VMOVEQ     S1,R2
+
+VMOV       R1,S2
+VMOVEQ     R1,S2
+
+; VMOV (between two ARM and single precision registers) (VFP)
+
+VMOV       S1,S2,R3,R4
+VMOVEQ     S1,S2,R3,R4
+
+VMOV       R1,R2,S3,S4
+VMOVEQ     R1,R2,S3,S4
+
+; VMOV (between two ARM and one double precision register) (VFP)
+
+VMOV       D1,R2,R3
+VMOVEQ     D1,R2,R3
+
+VMOV       R1,R2,D3
+VMOVEQ     R1,R2,D3
+
+#end

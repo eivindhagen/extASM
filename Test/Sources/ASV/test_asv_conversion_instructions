@@ -1,0 +1,155 @@
+
+#name <Tmp$Dir>.^.^.test_asv_conversion_instructions
+
+#area test,code
+
+; VCVT
+
+; Between floating point and integer (SIMD)
+
+VCVT.S32.F32 Q1,Q2   ; Q1=Q2 (SIMD, 4*32)
+VCVT.U32.F32 Q1,Q2   ; Q1=Q2 (SIMD, 4*32)
+VCVT.F32.S32 Q1,Q2   ; Q1=Q2 (SIMD, 4*32)
+VCVT.F32.U32 Q1,Q2   ; Q1=Q2 (SIMD, 4*32)
+
+VCVT.S32.F32 D1,D2   ; D1=D2 (SIMD, 2*32)
+VCVT.U32.F32 D1,D2   ; D1=D2 (SIMD, 2*32)
+VCVT.F32.S32 D1,D2   ; D1=D2 (SIMD, 2*32)
+VCVT.F32.U32 D1,D2   ; D1=D2 (SIMD, 2*32)
+
+; Between floating point and integer (VFP)
+
+VCVT.S32.F64 S1,D2     ; S1=D2 (VFP)
+VCVTEQ.S32.F64 S1,D2   ; S1=D2 (VFP)
+
+VCVT.S32.F32 S1,S2     ; S1=S2 (VFP)
+VCVTEQ.S32.F32 S1,S2   ; S1=S2 (VFP)
+
+VCVT.U32.F64 S1,D2     ; S1=D2 (VFP)
+VCVTEQ.U32.F64 S1,D2   ; S1=D2 (VFP)
+
+VCVT.U32.F32 S1,S2     ; S1=S2 (VFP)
+VCVTEQ.U32.F32 S1,S2   ; S1=S2 (VFP)
+
+VCVT.F64.S32 D1,S2     ; D1=S2 (VFP)
+VCVTEQ.F64.S32 D1,S2   ; D1=S2 (VFP)
+
+VCVT.F64.U32 D1,S2     ; D1=S2 (VFP)
+VCVTEQ.F64.U32 D1,S2   ; D1=S2 (VFP)
+
+VCVT.F32.S32 S1,S2     ; S1=S2 (VFP)
+VCVTEQ.F32.S32 S1,S2   ; S1=S2 (VFP)
+
+VCVT.F32.U32 S1,S2     ; S1=S2 (VFP)
+VCVTEQ.F32.U32 S1,S2   ; S1=S2 (VFP)
+
+; Between floating point and fixed point (SIMD)
+
+VCVT.S32.F32 Q1,Q2,#1   ; Q1=Q2 (SIMD, 4*32)
+VCVT.U32.F32 Q1,Q2,#1   ; Q1=Q2 (SIMD, 4*32)
+VCVT.F32.S32 Q1,Q2,#1   ; Q1=Q2 (SIMD, 4*32)
+VCVT.F32.U32 Q1,Q2,#1   ; Q1=Q2 (SIMD, 4*32)
+
+VCVT.S32.F32 D1,D2,#1   ; D1=D2 (SIMD, 2*32)
+VCVT.U32.F32 D1,D2,#1   ; D1=D2 (SIMD, 2*32)
+VCVT.F32.S32 D1,D2,#1   ; D1=D2 (SIMD, 2*32)
+VCVT.F32.U32 D1,D2,#1   ; D1=D2 (SIMD, 2*32)
+
+; Between floating point and fixed point (VFP)
+
+VCVT.S16.F64 D1,D1,#1     ; D1=D1 (VFP)
+VCVTEQ.S16.F64 D1,D1,#1   ; D1=D1 (VFP)
+
+VCVT.U16.F64 D1,D1,#1     ; D1=D1 (VFP)
+VCVTEQ.U16.F64 D1,D1,#1   ; D1=D1 (VFP)
+
+VCVT.S32.F64 D1,D1,#1     ; D1=D1 (VFP)
+VCVTEQ.S32.F64 D1,D1,#1   ; D1=D1 (VFP)
+
+VCVT.U32.F64 D1,D1,#1     ; D1=D1 (VFP)
+VCVTEQ.U32.F64 D1,D1,#1   ; D1=D1 (VFP)
+
+VCVT.S16.F32 S1,S1,#1     ; S1=S1 (VFP)
+VCVTEQ.S16.F32 S1,S1,#1   ; S1=S1 (VFP)
+
+VCVT.U16.F32 S1,S1,#1     ; S1=S1 (VFP)
+VCVTEQ.U16.F32 S1,S1,#1   ; S1=S1 (VFP)
+
+VCVT.S32.F32 S1,S1,#1     ; S1=S1 (VFP)
+VCVTEQ.S32.F32 S1,S1,#1   ; S1=S1 (VFP)
+
+VCVT.U32.F32 S1,S1,#1     ; S1=S1 (VFP)
+VCVTEQ.U32.F32 S1,S1,#1   ; S1=S1 (VFP)
+
+VCVT.F64.S16 D1,D1,#1     ; D1=D1 (VFP)
+VCVTEQ.F64.S16 D1,D1,#1   ; D1=D1 (VFP)
+
+VCVT.F64.U16 D1,D1,#1     ; D1=D1 (VFP)
+VCVTEQ.F64.U16 D1,D1,#1   ; D1=D1 (VFP)
+
+VCVT.F64.S32 D1,D1,#1     ; D1=D1 (VFP)
+VCVTEQ.F64.S32 D1,D1,#1   ; D1=D1 (VFP)
+
+VCVT.F64.U32 D1,D1,#1     ; D1=D1 (VFP)
+VCVTEQ.F64.U32 D1,D1,#1   ; D1=D1 (VFP)
+
+VCVT.F32.S16 S1,S1,#1     ; S1=S1 (VFP)
+VCVTEQ.F32.S16 S1,S1,#1   ; S1=S1 (VFP)
+
+VCVT.F32.U16 S1,S1,#1     ; S1=S1 (VFP)
+VCVTEQ.F32.U16 S1,S1,#1   ; S1=S1 (VFP)
+
+VCVT.F32.S32 S1,S1,#1     ; S1=S1 (VFP)
+VCVTEQ.F32.S32 S1,S1,#1   ; S1=S1 (VFP)
+
+VCVT.F32.U32 S1,S1,#1     ; S1=S1 (VFP)
+VCVTEQ.F32.U32 S1,S1,#1   ; S1=S1 (VFP)
+
+; Between double precision and single precision (VFP)
+
+VCVT.F64.F32 D1,S2        ; D1=S2 (VFP)
+VCVTEQ.F64.F32 D1,S2      ; D1=S2 (VFP)
+
+VCVT.F32.F64 S1,D2        ; S1=D2 (VFP)
+VCVTEQ.F32.F64 S1,D2      ; S1=D2 (VFP)
+
+; Between single precision and half precision (SIMD)
+
+VCVT.F32.F16 Q1,D2        ; Q1=D2 (SIMD, 4*16)
+VCVT.F16.F32 D1,Q2        ; D1=Q2 (SIMD, 4*16)
+
+; VCVTR
+
+; Between floating point and integer (VFP)
+
+VCVTR.S32.F64 S1,D2     ; S1=D2 (VFP)
+VCVTREQ.S32.F64 S1,D2   ; S1=D2 (VFP)
+
+VCVTR.S32.F32 S1,S2     ; S1=S2 (VFP)
+VCVTREQ.S32.F32 S1,S2   ; S1=S2 (VFP)
+
+VCVTR.U32.F64 S1,D2     ; S1=D2 (VFP)
+VCVTREQ.U32.F64 S1,D2   ; S1=D2 (VFP)
+
+VCVTR.U32.F32 S1,S2     ; S1=S2 (VFP)
+VCVTREQ.U32.F32 S1,S2   ; S1=S2 (VFP)
+
+; Between single precision and half precision (VFP)
+
+; VCVTB
+
+VCVTB.F32.F16 S1,S2     ; S1=S2 (VFP)
+VCVTBEQ.F32.F16 S1,S2   ; S1=S2 (VFP)
+
+VCVTB.F16.F32 S1,S2     ; S1=S2 (VFP)
+VCVTBEQ.F16.F32 S1,S2   ; S1=S2 (VFP)
+
+; VCVTT
+
+VCVTT.F32.F16 S1,S2     ; S1=S2 (VFP)
+VCVTTEQ.F32.F16 S1,S2   ; S1=S2 (VFP)
+
+VCVTT.F16.F32 S1,S2     ; S1=S2 (VFP)
+VCVTTEQ.F16.F32 S1,S2   ; S1=S2 (VFP)
+
+#end

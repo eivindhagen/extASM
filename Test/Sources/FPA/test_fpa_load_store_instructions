@@ -1,0 +1,40 @@
+
+#name <Tmp$Dir>.^.^.test_fpa_load_store_instructions
+
+#area test,code
+
+LDFS    F1,address
+LDFD    F1,[R1]
+LDFE    F1,[R1,#&100]
+LDFP    F1,[R1,#&100]!
+LDFS    F1,[R1],#4
+LDFEQS  F1,[R1]
+
+STFS    F1,address
+STFD    F1,[R1]
+STFE    F1,[R1,#&100]
+STFP    F1,[R1,#&100]!
+STFS    F1,[R1],#4
+STFEQS  F1,[R1]
+
+LFM     F1,1,address
+LFMEQ   F1,1,address
+LFMFD   F1,1,[R1]
+LFMEA   F1,1,[R1]
+LFMFD   F1,1,[R1]!
+LFMEA   F1,1,[R1]!
+LFMEQFD F1,1,[R1]
+LFMEQEA F1,1,[R1]
+
+SFM     F1,1,address
+SFMEQ   F1,1,address
+SFMFD   F1,1,[R1]
+SFMEA   F1,1,[R1]
+SFMFD   F1,1,[R1]!
+SFMEA   F1,1,[R1]!
+SFMEQFD F1,1,[R1]
+SFMEQEA F1,1,[R1]
+
+.address
+
+#end

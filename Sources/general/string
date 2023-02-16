@@ -1,0 +1,833 @@
+
+; >-------------------------------------------------------------<
+
+   ; The print specifiers
+   ; --------------------
+   ; '%<width>[.<decimals>]<specifier>'
+   ; <specifier> - d = Denary integer
+   ;               x = Hex integer
+   ;               f = FP value
+   ;               s = String
+   ;               c = Character
+   ; <width>     - Field width
+   ; <decimals>  - Number of decimals for FP values or number of digits for hexadecimal num.
+   ;
+   ; '\' is an 'escape' character, so '\%' = '%' and '\\' = '\'.
+   ;
+.Print_String                          ;_R0-> String, _R1-> Result string, _R2 = Parameter 1
+   STMFD    R13!,{R2,R3}               ;_R3 = Parameter 2, ~R0-> End of string,
+   MOV      R2,R13                     ;~R1-> End of result string
+   STMFD    R13!,{R4-R9,R14}           ; Any furter parameters are on the stack.
+   MOV      R4,R0                      ; FP values are stored as pointers to three words as
+   MOV      R5,R1                      ; stored by SFM. They are displayed using the given
+   MOV      R9,R2                      ; number of decimals, or if none is given, using
+                                       ; Number_Format.
+.PS_Text_Loop
+   MOV      R6,#0
+   MOV      R7,#0
+   LDRB     R0,[R4],#1
+   CMP      R0,#'%'
+   BNE      PS_Not_Control
+   LDRB     R0,[R4],#1
+   CMP      R0,#'0'
+   RSBGES   R1,R0,#'9'
+   BLT      PS_Check_Control
+   MOV      R0,#10
+   SUB      R1,R4,#1
+   SWI      OS_ReadUnsigned
+   MOV      R4,R1
+   MOV      R6,R2
+   LDRB     R0,[R4],#1
+   CMP      R0,#'.'
+   BNE      PS_Check_Control
+   MOV      R0,#10
+   MOV      R1,R4
+   SWI      OS_ReadUnsigned
+   MOV      R4,R1
+   MOV      R7,R2
+   LDRB     R0,[R4],#1
+
+.PS_Check_Control
+   CMP      R0,#'d'
+   BNE      PS_Not_Denary
+   ; Denary integer
+   ;
+   LDMFD    R9!,{R0}
+   ADD      R6,R6,R5
+   MOV      R1,R5
+   MOV      R2,#&100
+   SWI      OS_ConvertInteger4
+   MOV      R5,R1
+   CMP      R5,R6
+   BGE      PS_Text_Loop
+   MOV      R0,#' '
+
+.PS_Pad_Loop_Denary
+   STRB     R0,[R5],#1
+   CMP      R5,R6
+   BLT      PS_Pad_Loop_Denary
+   B        PS_Text_Loop
+
+.PS_Not_Denary
+   CMP      R0,#'x'
+   BNE      PS_Not_Hex
+   ; Hexadecimal integer
+   ;
+   LDMFD    R9!,{R0}
+   ADD      R6,R6,R5
+   ADR      R8,PS_NumberBuffer
+   MOV      R1,R8
+   MOV      R2,#&100
+   SWI      OS_ConvertHex8
+   RSB      R7,R7,#8
+
+.PS_Skip_Zero_Hex_Loop
+   LDRB     R0,[R8],#1
+   SUBS     R7,R7,#1
+   BLE      PS_End_Skip_Zero
+   CMP      R0,#'0'
+   BEQ      PS_Skip_Zero_Hex_Loop
+.PS_End_Skip_Zero
+   SUB      R0,R8,#1
+   MOV      R1,R5
+   BL       StrCopy
+   SUB      R5,R1,#1
+   CMP      R5,R6
+   BGE      PS_Text_Loop
+   MOV      R0,#' '
+
+.PS_Pad_Loop_Hex
+   STRB     R0,[R5],#1
+   CMP      R5,R6
+   BLT      PS_Pad_Loop_Hex
+   B        PS_Text_Loop
+
+.PS_Not_Hex
+   CMP      R0,#'f'
+   BNE      PS_Not_FP
+   ; Floating Point
+   ;
+   LDMFD    R9!,{R0}
+   LFM      F0,1,[R0]
+   CMP      R7,#0
+   LDREQ    R0,Number_Format
+   MOVNE    R0,R7,LSL #8
+   STR      R0,CSFP_Format
+   ADD      R6,R6,R5
+   MOV      R0,R5
+   BL       Convert_To_String_FP
+   MOV      R5,R0
+   CMP      R5,R6
+   BGE      PS_Text_Loop
+   MOV      R0,#' '
+
+.PS_Pad_Loop_FP
+   STRB     R0,[R5],#1
+   CMP      R5,R6
+   BLT      PS_Pad_Loop_FP
+   B        PS_Text_Loop
+
+.PS_Not_FP
+   CMP      R0,#'s'
+   BNE      PS_Not_String
+   ; String
+   ;
+   LDMFD    R9!,{R0}
+   ADD      R6,R6,R5
+   MOV      R1,R5
+   BL       StrCopy
+   SUB      R5,R1,#1
+   CMP      R5,R6
+   BGE      PS_Text_Loop
+   MOV      R0,#' '
+
+.PS_Pad_Loop_String
+   STRB     R0,[R5],#1
+   CMP      R5,R6
+   BLT      PS_Pad_Loop_String
+   B        PS_Text_Loop
+
+.PS_Not_String
+   CMP      R0,#'c'
+   BNE      PS_Not_Char
+   ; Character
+   ;
+   LDMFD    R9!,{R0}
+   ADD      R6,R6,R5
+   STRB     R0,[R5],#1
+   CMP      R5,R6
+   BGE      PS_Text_Loop
+   MOV      R0,#' '
+
+.PS_Pad_Loop_Char
+   STRB     R0,[R5],#1
+   CMP      R5,R6
+   BLT      PS_Pad_Loop_Char
+   B        PS_Text_Loop
+
+.PS_Not_Control
+   CMP      R0,#'\'
+   LDREQB   R0,[R4],#1
+   STRB     R0,[R5],#1
+   CMP      R0,#0
+   BNE      PS_Text_Loop
+   MOV      R0,R4
+   MOV      R1,R5
+   LDMFD    R13!,{R4-R9,R14}
+   ADD      R13,R13,#8
+   MOV      R15,R14
+
+.PS_Not_Char
+   ADR      R1,Block
+   STRB     R0,[R1]
+   MOV      R0,#0
+   STRB     R0,[R1,#1]
+   MOV      R0,#&07                    ; Messages_Error #&07 = Unknown conversion specifier '<Specifier>'
+   B        Messages_Error1
+
+.PS_NumberBuffer DBB  8
+
+; >-------------------------------------------------------------<
+
+   ; It uses CSFP_Format.
+   ; The meaning of this is as follows.
+   ;
+   ; Byte
+   ; ----
+   ; 4    - 1 - Use the format variable in STR$.
+   ;        0 - Use default format in STR$ (General, 17 digits).
+   ; 3    - Format type
+   ;        0 - General format. Numbers have the form nnn.nnn. Trailing zeros are skipped.
+   ;            If the number is bigger than the field width, or less than 0.001, the
+   ;            Exponent format is used instead.
+   ;        1 - Exponent format. Numbers have the form n.nnnEnn. The number of digits
+   ;            printed is given in the field width.
+   ;        2 - Fixed format. Numbers have the form nnn.nnn. If the number is bigger than
+   ;            the width of the precision (18 digits), the Exponent format is used instead.
+   ; 2    - Field width. This is the number of digits printed. For Fixed format, it gives
+   ;        the number of decimals printed.
+   ; 1    - Not used.
+   ;
+.Convert_To_String_FP                  ;_F0 = FP-number to print, _R0 -> String for result
+   STMFD    R13!,{R4-R10,R14}          ;~R0 -> End of string
+   MOV      R9,R0
+   ADR      R8,FP_Fraction
+   RFS      R0
+   ORR      R1,R0,#1 << 11
+   WFS      R1
+   ADR      R2,FP_Number_Buffer
+   STFP     F0,[R2]
+   WFS      R0
+   LDMIA    R2,{R4-R7}
+   MOV      R0,R5
+   MOV      R1,#28
+   BL       Convert_BCD
+   MOV      R0,R6
+   MOV      R1,#28
+   BL       Convert_BCD
+   MOV      R0,R7
+   MOV      R1,#28
+   BL       Convert_BCD
+   ADR      R8,FP_Exponent
+   MOV      R0,R4
+   MOV      R1,#24
+   BL       Convert_BCD
+   MOV      R0,#0
+   STRB     R0,[R8]
+   ;
+   ; R4 - Fraction string
+   ; R5 - Exponent string
+   ; R6 - Number format
+   ; R7 - Field width
+   ; R8 - Decimal point pointer
+   ; R9 - Result string
+   ; R10 - Exponent
+   ;
+   ADR      R4,FP_Fraction
+   ADR      R5,FP_Exponent
+   LDR      R6,CSFP_Format
+   MOV      R0,#&FF
+   AND      R7,R0,R6,LSR #8
+   AND      R8,R0,R6,LSR #16
+   CMP      R7,#18
+   MOVGT    R7,#18
+   CMP      R8,#2
+   MOVEQ    R1,#17
+   MOVNE    R1,R7
+   CMP      R7,#18
+   MOVLT    R0,R4
+   BLLT     Round_Number
+   MOV      R0,#10
+   MOV      R1,R5
+   SWI      OS_ReadUnsigned
+   LDR      R0,FP_Number_Buffer
+   TST      R0,#1 << 31
+   MOVNE    R1,#'-'
+   STRNEB   R1,[R9],#1
+   TST      R0,#1 << 30
+   RSBNE    R2,R2,#0
+   MOV      R10,R2
+   CMP      R8,#1
+   BLT      CSFP_General
+   BEQ      CSFP_Exponent
+   ; Fixed format
+   ;
+   CMP      R10,#18
+   BGT      CSFP_Exponent
+   ADD      R8,R4,R10                  ; Decimal point=fraction start+exponent
+   CMP      R8,R4                      ; Decimal point before fraction start?
+   MOVLT    R4,R8                      ; Fraction start=decimal point position
+   ADD      R7,R8,R7                   ; Fraction end=decimal point+field width
+   SUB      R0,R7,R4                   ; Number of digits-1=fraction end-fraction start
+   CMP      R0,#16                     ; Number of digits>17? (The maximimum rounded)
+   SUBGT    R0,R0,#16
+   SUBGT    R7,R7,R0                   ; Fraction end=fraction end-(number of digits-17)
+   MOV      R0,R4
+   SUB      R1,R7,R4
+   ADD      R1,R1,#1
+   BLLT     Round_Number
+
+.CSFPF_Fraction_Loop
+   CMP      R4,R8                      ; Is fraction pointer at decimal point?
+   LDRB     R0,[R4],#1
+   STRB     R0,[R9],#1
+   MOVEQ    R0,#'.'                    ; If so, store a decimal point
+   STREQB   R0,[R9],#1
+   CMP      R4,R7                      ; End of fraction?
+   BLE      CSFPF_Fraction_Loop
+   CMP      R0,#'.'                    ; If the last character is a decimal point, remove it
+   SUBEQ    R9,R9,#1
+   MOV      R0,#0
+   STRB     R0,[R9]
+   MOV      R0,R9
+   LDMFD    R13!,{R4-R10,R15}
+
+.CSFP_General
+   ; General format
+   ;
+   CMP      R10,R7                     ; Exponent>field width?
+   BGT      CSFP_Exponent
+   CMN      R10,#3                     ; Exponent<-3?
+   MOVLT    R8,R4                      ; If so, leave number in normalised form, add
+   BLT      CSFPG_Not_Adjust           ; exponent
+   ADD      R8,R4,R10                  ; Decimal point=fraction start+exponent
+   CMP      R8,R4                      ; Decimal point before fraction start?
+   MOVLT    R4,R8                      ; Fraction start=decimal point position
+   SUBLT    R7,R7,R10                  ; Increase field width by -exponent.
+
+.CSFPG_Not_Adjust
+   ADD      R7,R4,R7                   ; Pointer to end of fraction digits
+
+.CSFPG_Fraction_Loop
+   CMP      R4,R8                      ; Is fraction pointer at decimal point?
+   LDRB     R0,[R4],#1
+   STRB     R0,[R9],#1
+   MOVEQ    R0,#'.'                    ; If so, store a decimal point
+   STREQB   R0,[R9],#1
+   CMP      R4,R7                      ; End of fraction?
+   BLT      CSFPG_Fraction_Loop
+
+.CSFPG_Trailing_Zero
+   LDRB     R0,[R9,#-1]!
+   CMP      R0,#'0'
+   BEQ      CSFPG_Trailing_Zero
+   CMP      R0,#'.'                    ; If the last character after skipping trailing zeros
+   SUBEQ    R9,R9,#1                   ; is a decimal point, remove it
+   ADD      R9,R9,#1
+   CMN      R10,#3                     ; Exponent<-3?
+   BGE      CSFPG_End
+   MOV      R0,#'E'
+   STRB     R0,[R9],#1
+   MOV      R0,#'-'
+   STRB     R0,[R9],#1
+
+.CSFPG_Leading_Zero
+   LDRB     R0,[R5],#1
+   CMP      R0,#'0'
+   BEQ      CSFPG_Leading_Zero
+
+.CSFPG_Exponent
+   STRB     R0,[R9],#1
+   LDRB     R0,[R5],#1
+   CMP      R0,#0
+   BNE      CSFPG_Exponent
+
+.CSFPG_End
+   MOV      R0,#0
+   STRB     R0,[R9]
+   MOV      R0,R9
+   LDMFD    R13!,{R4-R10,R15}
+
+.CSFP_Exponent
+   ADD      R7,R4,R7                   ; Pointer to end of fraction digits
+   LDRB     R0,[R4],#1
+   STRB     R0,[R9],#1
+   CMP      R4,R7
+   BGE      CSFPE_End_Loop
+   MOV      R0,#'.'
+   STRB     R0,[R9],#1
+
+.CSFPE_Fraction_Loop
+   LDRB     R0,[R4],#1
+   STRB     R0,[R9],#1
+   CMP      R4,R7                      ; End of fraction?
+   BLT      CSFPE_Fraction_Loop
+
+.CSFPE_End_Loop
+   MOV      R0,#'E'
+   STRB     R0,[R9],#1
+   LDR      R0,FP_Number_Buffer
+   TST      R0,#1 << 30
+   MOVNE    R0,#'-'
+   STRNEB   R0,[R9],#1
+   ADD      R1,R5,#7
+
+.CSFPE_Leading_Zero
+   LDRB     R0,[R5],#1
+   CMP      R5,R1
+   BEQ      CSFPE_Exponent
+   CMP      R0,#'0'
+   BEQ      CSFPE_Leading_Zero
+
+.CSFPE_Exponent
+   STRB     R0,[R9],#1
+   LDRB     R0,[R5],#1
+   CMP      R0,#0
+   BNE      CSFPE_Exponent
+   MOV      R0,#0
+   STRB     R0,[R9]
+   MOV      R0,R9
+   LDMFD    R13!,{R4-R10,R15}
+
+; >-------------------------------------------------------------<
+
+.Convert_BCD                           ;_R0 = BCD word, _R1 = Counter
+   STMFD    R13!,{R4,R5,R14}
+   MOV      R4,R0
+   MOV      R5,R1
+
+.CSFP_Loop
+   MOV      R0,R4,LSR R5
+   AND      R0,R0,#&F
+   ADD      R0,R0,#'0'
+   STRB     R0,[R8],#1
+   SUBS     R5,R5,#4
+   BGE      CSFP_Loop
+   LDMFD    R13!,{R4,R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Round_Number                          ;_R0-> Number, _R1 = Number of digits to round to
+   ; R1 -> Current digit
+   ; R2 -  Carry flag
+   ; R3 -  Digit
+   ;
+   ADD      R1,R0,R1
+   LDRB     R3,[R1],#-1
+   CMP      R3,#'5'
+   MOVGE    R2,#1
+   MOVLT    R2,#0
+
+.RN_Round_Loop
+   LDRB     R3,[R1]
+   ADD      R3,R3,R2
+   CMP      R3,#'9'+1
+   MOVEQ    R3,#'0'
+   MOVEQ    R2,#1
+   MOVNE    R2,#0
+   STRB     R3,[R1],#-1
+   CMP      R1,R0
+   BGE      RN_Round_Loop
+   CMP      R2,#1
+   MOVNE    R15,R14
+   MOV      R3,#'1'
+   STRB     R3,[R1,#1]
+   LDR      R0,FP_Number_Buffer
+   TST      R0,#1 << 30
+   BNE      RN_Decrease_Exponent
+   ; Increase exponent
+   ;
+   ADD      R1,R5,#6
+   MOV      R2,#1
+
+.RN_Increase_Exponent_Loop
+   LDRB     R3,[R1]
+   ADD      R3,R3,R2
+   CMP      R3,#'9'+1
+   MOVEQ    R3,#'0'
+   MOVEQ    R2,#1
+   MOVNE    R2,#0
+   STRB     R3,[R1],#-1
+   BEQ      RN_Increase_Exponent_Loop
+   MOV      R15,R14
+
+.RN_Decrease_Exponent
+   ADD      R1,R5,#6
+   MOV      R2,#1
+
+.RN_Decrease_Exponent_Loop
+   LDRB     R3,[R1]
+   SUB      R3,R3,R2
+   CMP      R3,#'0'-1
+   MOVEQ    R3,#'9'
+   MOVEQ    R2,#1
+   MOVNE    R2,#0
+   STRB     R3,[R1],#-1
+   BEQ      RN_Decrease_Exponent_Loop
+   MOV      R15,R14
+
+.FP_Number_Buffer
+   DBD      4
+   DBB      24,'0'
+.FP_Fraction  DBD   6
+.FP_Exponent  DBD   2
+
+; >-------------------------------------------------------------<
+
+.StrCopySource                         ;_R10-> Source string
+.StrCopySourceLoop                     ;_R0-> New string, ~R0-> After new string
+   LDRB     R8,[R10],#1
+   STRB     R8,[R0],#1
+   CMP      R8,#'A'
+   RSBGES   R1,R8,#'Z'                 ; A-Z
+   BGE      StrCopySourceLoop
+   CMP      R8,#'a'
+   RSBGES   R1,R8,#'z'                 ; a-z
+   BGE      StrCopySourceLoop
+   CMP      R8,#'0'
+   RSBGES   R1,R8,#'9'                 ; 0-9
+   CMPLT    R8,#128                    ; 128-255
+   BGE      StrCopySourceLoop
+   CMP      R8,#'_'                    ; _
+   CMPNE    R8,#'.'                    ; .
+   BEQ      StrCopySourceLoop
+   MOV      R1,#0
+   STRB     R1,[R0,#-1]
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.StrCopy                               ;_R0-> String, _R1-> New string, ~R0-> End of string
+.StrCopy_Loop                          ;~R1-> End of new string
+   LDRB     R2,[R0],#1
+   STRB     R2,[R1],#1
+   CMP      R2,#0
+   BNE      StrCopy_Loop
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.StrCopyNum                            ;_R0-> String, _R1-> New string, R2 = Number of chars
+   CMP      R2,#0                      ;~R0-> End of string, ~R1-> End of new string
+   BLE      StrCopyNum_End
+
+.StrCopyNum_Loop
+   LDRB     R3,[R0],#1
+   STRB     R3,[R1],#1
+   SUBS     R2,R2,#1
+   BEQ      StrCopyNum_End
+   CMP      R3,#0
+   BNE      StrCopyNum_Loop
+   MOV      R15,R14
+
+.StrCopyNum_End
+   MOV      R3,#0
+   STRB     R3,[R1],#1
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.StrCopyCtrl                           ;_R0-> String (ctrl-terminated), _R1-> New string
+.StrCopyCtrl_Loop                      ;~R0-> End of string, ~R1-> End of new string
+   LDRB     R2,[R0],#1
+   STRB     R2,[R1],#1
+   CMP      R2,#' '
+   BGE      StrCopyCtrl_Loop
+   MOV      R2,#0
+   STRB     R2,[R1,#-1]
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.StrLen                                ;_R0-> String, ~R0 = Length of string
+   MOV      R1,#0                      ; Counter=0
+
+.StrLen_Loop
+   LDRB     R2,[R0],#1                 ; Read from string
+   CMP      R2,#0
+   ADDNE    R1,R1,#1
+   BNE      StrLen_Loop
+   MOV      R0,R1
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+   ; This function gives the value zero if the strings are equal,
+   ; -1 if str1<str2 and 1 if str1>str2.
+   ;
+.StrCmp                                ;_R0-> String 1, _R1-> String 2, ~R0 = Result (zero
+.StrCmp_Loop                           ; if str1=str2, -1 if str1<str2 and 1 if str1>str2)
+   LDRB     R2,[R0],#1
+   LDRB     R3,[R1],#1
+   CMP      R2,#0
+   CMPNE    R3,#0
+   BEQ      StrCmp_End
+   CMP      R2,R3
+   BEQ      StrCmp_Loop
+   MVNLT    R0,#0
+   MOVGT    R0,#1
+   MOV      R15,R14
+
+.StrCmp_End
+   CMP      R2,R3
+   MOVEQ    R0,#0
+   MVNLT    R0,#0
+   MOVGT    R0,#1
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+   ; This function gives the value zero if the strings are equal,
+   ; -1 if str1<str2 and 1 if str1>str2. The compare is case-insensitive.
+   ;
+.StrCmpNC                              ;_R0-> String 1, _R1-> String 2, ~R0 = Result (zero
+   STMFD    R13!,{R14}
+
+.StrCmpNC_Loop                         ; if str1=str2, -1 if str1<str2 and 1 if str1>str2)
+   LDRB     R2,[R0],#1
+   LDRB     R3,[R1],#1
+   CMP      R2,#'a'
+   RSBGES   R14,R2,#'z'
+   BICGE    R2,R2,#32
+   CMP      R2,#'à'
+   RSBGES   R14,R2,#'þ'
+   BICGE    R2,R2,#32
+   CMP      R3,#'a'
+   RSBGES   R14,R3,#'z'
+   BICGE    R3,R3,#32
+   CMP      R3,#'à'
+   RSBGES   R14,R3,#'þ'
+   BICGE    R3,R3,#32
+   CMP      R2,#0
+   CMPNE    R3,#0
+   BEQ      StrCmpNC_End
+   CMP      R2,R3
+   BEQ      StrCmpNC_Loop
+   MVNLT    R0,#0
+   MOVGT    R0,#1
+   LDMFD    R13!,{R15}
+
+.StrCmpNC_End
+   CMP      R2,R3
+   MOVEQ    R0,#0
+   MVNLT    R0,#0
+   MOVGT    R0,#1
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+   ; R0 - Str
+   ; R1 - Searchstr
+   ; R3 - Strpointer2
+   ; R4 - Searchstrpointer
+   ;
+.StrStr                                ;_R0-> String, _R1-> Search string, ~R0-> Found
+   STMFD    R13!,{R4,R5,R14}           ; string, or zero
+   MOV      R4,R1                      ; searchstrpointer=searchstr
+
+.StrStr_Loop
+   LDRB     R2,[R0],#1                 ; Read char from strpointer
+   LDRB     R5,[R1]                    ; Read char from searchstr
+   CMP      R2,#0
+   MOVEQ    R0,#0
+   LDMEQFD  R13!,{R4,R5,R15}
+   CMP      R2,R5                      ; char1=char2?
+   BNE      StrStr_Loop
+   ; Check for match
+   ;
+   MOV      R3,R0                      ; strpointer2=strpointer
+   ADD      R4,R1,#1                   ; searchstrpointer=searchstr+1
+
+.StrStr_Loop2
+   LDRB     R2,[R3],#1                 ; Read char1 from strpointer2
+   LDRB     R5,[R4],#1                 ; Read char2 from searchstrpointer
+   CMP      R5,#0
+   SUBEQ    R0,R0,#1
+   LDMEQFD  R13!,{R4,R5,R15}
+   CMP      R2,#0
+   MOVEQ    R0,#0
+   LDMEQFD  R13!,{R4,R5,R15}
+   CMP      R2,R5                      ; char1=char2?
+   BEQ      StrStr_Loop2
+   B        StrStr_Loop
+
+; >-------------------------------------------------------------<
+
+.StrChr                                ;_R0-> String, _R1 = Search char, ~R0-> Found char or
+.StrChr_Loop                           ; zero
+   LDRB     R2,[R0],#1                 ; Read char from string pointer
+   CMP      R2,R1
+   SUBEQ    R0,R0,#1
+   MOVEQ    R15,R14
+   CMP      R2,#0
+   BNE      StrChr_Loop
+   MOV      R0,#0
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.StrChrCtrl                            ;_R0-> String (ctrl-terminated), _R1 = Search char,
+.StrChrCtrl_Loop                       ;~R0-> Found char or zero
+   LDRB     R2,[R0],#1                 ; Read char from string pointer
+   CMP      R2,R1
+   SUBEQ    R0,R0,#1
+   MOVEQ    R15,R14
+   CMP      R2,#' '
+   BGE      StrChrCtrl_Loop
+   MOV      R0,#0
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Div
+   TEMP     R9
+   DIV      R10,R11,R12
+   LOCK     R9
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Print_Number
+   STMFD    R13!,{R0-R2,R14}
+   ADR      R1,Number_Buffer
+   MOV      R2,#20
+   SWI      OS_ConvertInteger4         ; Convert number to text
+   MOV      R2,R0
+   ADR      R0,Space
+   SUB      R1,R1,R2
+   RSBS     R1,R1,#Field               ; Number of space=field-number of digits
+   MOVMI    R1,#0
+   SWI      OS_WriteN                  ; Right justify the number
+   MOV      R0,R2
+   SWI      OS_Write0                  ; Print the number
+   LDMFD    R13!,{R0-R2,R15}
+
+; >-------------------------------------------------------------<
+
+.Print_HexNumber
+   STMFD    R13!,{R0-R2,R14}
+   ADR      R1,Number_Buffer
+   MOV      R2,#20
+   SWI      OS_ConvertHex8             ; Convert the number to text
+   MOV      R2,R0
+   ADR      R0,Space
+   SUB      R1,R1,R2
+   RSBS     R1,R1,#Field               ; Number of space=field-number of digits
+   MOVMI    R1,#0
+   SWI      OS_WriteN                  ; Right justify the number
+   MOV      R0,R2
+   SWI      OS_Write0                  ; Print the number
+   LDMFD    R13!,{R0-R2,R15}
+
+.Number_Buffer   DBB   16
+.Space           DBB   16,32
+
+; >-------------------------------------------------------------<
+
+.Print_FP_Number                       ;_F0 = FP-number to print
+   STMFD    R13!,{R0-R7,R14}
+   RFS      R0
+   ORR      R1,R0,#1 << 11
+   WFS      R1
+   ADR      R2,FP_Number_Buffer2
+   STFP     F0,[R2]
+   WFS      R0
+   LDMIA    R2,{R4-R7}
+   TST      R4,#1 << 31
+   SWINE    OS_WriteI+'-'
+   MOV      R0,R5,LSR #28
+   ADD      R0,R0,#'0'
+   SWI      OS_WriteC
+   SWI      OS_WriteI+'.'
+   MOV      R0,R5
+   MOV      R1,#24
+   BL       Print_BCD
+   MOV      R0,R6
+   MOV      R1,#28
+   BL       Print_BCD
+   MOV      R0,R7
+   MOV      R1,#28
+   BL       Print_BCD
+   SWI      OS_WriteI+'E'
+   TST      R4,#1 << 30
+   SWINE    OS_WriteI+'-'
+   MOV      R0,R4
+   MOV      R1,#24
+   BL       Print_BCD
+   LDMFD    R13!,{R0-R7,R15}
+
+.FP_Number_Buffer2 DBD  4
+
+; >-------------------------------------------------------------<
+
+.Print_BCD                             ;_R0 = BCD word, _R1 = Counter
+   STMFD    R13!,{R4,R5,R14}
+   MOV      R4,R0
+   MOV      R5,R1
+
+.PB_Loop
+   MOV      R0,R4,LSR R5
+   AND      R0,R0,#&F
+   ADD      R0,R0,#'0'
+   SWI      OS_WriteC
+   SUBS     R5,R5,#4
+   BGE      PB_Loop
+   LDMFD    R13!,{R4,R5,R15}
+
+.PrintStrCtrl                          ;_R0-> String (ctrl-terminated)
+   STMFD    R13!,{R1,R14}
+   MOV      R1,R0
+
+.PrintStrCtrl_Loop
+   LDRB     R0,[R1],#1
+   CMP      R0,#' '
+   LDMLTFD  R13!,{R1,R15}
+   SWI      OS_WriteC
+   B        PrintStrCtrl_Loop
+   LDMFD    R13!,{R1,R15}
+
+.PrintStrFilter
+   STMFD    R13!,{R1,R2,R14}
+   MOV      R1,R0
+
+.PrintStrFilter_Loop
+   LDRB     R0,[R1],#1
+   CMP      R0,#0
+   LDMEQFD  R13!,{R1,R2,R15}
+   CMP      R0,#10
+   BNE      PSF_Not_Newline
+   SWI      OS_NewLine
+   B        PrintStrFilter_Loop
+
+.PSF_Not_Newline
+   CMP      R0,#127
+   CMPNE    R0,#31
+   BLE      PSF_Not_Write_Char
+   SWI      OS_WriteC
+   B        PrintStrFilter_Loop
+
+.PSF_Not_Write_Char
+   SWI      OS_WriteI+'['
+   MOV      R2,R0
+   MOV      R0,R0,LSR #4
+   CMP      R0,#10
+   ADDGE    R0,R0,#'A'-10
+   ADDLT    R0,R0,#'0'
+   SWI      OS_WriteC
+   AND      R0,R2,#&F
+   CMP      R0,#10
+   ADDGE    R0,R0,#'A'-10
+   ADDLT    R0,R0,#'0'
+   SWI      OS_WriteC
+   SWI      OS_WriteI+']'
+   B        PrintStrFilter_Loop

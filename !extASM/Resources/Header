@@ -1,0 +1,35 @@
+; Default register bindings for AOF
+
+#set a1=0
+#set a2=1
+#set a3=2
+#set a4=3
+#set v1=4
+#set v2=5
+#set v3=6
+#set v4=7
+#set v5=8
+#set v6=9
+#set sl=10
+#set fp=11
+#set ip=12
+#set sp=13
+#set lr=14
+;#set pc=15    ; 'Hard-coded' in program
+
+#set A1=0
+#set A2=1
+#set A3=2
+#set A4=3
+#set V1=4
+#set V2=5
+#set V3=6
+#set V4=7
+#set V5=8
+#set V6=9
+#set SL=10
+#set FP=11
+#set IP=12
+#set SP=13
+#set LR=14
+;#set PC=15    ; 'Hard-coded' in program

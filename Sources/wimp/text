@@ -1,0 +1,245 @@
+
+; >-------------------------------------------------------------<
+
+.Wimp_Text_AddBlankLine
+   STMFD    R13!,{R2,R3}
+   MOV      R2,R13
+   SUB      R13,R13,#&100
+   STMFD    R13!,{R14}
+   ADR      R0,Empty_Str
+   MOV      R1,#TextColour_Foreground
+   BL       Wimp_TextLine
+   LDMFD    R13!,{R14}
+   ADD      R13,R13,#&108
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Wimp_Text_AddLine                     ;_R0-> New line to be added, NULL terminated
+   STMFD    R13!,{R2,R3}               ;~R0-> End of line
+   MOV      R2,R13
+   SUB      R13,R13,#&100
+   STMFD    R13!,{R14}
+   MOV      R1,#TextColour_Foreground
+   BL       Wimp_TextLine
+   LDMFD    R13!,{R14}
+   ADD      R13,R13,#&108
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Wimp_Text_AddColourLine               ;_R0-> New line to be added, NULL terminated
+   STMFD    R13!,{R2,R3}               ;_R1 = Colour, ~R0-> End of line
+   MOV      R2,R13
+   SUB      R13,R13,#&100
+   STMFD    R13!,{R14}
+   BL       Wimp_TextLine
+   LDMFD    R13!,{R14}
+   ADD      R13,R13,#&108
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Wimp_TextLine                         ;_R0-> String, possibly with print specifiers
+   STMFD    R13!,{R4-R10,R14}          ;_R1 = Colour, _R2-> Parameters, ~R0-> End of string
+   MOV      R4,R0
+   MOV      R5,R1
+   MOV      R6,R2
+   MOV      R0,#Flex_WimpText
+   BL       Flex_Adr
+   MOV      R9,R0
+
+   LDR      R7,Wimp_Text_Size
+   ADD      R8,R0,R7                   ; R8-> New char location
+   MOV      R1,R8
+
+   MOV      R0,R4
+   MOV      R10,R13
+   MOV      R13,R6
+   LDMIA    R13!,{R2,R3}
+   BL       Print_String
+   MOV      R4,R0
+   MOV      R13,R10
+   MOV      R2,#&0A
+   STRB     R2,[R1,#-1]
+
+   SUB      R1,R1,R8
+   ADD      R0,R1,R7
+   STR      R0,Wimp_Text_Size
+   ORR      R1,R1,R5,LSL #24
+   SUB      R0,R8,R9
+   BL       Wimp_Text_AddLineNum
+   BL       Check_TextSpace
+   MOV      R0,R4
+   LDMFD    R13!,{R4-R10,R15}
+
+; >-------------------------------------------------------------<
+
+.Wimp_Text_AddLineNum                  ;_R0 = Offset to line, _R1 - bit 0-23  = Length
+   STMFD    R13!,{R4-R7,R14}           ;                                24-31 = Colour
+   MOV      R4,R0
+   MOV      R5,R1
+   MOV      R0,#Flex_Offset
+   BL       Flex_Size
+   MOV      R6,R0
+   LDR      R7,Wimp_Text_Lines
+   MOV      R1,R1,LSR #3
+   CMP      R7,R1                      ; Number of lines > number of double-words in block?
+   MOVGE    R0,#Flex_Offset
+   MOVGE    R1,#Offset_Step
+   BLGE     Flex_Adjust                ; Increase block
+   STR      R4,[R6,R7,LSL #3]!         ; Store line start offset in Offset array
+   STR      R5,[R6,#4]                 ; Store length and colour
+   ADD      R7,R7,#1                   ; Increase line number
+   STR      R7,Wimp_Text_Lines
+   LDMFD    R13!,{R4-R7,R15}
+
+; >-------------------------------------------------------------<
+
+.Wimp_Text_Window                      ; This function calls Wimp_Poller, so it should not
+   STMFD    R13!,{R4-R7,R14}           ; be used while the Data Transfer Protocol is used
+                                       ; (which requires a strict message sequence)
+   LDR      R5,Wimp_Text_Lines
+   LDR      R6,Previous_Wimp_Text_Lines
+   CMP      R5,R6
+   BEQ      WTW_End
+   STR      R5,Previous_Wimp_Text_Lines
+   LDR      R0,Handle_STATUS
+   ADR      R1,StrBuffer
+   STR      R0,[R1]
+   SWI      Wimp_GetWindowInfo
+   LDR      R2,[R1,#48]                ; Work area min y
+   LDR      R3,[R1,#56]                ; Work area max y
+   SUB      R3,R3,R2
+   MOV      R7,R3,LSR #5
+   ADD      R1,R1,#44
+   CMP      R7,R5                      ; Work area < Number of lines?
+   BGE      WTW_Not_Set_Extent
+   ; Work area has to be enlarged, so set the extent. If the window is open and
+   ; auto-scrolling is enabled, scroll to the end of the text
+   ;
+   LDR      R0,[R1,#-44]
+   LDR      R2,[R1,#12]
+   MOV      R3,R5,LSL #5
+   SUB      R2,R2,R3
+   STR      R2,[R1,#4]                 ; Work area min y = Work area max y - New lines*32
+   SWI      Wimp_SetExtent
+   ;------> Check if window is open
+   LDR      R2,[R1,#-12]
+   TST      R2,#1 << 16
+   BEQ      WTW_End
+   LDR      R3,Options
+   TST      R3,#Option_AutoScroll
+   BEQ      WTW_Not_Set_Extent
+   SUB      R1,R1,#44
+   LDR      R2,[R1,#16]                ; Visible max y
+   LDR      R3,[R1,#8]                 ; Visible min y
+   SUB      R2,R2,R3
+   LDR      R3,[R1,#56]                ; Work area max y
+   LDR      R4,[R1,#48]                ; Work area min y
+   SUB      R3,R3,R4
+   SUB      R2,R2,R3
+   STR      R2,[R1,#24]                ; Scroll Y=(vmaxy-vminy)-(wmaxy-wminy)
+   SWI      Wimp_OpenWindow
+   ADD      R1,R1,#44
+
+.WTW_Not_Set_Extent
+   LDR      R2,[R1,#-12]
+   TST      R2,#1 << 16
+   BEQ      WTW_End
+   CMP      R7,R6                      ; Work area < Previous number of lines?
+   BLE      WTW_End
+   ; At least some of the lines is before any extent enlarging, so if the window is open,
+   ; perform a ForceRedraw
+   ;
+   LDR      R0,[R1,#-44]
+   LDMIA    R1,{R1-R4}
+   SUB      R2,R4,R5,LSL #5            ; Work area min y = Work area max y - Num lines*32
+   SUB      R4,R4,R6,LSL #5            ; Work area max y = Work area max y - Prev. lines*32
+   SWI      Wimp_ForceRedraw
+
+.WTW_End
+   MOV      R0,#0
+   BL       Wimp_Poller
+   LDMFD    R13!,{R4-R7,R15}
+
+; >-------------------------------------------------------------<
+
+.Wimp_Text_ClearAll
+   STMFD    R13!,{R4,R5,R14}
+
+   MOV      R0,#0
+   STR      R0,Wimp_Text_Size
+   STR      R0,Wimp_Text_Lines
+   STR      R0,Previous_Wimp_Text_Lines
+
+   MOV      R0,#Flex_WimpText
+   MOV      R1,#Default_WimpText_Size
+   SUB      R2,R1,#WimpText_Buffer
+   STR      R2,Wimp_Text_Space
+   BL       Flex_Resize
+
+   MOV      R0,#Flex_Offset
+   MOV      R1,#Default_Offset_Size
+   BL       Flex_Resize
+
+   MOV      R0,#10
+   LDR      R1,MinLines_Pointer
+   SWI      XOS_ReadUnsigned
+   MOVVS    R2,#Default_MinLines
+   CMP      R2,#4
+   MOVLT    R2,#4
+   MOV      R5,R2,LSL #5
+
+   ADR      R1,StrBuffer
+   LDR      R0,Handle_STATUS
+   STR      R0,[R1]
+   SWI      Wimp_GetWindowInfo
+   LDR      R2,[R1,#32]
+   TST      R2,#1 << 16
+   BEQ      WTC_Not_Open
+   ; Window is open
+   ;
+   LDR      R2,[R1,#16]
+   SUB      R2,R2,R5
+   LDR      R3,[R1,#8]
+   CMP      R3,R2                      ; Visible min y < Visible max y - NumLines*32?
+   STRLT    R2,[R1,#8]
+   MOV      R2,#0
+   STR      R2,[R1,#24]
+   SWI      Wimp_OpenWindow
+
+.WTC_Not_Open
+   LDR      R0,Handle_STATUS
+   ADD      R1,R1,#44
+   RSB      R2,R5,#0
+   STR      R2,[R1,#4]
+   SWI      Wimp_SetExtent
+
+   LDR      R2,[R1,#-12]
+   TST      R2,#1 << 16
+   LDMEQFD  R13!,{R4,R5,R15}
+   LDR      R0,Handle_STATUS
+   LDMIA    R1,{R1-R4}
+   SWI      Wimp_ForceRedraw
+
+   LDMFD    R13!,{R4,R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Check_TextSpace
+   STMFD    R13!,{R14}
+
+   LDR      R0,Wimp_Text_Size
+   LDR      R1,Wimp_Text_Space         ; This has available space-WimpText_Buffer (buffer)
+   CMP      R0,R1
+   LDMLTFD  R13!,{R15}
+
+   ADD      R1,R1,#WimpText_Step
+   STR      R1,Wimp_Text_Space
+
+   MOV      R0,#Flex_WimpText
+   ADD      R1,R1,#WimpText_Buffer
+   BL       Flex_Resize                ; WimpText_Step more Text Space
+
+   LDMFD    R13!,{R15}

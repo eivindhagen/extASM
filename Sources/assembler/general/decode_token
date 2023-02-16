@@ -1,0 +1,263 @@
+
+; >-------------------------------------------------------------<
+
+.Decode_Token                          ;_R8 = First char of token, ~R8 = EOL
+   STMFD    R13!,{R4-R7,R14}
+
+.Decode_Token_Direct                   ;_R0 = Options
+   ADR      R1,DT_LineEnd
+   ADR      R14,Error_Context
+   STMIA    R14,{R1,R4-R13}            ; Store Asm_Error context
+
+   CMP      R8,#&01
+   BNE      DT_Not_Source_Start
+   BL       Source_Start
+   B        DT_End
+
+.DT_Not_Source_Start
+   CMP      R8,#&02
+   BNE      DT_Not_Source_End
+   BL       Source_End
+   B        DT_End
+
+.DT_Not_Source_End
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   BNE      DT_Not_Skip_Blanks
+   BL       Skip_Blanks
+   MOV      R0,#0
+   CMP      R8,#&0A
+   LDMEQFD  R13!,{R4-R7,R15}
+
+.DT_Not_Skip_Blanks
+   CMP      R8,#'#'
+   BEQ      DT_Switch
+   CMP      R8,#'.'
+   BEQ      DT_Label
+   CMP      R8,#':'
+   BEQ      DT_Colon
+   CMP      R8,#';'
+   BNE      DT_Not_Flush_Line
+   BL       Flush_Line
+   LDMFD    R13!,{R4-R7,R15}
+
+.DT_Not_Flush_Line
+   CMP      R8,#'{'
+   CMPNE    R8,#'}'
+   BNE      DT_Not_Brace
+
+   LDR      R1,Brace_Count
+   CMP      R8,#'{'
+   ADDEQ    R1,R1,#1
+   CMP      R8,#'}'
+   SUBEQ    R1,R1,#1
+   LDR      R2,Enable_Brace_Return
+   CMP      R1,#0
+   RSBLTS   R3,R2,#0
+   MOVLT    R8,#&00
+   LDMLTFD  R13!,{R4-R7,R15}
+   STR      R1,Brace_Count
+
+.DT_Not_Brace
+   TST      R0,#Option_NoPeriod
+   SUBNE    R10,R10,#1
+   BNE      DT_Label
+
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   RSBGES   R0,R8,#'Z'
+   SUBGE    R8,R8,#'A'
+   ADDGE    R15,R15,R8,LSL #2
+   B        DT_Unknown
+   B        DT_A
+   B        DT_B
+   B        DT_C
+   B        DT_D
+   B        DT_E
+   B        DT_F
+   B        DT_Unknown
+   B        DT_Unknown
+   B        DT_I
+   B        DT_Unknown
+   B        DT_Unknown
+   B        DT_L
+   B        DT_M
+   B        DT_N
+   B        DT_O
+   B        DT_P
+   B        DT_Q
+   B        DT_R
+   B        DT_S
+   B        DT_T
+   B        DT_U
+   B        DT_V
+   B        DT_W
+   B        DT_Unknown
+   B        DT_Y
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_Label                              ;_R8 = "."
+   LDRB     R8,[R10],#1                ; R8 = First variable char, or Blank
+   BL       Skip_Blanks
+
+   ;------> Copy variable into struct buffer
+   ADR      R4,STRUCT_Name
+   ADR      R0,STRUCT_Array
+   LDR      R1,STRUCT_Level
+   SUBS     R1,R1,#1
+   LDRGEB   R0,[R0,R1]
+   MOVLT    R0,#0
+   ADD      R0,R4,R0
+   SUB      R10,R10,#1
+   BL       StrCopySource
+   LDR      R0,Object_Base
+   LDR      R1,Object_Size
+   ADD      R0,R0,R1
+   MOV      R1,#3
+   MOV      R2,R4
+   BL       Set_Variable
+   SUB      R10,R10,#1
+
+; >-------------------------------------------------------------<
+
+.DT_Colon                              ;_R8 = ":"
+   LDRB     R8,[R10],#1
+   LDR      R0,Options
+   TST      R0,#Option_NoPeriod
+   BLEQ     Skip_Blanks
+   CMP      R8,#&0A
+   BNE      Decode_Token_Direct
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_Unknown
+._Loop
+   LDRB     R8,[R10,#-1]!              ; Read backwards
+   CMP      R8,#':'
+   CMPNE    R8,#&0A
+   CMPNE    R8,#&01
+   CMPNE    R8,#&02
+   BNE      _Loop
+   ADD      R10,R10,#1                 ; R10-> Start of line
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+
+   ;------> Maybe it is a MACRO
+   ADR      R4,Block
+   MOV      R0,R4
+   SUB      R10,R10,#1
+   BL       StrCopySource
+   MOV      R5,R0
+
+   MOV      R0,R4
+   BL       Find_Macro
+   CMN      R14,#1
+   BEQ      DT_LineEnd
+   CMP      R1,#0
+   BEQ      DT_Found_Macro
+   SUB      R5,R5,#3
+   CMP      R5,R4
+   MOVLE    R0,#&23                    ; Asm_Error #&23 = Syntax error
+   BLE      Asm_Error
+   ; Check for macro name, minus the two last chars, in case it is a macro with condition
+   ; code
+   ;
+   LDRB     R6,[R5]
+   MOV      R0,#&00
+   STRB     R0,[R5]
+   MOV      R0,R4
+   BL       Find_Macro
+   CMP      R1,#0
+   MOVNE    R0,#&23                    ; Asm_Error #&23 = Syntax error
+   BNE      Asm_Error
+   LDR      R1,[R0]
+   LDRB     R2,[R1]
+   CMP      R2,#'$'
+   MOVNE    R0,#&23                    ; Asm_Error #&23 = Syntax error
+   BNE      Asm_Error
+   STRB     R6,[R5]
+   SUB      R10,R10,#2
+
+.DT_Found_Macro
+   SUB      R10,R10,#1
+   B        Assemble_Macro
+
+.DT_LineEnd
+   SUB      R10,R10,#1
+   MOV      R0,#0
+   BL       Next_Token
+
+.DT_End
+   BL       Check_WorkSpace
+
+   LDR      R0,REPT_Level
+   CMP      R0,#0
+   BLEQ     Asm_Fallback
+
+   BL       Skip_Blanks
+   CMP      R8,#':'
+   BEQ      DT_Colon
+   CMP      R8,#';'
+   BNE      DTE_Not_Flush_Line
+   BL       Flush_Line
+   LDMFD    R13!,{R4-R7,R15}
+
+.DTE_Not_Flush_Line
+   CMP      R8,#&00
+   CMPNE    R8,#&0A
+   LDMEQFD  R13!,{R4-R7,R15}
+   MOV      R0,#&24                    ; Asm_Error #&24 = Syntax overflow (too many operands)
+   B        Asm_Error
+
+; >-------------------------------------------------------------<
+
+.Next_Token                            ;_R0 = 1 - Return at "," or ";"
+   STMFD    R13!,{R4,R5,R14}           ;~R8 = ":" or EOL (or ",")
+   MOV      R4,R0
+   MOV      R5,#0
+
+.NT_Loop
+   LDRB     R8,[R10],#1
+   CMP      R8,#'"'
+   BEQ      NT_Quote
+   CMP      R8,#'''
+   BEQ      NT_Quote_Char
+   CMP      R8,#';'
+   CMPEQ    R4,#0
+   BLEQ     Flush_Line
+   CMP      R8,#':'
+   CMPNE    R8,#&0A
+   BEQ      NT_End
+   CMP      R4,#1
+   BNE      NT_Loop
+   CMP      R8,#'('
+   ADDEQ    R5,R5,#1
+   CMP      R8,#')'
+   SUBEQ    R5,R5,#1
+   CMP      R8,#','
+   CMPNE    R8,#';'
+   CMPEQ    R5,#0
+   BNE      NT_Loop
+
+.NT_End
+   LDMFD    R13!,{R4,R5,R15}
+
+.NT_Quote
+   LDRB     R8,[R10],#1
+   CMP      R8,#&0A
+   BEQ      NT_End
+   CMP      R8,#'"'
+   BNE      NT_Quote
+   B        NT_Loop
+
+.NT_Quote_Char
+   LDRB     R8,[R10],#1
+   CMP      R8,#&0A
+   BEQ      NT_End
+   LDRB     R8,[R10],#1
+   CMP      R8,#&0A
+   BEQ      NT_End
+   B        NT_Loop

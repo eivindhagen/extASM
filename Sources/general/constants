@@ -1,0 +1,162 @@
+
+#set Block_Size        = 2048           ; General use
+#set Block2_Size       = 256            ; General use
+#set Ind_Size          = 2048           ; Indirected data
+#set Menu_Size         = 2048           ; Menu data
+#set Message_Size      = 8192           ; Message data
+#set Max_String_Size   = 239            ; Max. string length (60 chars/chunk, zero term.)
+#set Max_Menu_Entries  = 10             ; Number of menus and windows in menu tree
+#set Stack_Size        = 1024
+#set X_Margin          = 16
+#set Max_Passes        = 10             ; Max. number of passes, when using AutoShrink,
+#set Num_Flex_Blocks   = 14             ; before disabling temporarily AutoShrink
+#set Relative_Position = &100
+#set Default_PieRadius = 130
+#set Default_MinLines  = 16
+#set Field             = 10
+
+#set Default_MinObject_Size  = 8192
+#set Default_MinVarList_Size = 8192
+#set Default_WimpText_Size   = 8192
+#set Default_Offset_Size     = 1024
+#set Default_Binaries_Size   = 256
+
+#set SourceName_Step    = 1024
+#set Object_Step        = 8192
+#set Expand_Step        = 1024
+#set VarList_Step       = 8192
+#set WimpText_Step      = 1024
+#set Offset_Step        = 1024
+#set Binaries_Step      = 256
+#set String_Chunk_Step  = 16           ; Each chunk is 64 bytes, so this is 1024 bytes
+#set WorkSpace_Buffer   = 1024
+#set WimpText_Buffer    = 1024
+
+#set Max_IF_Nesting     = 16
+#set Max_REPT_Nesting   = 16
+#set Max_STRUCT_Nesting = 16
+
+#set TextColour_Foreground = 0
+#set TextColour_Background = 1
+#set TextColour_Info       = 2
+#set TextColour_Errors     = 3
+#set TextColour_Include    = 4
+
+#set Flex_Header     = 0
+#set Flex_Error      = 1
+#set Flex_Warning    = 2
+#set Flex_Source     = 3
+#set Flex_SourceName = 4
+#set Flex_Variable   = 5
+#set Flex_Macro      = 6
+#set Flex_Object     = 7
+#set Flex_Expand     = 8
+#set Flex_VarList    = 9
+#set Flex_WimpText   = 10
+#set Flex_Offset     = 11
+#set Flex_Binaries   = 12
+#set Flex_String     = 13
+
+#set Option_AutoShrink       = 1
+#set Option_AutoSave         = 1 << 1
+#set Option_AutoRun          = 1 << 2
+#set Option_UseDefaultHeader = 1 << 3
+#set Option_PopProcessWindow = 1 << 4
+#set Option_PopStatusWindow  = 1 << 5
+#set Option_AutoExpand       = 1 << 6
+#set Option_Summary          = 1 << 7
+#set Option_OnlyADRLoadStore = 1 << 8
+#set Option_VariableWarning  = 1 << 9
+#set Option_CodeStat         = 1 << 10
+#set Option_CodeStatMacro    = 1 << 11
+#set Option_VarList          = 1 << 12
+#set Option_VarListSort      = 1 << 13
+#set Option_NoPeriod         = 1 << 14
+#set Option_DoubleClick      = 1 << 15
+#set Option_Throwback        = 1 << 16
+#set Option_AutoScroll       = 1 << 17
+#set Option_Fast             = 1 << 18
+
+#set extASM_FileType         = &725
+#set DDEUtils_ReadTaskHandle = &4258A
+
+; Assembler
+
+#set Int_Value    = 0
+#set FP_Value     = 1
+#set String_Value = 2
+
+#set CC_EQ = &0
+#set CC_NE = &1
+#set CC_CS = &2
+#set CC_CC = &3
+#set CC_MI = &4
+#set CC_PL = &5
+#set CC_VS = &6
+#set CC_VC = &7
+#set CC_HI = &8
+#set CC_LS = &9
+#set CC_GE = &A
+#set CC_LT = &B
+#set CC_GT = &C
+#set CC_LE = &D
+#set CC_AL = &E
+#set CC_NV = &F
+#set CC_HS = &2
+#set CC_LO = &3
+
+#set CC_Pos = 28
+
+#set Rd_Pos = 12
+#set Rn_Pos = 16
+#set Rm_Pos = 0
+#set Rs_Pos = 8
+
+#set ALU_Opcode_Pos = 21
+#set Write_Back_Pos = 21
+#set Preindexed_Pos = 24
+
+#set Store_Double_Bit                     = 1 << 5
+#set Update_PSR_Bit                       = 1 << 20
+#set Load_Bit                             = 1 << 20
+#set Multiplexed_Load_Bit                 = 1 << 21
+#set Write_Back_Bit                       = 1 << Write_Back_Pos
+#set Load_Store_Byte_Bit                  = 1 << 22
+#set Load_Store_Byte_Double_Immediate_Bit = 1 << 22
+#set Add_Bit                              = 1 << 23
+#set Preindexed_Bit                       = 1 << Preindexed_Pos
+#set Immediate_Bit                        = 1 << 25
+
+#set Register_List_Single_Lane = 1 << 30
+#set Register_List_All_Lanes   = 1 << 31
+
+#set VFP_Operand_Int        = 0
+#set VFP_Operand_FP         = 1
+#set VFP_Operand_Polynomial = 2
+
+#set VFP_Operand_Signed   = 0
+#set VFP_Operand_Unsigned = 1
+
+#set VFP_Operand_8  = %00
+#set VFP_Operand_16 = %01
+#set VFP_Operand_32 = %10
+#set VFP_Operand_64 = %11
+
+#set VFP_Operand_Unknown = -1
+
+#set VFP_D_Pos = 22
+#set VFP_N_Pos = 7
+#set VFP_M_Pos = 5
+
+#set VFP_Size_Bit = 1 << 8
+#set VFP_E_Bit    = 1 << 7
+#set VFP_Z_Bit    = 1 << 7
+
+#set SIMD_Size_Pos_DNM = 20
+#set SIMD_Size_Pos_DM  = 18
+#set SIMD_U_Pos        = 24
+#set SIMD_Cmode_Pos    = 8
+#set SIMD_F_Pos        = 8
+
+#set SIMD_Q_Bit = 1 << 6
+#set SIMD_F_Bit = 1 << SIMD_F_Pos

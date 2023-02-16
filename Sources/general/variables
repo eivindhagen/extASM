@@ -1,0 +1,334 @@
+
+; >-------------------------------------------------------------<
+
+.Find_Variable                         ;_R0-> Variable name, _R1 = Search flag
+   ; R4 - Variable name                ; (1 = Ignore local label/variable type)
+   ; R5 - Variable array               ;~R0-> Variable record, ~R1 = Found
+   ; R6 - Hash key                     ; (-1 = Variable not found)
+   ; R7 - Maximum number of variables
+   ; R8 - Count
+   ; R9 - Array pointer
+   ;
+   STMFD    R13!,{R4-R10,R14}
+   MOV      R4,R0
+   LDRB     R2,[R4]
+   CMP      R2,#'_'
+   CMPEQ    R1,#0
+   BEQ      Find_Local_Variable
+   MOV      R0,#Flex_Variable
+   BL       Flex_Adr
+   ADD      R5,R0,#16                  ; Array=Address+16 (skip to name)
+   ; Calculate hash key
+   ;
+   MOV      R1,R4
+   MOV      R6,#0                      ; Hash key=0
+   ADD      R3,R1,#47
+
+.FV_CharLoop
+   LDRB     R0,[R1],#1
+   ADD      R6,R6,R0                   ; Hash key=Hash key + Char
+   CMP      R0,#&00
+   CMPNE    R1,R3
+   BNE      FV_CharLoop
+   CMP      R0,#&00
+   MOVNE    R0,#&33                    ; Asm_Error #&33 = Maximum length of variable name is 46 characters
+   BNE      Asm_Error
+   MOV      R0,#&1D871                 ; Random constant
+   LDR      R2,Variable_Power2
+   MUL      R6,R0,R6
+   MOV      R0,R6,LSR R2
+   SUB      R6,R6,R0,LSL R2            ; Hash key=Hash key*Constant MOD Array size
+   ; Search for variable
+   ;
+   LDR      R7,Variable_MaxNum         ; Maximum number of variables (size of array)
+   MOV      R8,R7                      ; Count=Array size
+   MOV      R10,#0
+
+.FV_StrLoop
+   ADD      R9,R5,R6,LSL #6            ; Array pointer=Array + Hash key*64
+   LDRB     R0,[R9]
+   CMP      R0,#0                      ; Is the array entry empty?
+   MVNEQ    R1,#0
+   BEQ      FV_End                     ; Array entry was empty, so variable was not found
+   CMP      R0,#'$'                    ; Is the variable deleted?
+   MOVEQ    R10,R9                     ; Mark the position
+   BEQ      FV_Not_Found
+   MOV      R0,R4
+   MOV      R1,R9
+   BL       StrCmp
+   CMP      R0,#0
+   MOVEQ    R1,#0
+   BEQ      FV_End                     ; Variable is found
+
+.FV_Not_Found
+   ADD      R6,R6,#1                   ; Hash key=Hash key + 1, try next array entry
+   CMP      R6,R7                      ; Hash key>=Array size?
+   MOVGE    R6,#0                      ; Hash key=0
+   SUBS     R8,R8,#1                   ; Count=Count-1
+   BNE      FV_StrLoop                 ; Have the whole array been searched?
+   MOV      R0,#&06                    ; Messages_Error #&06 = Variable or macro array full
+   B        Messages_Error
+
+.FV_End
+   CMP      R1,#0
+   CMPNE    R10,#0                     ; If variable is not found, and deleted variable
+   SUBNE    R0,R10,#16                 ; found, return to mark
+   SUBEQ    R0,R9,#16
+   LDMFD    R13!,{R4-R10,R15}
+
+.Find_Local_Variable
+   MOV      R0,#Flex_VarList
+   BL       Flex_Adr
+   LDR      R7,VarList_Size
+   SUB      R1,R7,#1
+   BIC      R0,R0,R1                   ; Data must lie on the size of each element boundary
+   ADD      R0,R0,R7                   ; for the sort to work
+   LDR      R5,Prev_Real_Variable_Offset
+   ADD      R5,R5,R0
+
+.FV_Local_Loop
+   LDR      R6,[R5],R7
+   CMP      R6,#0
+   MVNEQ    R1,#0
+   BEQ      FV_Local_End
+   CMP      R7,#16
+   BICEQ    R6,R6,#&FF000000
+   LDRB     R0,[R6,#16]
+   CMP      R0,#'$'
+   BEQ      FV_Local_Loop
+   CMP      R0,#'_'
+   MVNNE    R1,#0
+   BNE      FV_Local_End
+   MOV      R0,R4
+   ADD      R1,R6,#16
+   BL       StrCmp
+   CMP      R0,#0
+   BNE      FV_Local_Loop
+   MOV      R1,#0
+   LDR      R2,[R5,#-16]
+   CMP      R7,#16
+   MOVEQ    R2,R2,LSR #24
+   STRB     R2,[R6,#63]
+   SUB      R5,R5,R7
+   AND      R2,R2,#3
+   CMP      R2,#1
+   LDFEQE   F0,[R5,#4]
+   STFEQE   F0,[R6]
+   LDRNE    R0,[R5,#4]
+   STR      R0,[R6]
+
+.FV_Local_End
+   MOV      R0,R6
+   LDMFD    R13!,{R4-R10,R15}
+
+; >-------------------------------------------------------------<
+
+.Set_Variable                          ;_R0/F0 = Value, _R1 = Flags, _R2-> Variable name
+   ; R4 - Value                        ;~R0-> Variable record
+   ; R5 - Flags                        ; The flags are the same as for the variable array,
+   ; R6 - Variable name                ; with some extra
+   ; R7 - Variable record              ;
+   ;                                   ; bit 0-1 - Type of variable
+   STMFD    R13!,{R4-R8,R14}           ;           0 = Integer, 1 = Floating Point,
+   MOV      R4,R0                      ;           2 = String, 3 = Label (integer)
+   MOV      R5,R1                      ;     2   - 0 = Ok, 1 = Warning
+   MOV      R6,R2                      ;     3   - 0 = Not used, 1 = Used
+   LDRB     R0,[R6]                    ;     4-7 - Relative register (automatically added)
+   AND      R8,R5,#3                   ;     8   - 1 = Give error if exists
+   MOV      R0,R6                      ;     9   - 1 = Delete variable, if it exists
+   MOV      R1,#1                      ;    10   - 1 = Don't add relative register
+   BL       Find_Variable
+   MOV      R7,R0
+   CMP      R1,#0
+   BEQ      SV_Found
+   TST      R5,#1 << 9                 ; Should the variable be deleted?
+   LDMNEFD  R13!,{R4-R8,R15}
+   ; Create variable
+   ;
+   MOV      R0,R6
+   ADD      R1,R7,#16
+   BL       StrCopy
+   AND      R0,R5,#3
+   B        SV_Set
+
+.SV_Found
+   TST      R5,#1 << 9                 ; Should the variable be deleted?
+   MOVNE    R0,#'$'
+   STRNEB   R0,[R7,#16]                ; Delete variable
+   MOVNE    R0,R7
+   LDMNEFD  R13!,{R4-R8,R15}
+   LDR      R0,Asm_Pass
+   LDRB     R1,[R6]
+   CMP      R8,#3
+   CMPEQ    R0,#1                      ; Is it label and first pass?
+   BNE      SV_No_Reuse
+   CMP      R1,#'_'                    ; Is the first char='_'?
+   MOVNE    R0,#&31                    ; Asm_Error #&31 = Reuse of label, '<Name>'
+   MOVNE    R2,R6
+   BNE      Asm_Error
+
+.SV_No_Reuse
+   TST      R5,#1 << 8                 ; Should it give error if exists?
+   CMPNE    R1,#'_'
+   MOVNE    R2,R6
+   MOVNE    R0,#&35                    ; Asm_Error #&35 = Variable in parameter header, '<Name>', already in use
+   BNE      Asm_Error
+   LDRB     R0,[R7,#63]
+   AND      R0,R0,#1 << 3
+   ORR      R5,R5,R0                   ; Preserve the Used flag
+
+.SV_Set
+   TST      R5,#1 << 10
+   LDREQ    R0,RELATIVE_Register_Set
+   ORREQ    R5,R5,R0,LSL #4
+   CMP      R8,#3
+   BICEQ    R5,R5,#3
+   CMP      R8,#1
+   BEQ      SV_FP
+   CMP      R8,#2
+   BEQ      SV_String
+   ; Integer
+   ;
+   STR      R4,[R7]
+   STRB     R5,[R7,#63]
+   ; Update variable linked list
+   ;
+   LDR      R6,VarList_Size
+   MOV      R8,R5
+   MOV      R0,#Flex_VarList
+   BL       Flex_Size
+   LDR      R5,Prev_Variable_Offset
+   ADD      R2,R5,#36
+   CMP      R2,R1
+   MOVGE    R0,#Flex_VarList
+   MOVGE    R1,#VarList_Step
+   BLGE     Flex_Adjust
+   SUB      R1,R6,#1
+   BIC      R0,R0,R1                   ; Data must lie on the size of each element boundary
+   ADD      R0,R0,R6                   ; for the sort to work
+   CMP      R6,#16
+   ORREQ    R1,R7,R8,LSL #24
+   MOVNE    R1,R7
+   STR      R1,[R0,R5]!
+   STRNE    R8,[R0,#16]
+   ADD      R5,R5,R6
+   LDRB     R1,[R7,#16]
+   CMP      R1,#'_'
+   STREQ    R4,[R0,#4]
+   STRNE    R5,Prev_Real_Variable_Offset
+   STR      R5,Prev_Variable_Offset
+   MOV      R0,R7
+   LDMFD    R13!,{R4-R8,R15}
+   ; Floating Point
+   ;
+
+.SV_FP
+   STFE     F0,[R7]
+   STRB     R5,[R7,#63]
+   ; Update variable linked list
+   ;
+   LDR      R6,VarList_Size
+   MOV      R8,R5
+   MOV      R0,#Flex_VarList
+   BL       Flex_Size
+   LDR      R5,Prev_Variable_Offset
+   ADD      R2,R5,#36
+   CMP      R2,R1
+   MOVGE    R0,#Flex_VarList
+   MOVGE    R1,#VarList_Step
+   BLGE     Flex_Adjust
+   SUB      R1,R6,#1
+   BIC      R0,R0,R1                   ; Data must lie on the size of each element boundary
+   ADD      R0,R0,R6                   ; for the sort to work
+   CMP      R6,#16
+   ORREQ    R1,R7,R8,LSL #24
+   MOVNE    R1,R7
+   STR      R1,[R0,R5]!
+   STRNE    R8,[R0,#16]
+   ADD      R5,R5,R6
+   LDRB     R1,[R7,#16]
+   CMP      R1,#'_'
+   STFEQE   F0,[R0,#4]
+   STRNE    R5,Prev_Real_Variable_Offset
+   STR      R5,Prev_Variable_Offset
+   MOV      R0,R7
+   LDMFD    R13!,{R4-R8,R15}
+
+   ; String variable
+   ;
+.SV_String
+   LDRB     R8,[R7,#63]
+   AND      R8,R8,#3
+   STRB     R5,[R7,#63]
+   MOV      R0,#Flex_String
+   BL       Flex_Adr
+   MOV      R6,R0
+   LDR      R5,[R7]
+   CMP      R8,#2
+   MOV      R8,R7
+   BNE      SV_New_Chunk
+   CMP      R5,#0
+   BEQ      SV_New_Chunk
+
+.SV_Next_Chunk
+   SUB      R5,R5,#1
+   ADD      R8,R6,R5,LSL #6
+   ADD      R2,R8,#4
+   ADD      R3,R2,#60
+
+.SV_String_Store_Loop
+   LDRB     R0,[R4],#1
+   STRB     R0,[R2],#1
+   CMP      R0,#0
+   CMPNE    R2,R3
+   BNE      SV_String_Store_Loop
+   CMP      R0,#0
+   BEQ      SV_String_End
+   LDR      R5,[R8]
+   CMP      R5,#0
+   BNE      SV_Next_Chunk
+
+.SV_New_Chunk
+   LDR      R5,String_Chunk
+   ADD      R5,R5,#1
+   STR      R5,String_Chunk
+   STR      R5,[R8]
+   LDR      R0,Max_String_Chunk
+   CMP      R5,R0
+   BLE      SV_Next_Chunk
+   ADD      R0,R0,#String_Chunk_Step
+   STR      R0,Max_String_Chunk
+   MOV      R1,R0,LSL #6
+   MOV      R0,#Flex_String
+   BL       Flex_Resize
+   B        SV_Next_Chunk
+
+.SV_String_End
+   ; Update variable linked list
+   ;
+   LDR      R6,VarList_Size
+   MOV      R8,R5
+   MOV      R0,#Flex_VarList
+   BL       Flex_Size
+   LDR      R5,Prev_Variable_Offset
+   ADD      R2,R5,#36
+   CMP      R2,R1
+   MOVGE    R0,#Flex_VarList
+   MOVGE    R1,#VarList_Step
+   BLGE     Flex_Adjust
+   SUB      R1,R6,#1
+   BIC      R0,R0,R1                   ; Data must lie on the size of each element boundary
+   ADD      R0,R0,R6                   ; for the sort to work
+   CMP      R6,#16
+   ORREQ    R1,R7,R8,LSL #24
+   MOVNE    R1,R7
+   STR      R1,[R0,R5]!
+   STRNE    R8,[R0,#16]
+   ADD      R5,R5,R6
+   LDRB     R1,[R7,#16]
+   CMP      R1,#'_'
+   STREQ    R4,[R0,#4]
+   STRNE    R5,Prev_Real_Variable_Offset
+   STR      R5,Prev_Variable_Offset
+   MOV      R0,R7
+   LDMFD    R13!,{R4-R8,R15}

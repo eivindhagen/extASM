@@ -1,0 +1,69 @@
+
+; >-------------------------------------------------------------<
+
+.Messages_Error                       ;_R0 = Error number of error in Messages file
+   STMFD    R13!,{R14}
+   MOV      R4,R0
+   ADR      R1,ME_Error+5
+   MOV      R2,#&100
+   SWI      OS_ConvertHex2
+   ADR      R0,ME_Error
+   ADR      R5,StrBuffer
+   ADD      R1,R5,#4
+   BL       Message
+   MOV      R0,R5
+   MOV      R1,#1
+   ADR      R2,Task_Name
+   CMP      R4,#&F
+   SWIGT    Wimp_ReportError
+   SWILE    OS_GenerateError
+   ADR      R14,Internal_Context
+   LDMIA    R14,{R0,R13}
+   MOV      R15,R0
+
+; >-------------------------------------------------------------<
+
+.Messages_Error1                       ;_R0 = Error number of error in Messages file
+   MOV      R4,R0                      ;_R1-> Parameter string
+   MOV      R3,R1
+   ADR      R1,ME_Error+5
+   MOV      R2,#&100
+   SWI      OS_ConvertHex2
+   ADR      R0,ME_Error
+   ADR      R5,StrBuffer
+   MOV      R1,R5
+   MOV      R2,R3
+   BL       Message1
+   SUB      R0,R5,#4
+   MOV      R1,#1
+   ADR      R2,Task_Name
+   CMP      R4,#&100
+   SWIGT    Wimp_ReportError
+   SWILE    OS_GenerateError
+   ADR      R14,Internal_Context
+   LDMIA    R14,{R0,R13}
+   MOV      R15,R0
+
+.ME_Error   DCB   "Error",0,0,0
+
+; >-------------------------------------------------------------<
+
+.Message                               ;_R0-> Token string, _R1-> Result string
+   MOV      R2,R1
+   MOV      R1,R0
+   ADR      R0,Ctrl_Block
+   MOV      R3,#&100
+   SWI      MessageTrans_Lookup
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Message1                              ;_R0-> Token string, _R1-> Result string
+   STMFD    R13!,{R4,R14}              ;_R2-> Parameter string
+   MOV      R4,R2
+   MOV      R2,R1
+   MOV      R1,R0
+   ADR      R0,Ctrl_Block
+   MOV      R3,#&100
+   SWI      MessageTrans_Lookup
+   LDMFD    R13!,{R4,R15}

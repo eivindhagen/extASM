@@ -1,0 +1,1578 @@
+=====================================================================
+                   extASM v2.00 - Users Manual
+=====================================================================
+
+TODO: Add information for version 1.00 to 2.00.
+
+Contents
+--------
+1.   Introduction
+2.   Conditions of use
+3.   Starting extASM
+
+4.   Windows
+4.1  Icon bar icon
+4.2  Menu
+
+4.3  Process
+4.4  Status Info
+4.5  Options
+
+5.   Switches
+6.   Extra instructions/statements
+
+7.   Miscellaneous
+7.1  Extra info
+7.2  Case sensitivity
+7.3  Register binding
+7.4  Values
+7.5  Value types
+7.6  Operators
+7.7  Local variables
+7.8  FP instruction precisions
+7.9  Starting assembly from command line, or Obey file
+7.10 Limits
+7.11 Stack setup
+7.12 Removing warning messages
+7.13 Possible future features for extASM
+
+8.   Auto-expansion
+9.   Auto-expanding technical section
+9.1  Instruction changing
+9.2  Auto-expansion method
+9.3  PSR setting for auto-expansion
+9.4  Auto-expanding instructions
+
+10.  ARM and FPA pie chart instructions
+
+11.  ARM instructions
+12.  FPA instructions
+
+
+1. Introduction
+---------------
+extASM is an extended assembler for ARM RISC Processors.
+è Complete ARM 2/3/6 and FPA10 instruction set.
+è Interactive WIMP interface.
+è Smart auto-expanding instruction-set.
+è Written in assembly code.
+è Can produce object code in AOF (ARM Object Format) with the aid of the
+  extAOF application, which is bundled with extASM. This function may
+  later be incorporated in extASM.
+
+2. Conditions of use
+--------------------
+See the !Help file for the legalities.
+
+3. Starting extASM
+------------------
+Double click on the application. It will then install itself on the iconbar.
+
+
+4. Windows
+---------------------------------------------------------------------
+4.1 Iconbar icon
+----------------
+SELECT - Open Process window
+MENU   - Open menu
+ADJUST - Open Status-info window
+Drag:    Drag the source file to the icon-bar icon to load, and start
+         assembly process. You can also drag the source into the PROCESS
+         window.
+
+         The OS-variable "Tmp$Dir", which can be used in the assembly
+         source, is set to the same directory as the source. If no path
+         is available, it is set to the currently selected directory.
+
+4.2 Menu
+--------
+Info     - This leads to the Info window. Click to get StrongHelp help
+           about extASM. If the StrongHelp application has been seen, it
+           will be loaded.
+
+           The extASM StrongHelp help has almost exactly the same
+           information as what is given in this file, since the text in the
+           help is copied from this file. The only difference between the
+           two manual versions is that the StrongHelp version doesn't have
+           the 'Contents' index, and things like that, since it is organized
+           slightly different than this manual file.
+
+Options  - This leads to the Options window. Click to open the Options
+           window.
+Misc     - This leads to the Miscellaneous menu
+Abort    - Abort assembly
+Pause    - Pause assembly
+Continue - Continue assembly after Pause is selected
+Quit     - Quit program
+
+Miscellaneous menu
+------------------
+Save Status - This leads to a save window where you can save the Status
+              Info text.
+Colours     - This leads to the Colours menu where you can select the
+              colours in the Status Info window.
+ARM         - This leads to a pie chart window which shows the distribution
+              of the ARM instruction groups. Click to open the window.
+              The 'Code statistics' option must have been selected before
+              the last assembly.
+FPA         - This leads to a pie chart window which shows the distribution
+              of the FPA instruction groups. Click to open the window.
+              The 'Code statistics' option must have been selected before
+              the last assembly.
+Radius      - This leads to a menu where you can select the radius of the
+              ARM and FPA pie charts.
+Min. lines  - This leads to a menu where you can select the minimum number
+              of lines in the Status-info window. This is the y-size it will
+              resize to when it is cleared, when a new file is loaded.
+
+
+4.3 Process window
+------------------
+Reload - Reload the last source file.
+
+Source box
+----------
+Name - Edit this if you want to reload another source file.
+
+Object box
+----------
+File - Drag to save.
+Save - Click to save.
+Name - Edit this if you want another object file name.
+
+
+4.4 Status-info window
+----------------------
+All messages appear here!
+
+
+4.5 Options window
+------------------
+Auto Shrink
+-----------
+When this is on, it will try to shrink the code again, if at a later pass
+it turns out that a smaller statement can be used or no auto-expansion is
+needed. As it is now, a NOP is inserted after a statement if it shrinks,
+to avoid recalculating offsets etc.
+
+When this option is on it will make the most efficient code, but it may use
+more passes. It may also not succeed at all, and in this case, a warning
+will be given and it will temporarily turn off the auto-shrink option (for
+the current assembly). The maximum number of passes before this happens is
+10.
+
+Auto Save Object
+----------------
+When this is on, it will save the object code after assembly.
+
+Auto Run after Save
+-------------------
+When this is on, it will run the object file after assembly.
+
+Use default header
+------------------
+When this is on, it will also assemble the file called "Header" in the
+"Resources" directory. This file can be changed if wanted.
+
+Auto Pop PROCESS window
+-----------------------
+When this is on, the PROCESS window will be opened, if not opened, and
+put at the top when a file is loaded.
+
+Auto Pop STATUS window
+----------------------
+When this is on, the STATUS window will be opened, if not opened, and
+put at the top when a file is loaded.
+
+Auto Expand
+-----------
+When this is on it will give a message when it auto-expands a statement.
+
+This can be very useful for "profiling" your code, in that you can see
+where it is auto-expaneded. Then you can reserve TEMP-registers if you want,
+or move data closer, to make less auto-expanding. More about auto-expanding
+later. At the end of the listing, an auto-expansion summary will be
+displayed. It will also show how many FP values are stored at each #fppool.
+
+The 'Number of Fast-NOPs' printed is the number of ADR instructions that
+are expaned using a NOP, i.e. no auto-expansion was necessary. This may
+happen if the 'Fast' option is on (ADRs are minimum 16-bit, described below)
+or if the 'ADRL' (long ADR) form of of the ADR is used, which means use
+the 'Fast' option for this instruction.
+
+The 'Number of Fallback NOPs' printed is the number of ADR instructions
+that have been auto-expanded, but were at a later pass found to need less
+or no auto-expansion (because the address became aligned in some way,
+e.g. from &FFFC to &10000). extASM will then insert a NOP (MOV R0,R0)
+after the ADR, to give the same length as previous passes, so that
+offsets in other parts of the program do not have to be recalculated.
+
+If the 'Auto Shrink' option is on (described above), it will shrink the code
+again instead of inserting a NOP after an ADR.
+
+Summary
+-------
+When this is on, only the summary will be printed when the 'Auto Expand'
+option is turned on.
+
+Only ADR and Load/Store
+-----------------------
+When this is on, only auto-expanding of ADRs and load/store instructions
+will be displayed. The 'Auto Expand' option must be on.
+
+Unused variable warning
+-----------------------
+When this is on, extASM will give a warning about any variables which are
+not used by the program.
+
+Code statistics
+---------------
+When this is on, it will show code statistics. This also makes it possible
+to display the two pie charts, from the menu, showing the distribution of
+the ARM and FPA instruction groups. The statistics given are:
+
+   è The number of each ARM instruction, and the total number of ARM
+     instructions
+   è The number of each FPA instruction, and the total number of FPA
+     instructions
+   è The total number of instructions.
+   è The number of each condition code, and the total number of condition
+     codes
+   è The number of each shift type (type and register/constant shift), and
+     the total number of shifts.
+   è The number of 'constant' shifts, that is when a constant is shifted
+     to produce the constant wanted, like: "MOV   R1,#&FF000000"
+
+All statistics are based on the source code, except the constant shifts,
+which are based on the generated code. Therefore if you e.g. have an
+auto-expanding MOV, it will still be counted as one MOV, and not one
+MOV followed by one ORR, which may be the generated code.
+
+Macro
+-----
+When this is on, code in macros, when they are called, will also be counted
+in the code statistics.
+
+Variable listing
+----------------
+When this is on, it will show the variable list, optionally sorted, and
+macro list. It will also show the number of references to each variable,
+and the number of times each macro is called.
+
+Sort
+----
+When this is on, the variable list will be sorted.
+
+No-period labels
+----------------
+When this is on, labels can be specified without a period in front of them.
+All other assembly statements must then be indented by one or more spaces
+or TABs.
+
+Make AOF format
+---------------
+When this is on, extASM will produce an object file in ARM Object Format,
+which can then be linked with e.g. C.
+
+This is done with the aid of extAOF, which is bundled with extASM. This
+function may later be incorporated into extASM. The following statements are
+used: '#area', '#end', '#import', '#export', '#entry' and '#%'. They are
+ignored by extASM, but used by the extAOF application.
+
+Throwback
+---------
+When this is on, extASM will also use Throwback to display errors, warnings
+and 'output' statement etc., so any editor which has Throwback can display
+them.
+
+Auto scroll
+-----------
+When this is on, the STATUS window will scroll to the end, when new messages
+are added.
+
+Fast
+----
+When this is on, it will auto-expand all ADRs to minimum 16-bit (two
+instructions). This may reduce the number of passes, at the expense of
+more NOPs. However, it is recommended that you use the new 'relative'
+statement to reduce auto-expanding, and then use the new 'ADRL'
+(minimum 16-bit ADR) where it is needed.
+
+
+5. Switches
+---------------------------------------------------------------------
+Switches must be at the first non-blank character of a line. A switch may
+follow another switch on a line, separated by a colon.
+
+Most of the switches are actually handled by the Assembler, and not the
+Preprocessor. This is so that variables and expressions etc. can be used
+as parameters.
+
+However, many of them are often used anyway in the Preprocessor, to
+determine the number of variables and macros so that the right amount of
+memory can be reserved for them. Since 'hashing' is used for variable and
+macro searching (which makes it very fast), the assembler needs to reserve
+the maximum space needed for variables and macros, before any variables or
+macros are stored. The only switches that are handled completely by the
+Preprocessor are:
+
+#name
+#include
+#speed
+
+
+#name <objectname>
+------------------
+Set name of object file. Default "Object".
+
+
+#base <address>
+---------------
+Set base address for assembly. Default &8000.
+If it is used, this must be used before any assembler instructions.
+
+#type <filetype>
+----------------
+Set type of object file. Default &FF8.
+
+#load <address>
+---------------
+Set object load address (type must be 0). Default 0.
+
+#exec <address>
+---------------
+Set object exec address (type must be 0). Default 0.
+
+
+#include <filename>
+-------------------
+Includes another source file, like in C.
+
+
+#set <variable> = <expression>
+------------------------------
+Set integer value of <variable> to that of <expression>.
+
+#fpset <FP-variable> = <expression>
+-----------------------------------
+Set Floating Point value of <FP-variable> to that of <expression>. The
+number is stored in maximum precision ('E' - Extended) format.
+
+All expressions using FP values are evaluated with the maximum precision.
+Integer and Floating Point operands will will be automatically cast to the
+other, if it is required by the operation. The same goes for the result,
+if it is required by the variable it is stored in, or the instruction which
+uses the value. When a FP value is cast to integer, it is rounded by
+discarding the decimals.
+
+#strset <String-variable> = <expression>
+----------------------------------------
+Set <String-variable> to that of <expression>.
+
+#if <expression>
+----------------
+Assemble code if <expression> if TRUE (non-zero)
+Part of the #if-#else-#endif construction.
+#if's may be nested
+
+#else
+-----
+Assemble from here if #if was FALSE (zero)
+
+#endif
+------
+End #if/#else conditional assembly
+
+
+#rept <number>
+--------------
+Repeat code <number> times
+The code is ended with #endr.
+#rept's may be nested
+
+#endr
+-----
+End of code to be repeated (after a #rept)
+
+
+#fppool [<Register> [,<Offset>]]
+--------------------------------
+This tells the assembler where Floating Point values can be stored, when
+FP-instructions are auto-expanded. The assembler will store FP-values at
+the address of the next "#fppool" statement. If the range to this is less
+than 1020 bytes, the LDF instruction used in the auto-expansion does not
+have to be expanded as well as the FP-instruction.
+
+If <Register> is used, then <Register> will be used as the "relative"
+register in the LDF, instead of the usual R15. <Register> must then be
+set up before any FP instruction that may be auto-expanded is used.
+<Offset> makes the address of the values start from <Offset>. This means
+that you can take advantage of the +/- sign of the LDF that loads the
+value. If you set the register to point at the address of the
+#fppool + Offset, the <Offset> should be set to -Offset.
+
+#format <number-format>
+-----------------------
+Set format for converting Floating Point values in the 'STR$(num)' function
+or the 'output' command. See below. Default &1100 (General, 17 digits).
+
+#smile
+------
+Gives a smile when life is good (no errors in assembly). Default off.
+
+#speed <lines>
+--------------
+Set number of lines to assemble each Wimp-Poll. Default 256.
+
+
+AOF switches
+------------
+The use of these switches is explained in the !AOFManual file. Here is
+just a summary.
+
+#area <Name> [,code|noinit] [,readonly]
+---------------------------------------
+Start an area
+
+#end
+----
+End an area (it doesn't have to be used if a new #area follows after
+another #area)
+
+#import <Variable>
+------------------
+Reference an external symbol
+
+#export <Variable>
+------------------
+Define a symbol
+
+#entry
+------
+Set entry point for AOF file (address to start program)
+
+#% <Size>
+---------
+Set size of zero-initialised area
+
+
+#format syntax
+--------------
+This assembler switch determines how FP-numbers shall be formatted in
+the "STR$(num)" function, and the "output" statement. This is about the
+same as the @% variable in Basic.
+
+Byte (byte 4 is MSB, byte 1 is LSB)
+-----------------------------------
+4     - Not used
+3     - Format type
+        0 - General format. Numbers have the form nnn.nnn. Trailing zeros
+            are skipped. If the number is bigger than the field width, or
+            less than 0.001, the Exponent format is used instead.
+        1 - Exponent format. Numbers have the form n.nnnEnn. The number of
+            digits printed is given in the field width.
+        2 - Fixed format. Numbers have the form nnn.nnn. If the number is
+            bigger than the width of the precision (18 digits), the
+            Exponent format is used instead.
+2    - Field width. This is the number of digits printed. For Fixed
+       format, it gives the number of decimals printed.
+1    - Not used.
+
+
+6. Extra instructions/statements
+---------------------------------------------------------------------
+ADR
+DIV
+EXG
+
+ALIGN
+
+DCx
+DCFx
+DBx
+DBFx
+
+INCBIN
+STRUCT
+RELATIVE
+MACRO
+
+TEMP
+LOCK
+
+OUTPUT
+
+
+Extra instructions
+------------------
+ADR
+---
+Get address.
+
+Syntax:    ADR[CC]   Rd,<Label>
+Operation: Rd = Address of <label>
+
+Examples of use:
+
+ADR      R1,Data_Block
+
+ADRL
+----
+Minimum 16-bit ADR.
+
+This is the same as ADR, except that it assembles to minimum 16 bit
+(two instructions) (long ADR). It's the same as setting the 'Fast' option
+for this ADR. Using this for the ADR instructions that needs it can reduce
+the number of passes.
+
+extASM will continue to assemble until two passes have the same length
+and all variables are resolved. Therefore, if you specify ADR's as
+minimum 16-bit then they will auto-expand to that the first time,
+instead of maybe a later pass, if it uses a forward referencing label.
+
+
+DIV
+---
+Integer division.
+
+Syntax:    DIV[CC]   Rd,Rn,Rs
+Operation: Rd = Rn DIV Rs
+           Rn = Rn MOD Rs
+Notice:    Rd, Rn & Rs must be uniqe.
+Extra:     Uses 1 Temp Register. Uses bit 0 and 1 of R13 temporarily,
+           so it should be set up as e.g. a stack pointer.
+
+Examples of use:
+
+DIV      R1,R4,R7
+DIVLE    R10,R11,R12
+
+
+EXG
+---
+Exhange contents of two integer registers.
+
+Syntax:    EXG[CC]   Rd,Rn
+Operation: Rd = old Rn
+           Rn = old Rd
+Notice:    Rd must be different from Rn.
+
+Examples of use:
+
+EXG      R1,R2
+EXGLT    R3,R9
+
+
+Statements
+----------
+ALIGN
+-----
+Alignment of Code & Data
+
+Syntax: ALIGN [Boundary] [,Offset]
+Notice: The assembler will issue warnings if code is not word-aligned, but
+        it will not warn if data is not word-aligned (bytes...).
+
+It aligns the code to a chosen boundary and offset. (default boundary is 4
+(word) and offset 0). Offset means that after <Offset> bytes, the pointer
+will be <Boundary> aligned.
+
+Examples of use:
+
+ALIGN
+
+ALIGN 16,4              ; Cache-alignment
+DCD   0                 ; This will not be aligned
+.Start                  ; But this will be!
+
+
+Constant Declarations
+---------------------
+DCB    Declare Constant Byte, also used for strings.
+DCW    Declare Constant Word (16 bit).
+DCD    Declare Constant Doubleword (32 bit).
+DCFS   Declare FP-Constant, Single precision (32 bit)
+DCFD   Declare FP-Constant, Double precision (64 bit)
+DCFE   Declare FP-Constant, Extended precision (96 bit)
+DCFP   Declare FP-Constant, Packed BCD (96 bit)
+DCFEP  Declare FP-Constant, Extended Packed BCD (128 bit)
+
+Syntax:  <DCB | DCW | DCD | DCFS | DCFD | DCFE | DCFP | DCFEP>
+         <Const> {,<Const>}
+Special: DCB <Const | String> {,<Const | String>}
+Where:   Const is any legal expression, and String is any string.
+
+Examples of use:
+
+DCB   0
+DCB   1,2,3
+DCB   "Text",0,"More text","Yet more ""and in quotes"",
+                 <10> Linefeed" 10,13,0
+DCB   "More quotes |"Some text|", the following is taken
+               literally |<10>","<Some$Var>"
+DCW   10000,20000,30000,101,102,103
+DCD   -1,-2,-3,1 << 16,1 << 24,1 << 30
+DCD   Label_1,Label_4-Label_3,&8000+Offset_to_something
+DCFS  1.23
+DCFD  123.4E10
+DCFE  0.00123E-20
+DCFP  -1.23
+DCFEP 123
+
+Block Declarations
+------------------
+DBB    Declare Block of Bytes.
+DBW    Declare Block of Words (16 bit).
+DBD    Declare Block of Doublewords (32 bit).
+DBFS   Declare Block of FP-Constant, Single precision (32 bit)
+DBFD   Declare Block of FP-Constant, Double precision (64 bit)
+DBFE   Declare Block of FP-Constant, Extended precision (96 bit)
+DBFP   Declare Block of FP-Constant, Packed BCD (96 bit)
+DBFEP  Declare Block of FP-Constant, Extended Packed BCD (128 bit)
+
+Syntax: <DBB | DBW | DBD | DBFS | DBFD | DBFE | DBFP | DBFEP> Size [, Const]
+Where:  Size is how many items in the block (bytes, words or doubles).
+        Const is the value of each item, default 0.
+
+Examples of use:
+
+DBB   1024,&FF
+DBW   100,%0110110101010100
+DBD   512
+DBFS  10,1.23
+DBFD  4,123
+DBFE  100
+DBFP  20,123E10
+DBFEP 10,123.4
+
+
+Including binary file (data-file)
+---------------------------------
+INCBIN
+------
+Include binary file.
+
+Syntax:  INCBIN <filename>
+Where:   <filename> is the data-file to insert.
+Notice:  Space is automatically allocated for the file, and is byte-aligned.
+
+Examples of use:
+
+.SinTable   incbin   "<Tmp$Dir>.Tables.SinusTable"
+
+
+Structures
+----------
+Structures let you combine several data-types to make a complex data-type.
+Most high-level languages support such mechanisms, and now you can benefit
+from this useful technique in assembly level programming as well.
+
+The labels inside the structure will start at zero (or <Offset>). If you
+use <Step>, then the address will increase by <Step> for each line. You
+can also have nameless structures.
+
+Syntax:
+-------
+STRUCT [<Name>] [,#<Offset>] [,<Step>]
+{
+<Data>
+}
+
+Here are some examples:
+
+Here's how to make a simple structure:
+
+struct Mouse
+{
+   .X_Pos       DCD   0
+   .Y_Pos       DCD   0
+   .Buttons     DCD   0
+   .Size                             ; .Size = size of struct! (end...)
+}
+
+To allocate some static space for an instance of this data-type do this:
+
+.MouseBlock
+   DBB   Mouse.Size,0                ; Declare block of right size
+   ALIGN                             ; Just in case it wasn't aligned...
+
+Easy! Now, to address directly into this area, here's how:
+
+   SWI      OS_Mouse
+   STR      R0,MouseBlock + Mouse.X_Pos
+   STR      R1,MouseBlock + Mouse.Y_Pos
+   STR      R2,MouseBlock + Mouse.Buttons
+
+Or, if you have a register pointing to the data-area, you can:
+
+   SWI      OS_Mouse
+   ADR      R9,MouseBlock
+   STR      R0,[R9,#Mouse.X_Pos]
+   STR      R1,[R9,#Mouse.Y_Pos]
+   STR      R2,[R9,#Mouse.Buttons]
+
+
+struct List,#&1000
+{
+   .Code1   DCD   0      ; List.Code1 = &1000
+   .Code2   DCD   0      ; List.Code2 = &1004
+   .Code3   DCD   0      ; List.Code3 = &1008
+}
+
+struct #&400C0,1
+{
+ .Wimp_Initialise   ; Wimp_Initialise = &400C0
+ .Wimp_CreateWindow ; Wimp_CreateWindow = &400C1
+ .Wimp_CreateIcon   ; Wimp_CreateIcon  = &400C2
+ ; This is not needed as extASM works out SWI numbers itself
+}
+
+
+Structures can also be nested, so you can write something like:
+
+struct Person
+{
+   struct Name
+   {
+      .First   DCD   0
+      .Last    DCD   0
+   }
+   .Address
+}
+
+This can be accessed by:
+
+   LDR      R1,[R9,#Person.Name.First]
+   LDR      R2,[R9,#Person.Name.Last]
+   LDR      R3,[R9,#Person.Address]
+
+
+'Relative' statement
+--------------------
+You can designate an area with labels as relative to a register other than
+the usual R15, for Load/Store and ADR. This way you can have one register
+pointing to a data area, and then you can save a lot of auto-expansion.
+The register will then be closer to the area than R15, when used in the
+Load/Store or ADR.
+
+The statement is like 'struct', because the labels inside the statement
+start at zero (or <Offset>). One difference is that whereas 'struct' only
+makes a 'template' of the data, assigning only the labels, not storing the
+data, 'relative' executes the source inside the statement as normal. The
+data and code there is retained.
+
+If the 'virtual' parameter is used, then only the labels are stored, and
+not the data, as with 'struct'. This can be handy because the object file
+need be no bigger than necessary, or be filled with unnecessary data, if
+the data are initialised at run-time.
+
+The variables and labels that are assigned inside the statement are marked
+specially, so that they will be coded as relative to <Register> when used
+with ADR or Load/Store. You will get the usual value when they are used in
+other places.
+
+Syntax:
+-------
+RELATIVE <Register> [,<Offset>] [,virtual]
+{
+<Data>
+}
+
+For example:
+
+relative R12
+{
+.Label   DCD   0             ; Label  = 0
+.Label2  DCD   0             ; Label2 = 4
+}
+
+ADR      R1,Label            ; Coded as 'ADD   R1,R12,#Label'
+LDR      R2,Label2           ; Coded as 'LDR   R2,[R12,#Label2]'
+LDFS     F3,Label            ; Coded as 'LDFS  F3,[R12,#Label]'
+
+
+If you use the offset you can have twice the amount of data without
+auto-expansion, as you can then use the sign-capability of ADR and
+Load/Store. ADR can access +/- 1K (word-aligned, or else it is +/- 255
+bytes), and LDR/STR can access +/- 4K.
+
+relative R10,-16,virtual     ; 'Virtual' parameter, so only the labels are
+{                            ; assigned, no data is stored
+.Label   DBD   4             ; Label  = -16
+.Label2  DBD   4             ; Label2 = 0
+.Label3  DBD   4             ; Label3 = 16
+}
+
+
+Macros
+------
+The use of macros makes it easier to do things routinely, and can be a very
+powerful tool in making complex code. A macro can be defined anywhere in
+the source, and it is smart to have a standard file of all your standard
+macros, so that you can easily include this into any other programs you
+write.
+
+Syntax:
+-------
+macro <Name>[$<CCVar>] [<Parameter1>:<Type1> {,<Parameter2>:<Type2>} ]
+{
+<Code>
+}
+
+The macro header must be the first non-blank character on a line.
+
+Macros can take five different passing-parameters, and use seven different
+parameters. The additional use-parameters are temp-registers.
+
+Macro condition-codes
+---------------------
+You can even have condition-codes for the macros, so that they can make
+new instructions. This can be done by using "$<VarName>" after the macro
+name in the definition. The variable <VarName> will then contain the
+integer condition code (0-15).
+
+This can be used by instructions in the macro, by using "$<varname>" after
+any of the instructions. In fact, the "<Instruction>$<VarName>" construction
+can be used anywhere in the program, not just in macros.
+
+Using macros with condition code can also be handy for debugging. You can
+e.g. have a macro call like this: 'PrintCCEQ "The condition code is EQ"'
+(the macro name is "PrintCC").
+
+If there are characters after the condition code variable, then you can
+terminate the variable name with '#', like this:
+
+MOV$CC#S   R1,#1
+LDM$CC#FD  R1,{R2-R4}
+
+
+Macro parameters
+----------------
+The five passing-parameter types are:
+
+    Type                   Variable type for parameter in macro
+    -----------------------------------------------------------
+    R    Register          Integer
+    F    FP-Register       Integer
+    I    Integer           Integer
+    X    FP-value          FP
+    S    String            String
+
+The last two use-only parameters are:
+
+    TR   Temp register      Integer
+    TF   Temp FP-register   Integer
+
+The passing-parameters are the arguments sent from the source upon using
+the macro, and they translate to the parameter variables inside the macro.
+The parameter-variables are local in the macro.
+
+The macro temp-registers are additional registers that the macro needs to
+do the job. The temp-registers will be allocated by the assembler
+automatically.
+
+Note: If temp-registers are used and stacked, then only the
+registers in the header is allowed to be used in the macro, since the
+register may otherwise have been allocated as a temp-register...
+The assembler will give an error if this is done.
+
+When allocating FP temp-registers that have to be stacked, the assembler
+allocates subsequent registers, starting from the first free register.
+This is so that SFM/LFM can be used for the stacking.
+
+Because of this, when using FP temp-registers in a macro, the macro has to
+be called in such a way that there are enough free registers from the first
+free register and onwards, to accomodate for the FP temp-registers,
+otherwise there will be an error.
+
+Here is an example of a macro.
+
+; Define macro
+
+macro TEST$cc Reg:r,FPReg:f,Num:i,FPNum:x,Str:s,TempReg:tr,FPTempReg:tf
+{
+   ADD      Reg,TempReg,#Num
+   ADFS     FPReg,FPTempReg,#FPNum
+   DCB      Str,0
+   ADD$cc   Reg,#1
+}
+
+TEST R1,F1,123,1.23,"A little string"   ; Call macro, condition code AL (&E)
+TESTEQ Reg,FPReg,1+2,sqr(3),"ABC"+"DEF" ; Call macro, condition code EQ (&0)
+
+
+Temp Register Management
+------------------------
+TEMP & FPTEMP   Mark a register as unused, so it can be used as a TempReg.
+
+Syntax:   <TEMP | FPTEMP>   RegList
+Where:    Reglist is a list of registers, or register-ranges.
+Notice:   The contents of RegList is unsafe until it is LOCK'ed or
+          FPLOCK'ed again.
+
+Examples of use:
+
+TEMP     R0
+TEMP     R1,R2,R8-R12
+FPTEMP   F0
+FPTEMP   F0,F1,F3-F7
+
+
+LOCK & FPLOCK   Reclaim a register after a it has been TEMP'ed or FPTEMP'ed.
+
+Syntax:  <LOCK | FPLOCK>   RegList
+Where:   Reglist is a list of registers, or register-ranges.
+Notice:  The contents of RegList is safe after this point.
+
+Examples of use:
+
+LOCK     R0
+LOCK     R1,R2,R8-R12
+FPLOCK   F0
+FPLOCK   F0,F1,F3-F7
+
+
+Output values
+-------------
+OUTPUT <expression> {,<expression>}
+
+This prints expression result in Status-info window.
+
+
+7. Miscellaneous
+---------------------------------------------------------------------
+7.1 Extra info
+--------------
+The instruction ORR can be spelled OR if you prefer.
+You can use spaces or TABs in the source code.
+
+
+7.2 Case sensitivity
+--------------------
+All assembler syntax is case insensitive.
+All macros and variables are case sensitive.
+
+
+7.3 Register binding
+--------------------
+Registers (R0-R15 or F0-F7) can be typed in several ways:
+
+è Using the hard-coded "R0"-"R15", "PC" or "F0"-"F7".
+è By typing any value, e.g. "8", "%0011", "&A", "(1+2)" or similar.
+è By using a variable defined by #set, or in macro header,
+   e.g. "MyReg", "Result".
+
+
+7.4 Values
+----------
+Integers may be specified in decimal, hexadecimal, binary or octal.
+
+&, $ - Hexadecimal
+%    - Binary
+@    - Octal
+
+"E" (exponent) may be used for both integers and floating point numbers,
+like this:
+
+123E3
+3.45E-4
+
+Special characters can be used in the string. They are:
+
+"" = "
+"<ASCII value/OS variable>", for example "<10>", "<Obey$Dir>".
+ASCII 0 should not be used in a string, as it is used to mark the end of
+the string.
+
+"|" is an "escape" character, so |" = " and |<10> = <10>
+
+
+7.5 Value types
+---------------
+There are three value types: Integer, floating point and string.
+
+Integer and Floating Point operands will auto-cast to the operands needed
+for the operator, and for the result required. Thus you can use all the
+Floating Point and integer operators, whether the operands or your result
+should be a Floating Point number or an integer.
+
+If one or both of the operators are of type FP, and there is a
+corresponding FP operation, any Integer operand will be cast to FP, and
+the FP operation will be used. Also, the FP operation will be used if
+the Integer precision is insufficient to hold the result.
+
+If no corresponding FP operation is available, instead any FP operand
+will be cast to Integer, and the Integer operation will be used.
+
+
+7.6 Operators
+-------------
+In the following table, the result type is shown by characters in
+parentheses, if it is different from the type of the operators.
+
+All the compare operators return integer -1 for TRUE or 0 for FALSE.
+
+The following operators and functions are implemented:
+
+Level   Integer                  Floating Point             String
+----------------------------------------------------------------------------
+0       ( )                      ( )                        ( )
+1       NOT   Bitwise NOT        ABS   Absolute value       LEFT$(S,I)
+        RND   Pseudo-random num. SQR   Square root          MID$(S,I [,I] )
+              (see below)        LOG   Logarithm base 10    RIGHT$(S,I)
+        ABS   Absolute value     LN    Logarithm base e     VAL(S)   (I / F)
+        SGN   Sign (-1 for       EXP   Exponent of e (e^x)  STR$(I / F) (S)
+              negative, 0 for    SIN   Sine                 STRING$(S,I)
+              0, and 1 for       COS   Cosine               INSTR(S,S [,I] )  (I)
+              positive)          TAN   Tangent              EVAL(S)  (I / F)
+        ALIGN(Num,Boundary)      ASN   Arc-Sine             CHR$(I)      (S)
+              Returns Num        ACS   Arc-Cosine           ASC(S)       (I)
+              aligned to         ATN   Arc-Tangent          TIME$
+              Boundary           DEG   Convert radians to   LEN(S)       (I)
+                                       degrees
+                                 RAD   Convert degrees to
+                                       radians
+                                 SGN (I)   Sign, as for Integer
+                                 INT (I)   Convert to Integer
+2       ^     Power              ^     Power
+3       *     Multiplication     *     Multiplication
+        / (F) Division           /     Division
+        DIV   Integer division
+        MOD   Integer modulus
+              (remainder after
+               division)
+4       +     Addition           +     Addition           +  String addition
+        -     Subtraction        -     Subtraction
+5       <<    Shift left
+        >>    Arithmetic shift
+              right
+        >>>   Logical shift
+              right
+6       ==         Test for equal             Same as       Same as
+        <> or !=   Test for not-equal         Integer       Integer
+        <= or =<   Test for less-than-or-equal
+        >= or =>   Test for greater-than-or-equal
+        <          Test for less-than
+        >          Test for greater-than
+7       AND        Bitwise AND
+8       EOR        Bitwise Exclusive OR
+9       OR         Bitwise OR
+
+RND gives a pseudo-random integer between 0 and N-1, where N is the
+argument. If N is zero, then the previous RND number is given. If N is
+negative, N is used to seed the random number generator, and RND returns N.
+
+TIME$ gives a date and time string equal to Basic's TIME$.
+
+
+7.7 Local variables
+-------------------
+Local variables are very useful in assembler programming, because they
+make it possible to use the same label name many times. When defining a
+local variable, the first character of the label name should be an
+underscore (_). The scope of the local variable (where it is legal) is
+only between two normal variables. Here is an example:
+
+.Skip_Blanks                 ; R0 = char, R10-> next char
+   STMFD    R13!,{R14}
+._Loop                       ; define local label
+   CMP      R0,#' '          ; search for space-char
+   CMPNE    R0,#&09          ; ... or a TAB-char
+   LDREQB   R0,[R10],#1
+   BEQ      _Loop            ; use local label
+   LDMFD    R13!,{R15}^
+
+All variable types can be local, by using the '_' character as the first
+character. like:
+'#set _LocalVar=123'.
+
+
+7.8 FP instruction precision
+----------------------------
+The number of significant digits, and maximum exponent for the different
+FP precisions are:
+
+S - 6-7 digits (over exponent 8 to get Inexact error), exponent 38
+D - 11-12 digits (over exponent 22 to get Inexact error), exponent 308
+E - 18-19 digits, exponent 4932
+
+
+7.9 Starting assembly from command line, or Obey file
+-----------------------------------------------------
+A star-command is supported to enable starting assembly from the command
+line, or an obey-file, when the assembler is loaded.
+
+Syntax: *Drag <AppName> <Filename>
+Where:  <AppName> is "extASM" and <Filename> is the source filename.
+
+This sends a DataLoad message to extASM, so that it loads the source
+<Filename> and starts assembly. It simulates a drag of a file from the Filer
+to the extASM icon on the iconbar.
+
+This command is provided by the "DragMod" module, and that is the only thing
+it does, and the module can be used freely for other things. It is in the
+"Resources" directory of extASM.
+
+Notice: Some editors (e.g. StrongED) can be programmed to start the
+        assembly-process in the same manner (F10 in StrongED).
+
+
+7.10 Limits
+-----------
+Limits                      Memory=Only limited by available memory
+-------------------------------------------------------------------
+#include nesting            Memory
+Macro call nesting          Memory
+#if-#else-#endif nesting    16
+#rept-#endr nesting         16
+struct nesting              16
+
+Parameters for macro calls  Memory
+
+Variable name length        Max. 46 characters
+Macro name length           Max. 43 characters.
+
+Integer                     32 bit
+Floating Point              18 significant digits, max. exponent is 4932
+                            ("E" - Extended format is used)
+String                      Max. 239 characters
+
+
+7.11 Stack setup
+----------------
+The assembler assumes there is a valid full-descending stack at R13. This
+is for saving temporary registers during macros or auto-expansion
+instructions where no temp-regs are available.
+
+Here is an example of how to set up a valid stack:
+
+#set StackSize = 1024        ; How large stack do we want?
+.Start
+   ADR      R13,Stack
+   STMFD    R13!,{R14}
+   ;        Normal code
+.End
+   LDMFD    R13!,{R15}^
+.Stack_Base
+   #set Stack=Stack_Base+Stack_Size
+   ; You can also use 'DBB   Stack_Size', but that will increase the size
+   ; of the object file.
+
+
+7.12 Removing warning messages
+------------------------------
+A warning message can be commented out, if it is not wanted. This can be
+done by placing a "|" before the warning-text in the "Warning" file
+(in the "Resources" directory), like this:
+
+"#&04 = |Data not halfword-aligned".
+
+This program also supports interactive help, using the !Help application.
+
+
+7.13 Possible/probable future features for extASM
+-------------------------------------------------
+è AOF capability incorporated into extASM.
+
+8. Auto-expansion
+-----------------
+Most ALU, FPU, and Load/Store instructions will be auto-expanded if the
+immediate constant is too big to be handled by a single instruction. FPU
+instructions are auto-expanded by using a LDF to load the value, and the
+value is stored at the next "#fppool" switch. LDR & STR using labels will
+be auto-expanded if the 4KB range is exceeded. The same is true for LDF,
+STF, LFM and SFM if their range is exceeded.
+
+TEMP, LOCK, FPTEMP & FPLOCK are used to tell the assembler that some
+registers can be temporarily used by macros or for auto-expanding,
+eliminating the need to save registers on the stack when extra registers
+are needed.
+
+Use of the #fppool
+------------------
+Before FP instructions (besides LDF, STF, LFM and SFM) may be auto-expanded,
+one or more '#fppool's need to be set up (somewhere in the code). The
+position of the next #fppool after the instruction will be used to store
+the data. Here are some examples:
+
+ADFS   F1,F2,#123   ; Coded as LDFS F1,FPPOOL (LDFS F1,[R15,#Offset]),
+                    ; then ADFS F1,F2,F1
+MVFS   F1,#234      ; ----"--- LDFS F1,FPPOOL+4
+
+#fppool             ; Here the numbers will be stored, which are here equal
+                    ; to DCFS 123 and DCFS 234
+
+
+Another example
+---------------
+ADR    R12,FPPOOL_Adr
+
+MVFS   F1,#123      ; Coded as LDFS F1,[R12]
+MVFS   F2,#234      ; ----"--- LDFS F2,[R12,#4]
+MVFS   F3,#345      ; ----"--- LDFS F3,[R12,#8]
+
+.FPPOOL_Adr
+#fppool R12
+
+
+The following statements will be auto-expanded as follows:
+
+ADFS  F1,F2,#123
+MUFS  F3,F1,#asn(1)*2    ; PI, the number is calculated before storing
+
+Coded as
+--------
+LDFS  F1,Label_123       ; 123 is stored at "Label_123"
+ADFS  F1,F2,F1
+LDFS  F3,Label_3.1415...
+MUFS  F3,F1,F3
+
+This exploits the capability of the FPA to execute Load/Store and
+arithmetic instructions at the same time better than if one loaded the
+constants at the start of the calculation. If precision for the constant
+in the instruction is too low, the necessary precision is used in the LDF
+and the expanded instruction. For example:
+
+ADFS  F1,F2,#1E100       ; Too big for "S" precision
+
+Coded as
+--------
+LDFD  F1,Label_1E100
+ADFD  F1,F2,F1
+
+
+9. Auto-expanding technical section
+-----------------------------------
+The following section is not needed to use the assembler, but it shows some
+of the workings of the auto-expansion, and it shows how to make better code.
+
+9.1 Instruction changing
+------------------------
+Some instructions may be automatically changed to others, and any negative
+constant used is changed accordingly. This is done to eliminate or reduce
+auto-expanding. This may be done for the following ARM instructions:
+
+MOV <-> MVN
+ADD <-> SUB
+ADC <-> SBC
+AND <-> BIC
+CMP <-> CMN
+
+For the FPA, the same is the case for the following instructions (only if
+it can be coded without auto-expansion, otherwise the instruction and
+constant is unchanged):
+
+MVF <-> MNF
+ADF <-> SUF
+CMF <-> CNF
+
+This effectively sign-extends the range of values that can be coded with
+these instructions to include 0.0 - -5.0, -0.5 and -10.0.
+
+Examples                  Coded as
+----------------------------------
+MOV   R1,#-123         -> MVN   R1,#122     ; This is NOT -123
+ADD   R1,R2,#-123      -> SUB   R1,R2,#123
+AND   R1,R2,#&FFFFFF00 -> BIC   R1,R2,#&FF
+
+MVFS  F1,#-3           -> MNFS  F1,#3
+
+
+This changing can be handy when variables are used where the sign of the
+variable is not known (or specified) in advance, like:
+
+MOV   R1,#Offset       ; May be coded as MOV or MVN depending on the number
+
+
+9.2 Auto-expansion method
+-------------------------
+The auto-expansion is done by using more instructions to encode an
+immediate constant. For the ALU instructions these can be up to a total
+of four instructions, for a 32-bit word. The ARM instructions are
+auto-expanded as follows:
+
+MOV -> MOV, then one or more ORRs
+MVN -> MVN, --------"------- EORs
+ADD -> ADD, --------"------- ADDs
+SUB -> SUB, --------"------- SUBs
+RSB -> RSB, --------"------- ADDs
+ADC -> ADC, --------"------- ADDs
+SBC -> SBC, --------"------- SUBs
+RSC -> RSC, --------"------- ADDs
+
+AND -> BIC, --------"------- BICs  (AND cannot be divided over several
+ORR -> ORR, --------"------- ORRs   instructions. The immediate constant is
+EOR -> EOR, --------"------- EORs   NOTed and BIC is used.)
+BIC -> BIC, --------"------- BICs
+
+CMP -> An auto-expanding MOV, then CMP
+CMN -> ----------"---------------- CMN
+TST -> ----------"---------------- TST
+TEQ -> An auto-expanding EORS, using a temp-register for the result
+
+LDR R1,Long_Label  -> An (auto-expanding, if necessary) ADR, followed by LDR
+STR R1,Long_Label  -> -------------------------"------------------------ STR
+                       (needs temp-reg)
+
+LDR R1,[R2,#&12344] -> This is done in various ways, depending on
+                       whether it is pre/post indexed and write-back.
+STR R1,[R2,#&12344] -> ---------------------"------------------------
+
+
+Examples
+--------
+MOV   R1,#&1234        -> MOV   R1,#&1200
+                          ORR   R1,R1,#&34
+
+ADDS  R1,R2,#&12003400 -> ADD   R1,R2,#&12000000
+                          ADDS  R1,R1,#&3400
+
+AND   R1,R2,#&FFFF     -> BIC   R1,R2,#&FF000000
+                          BIC   R1,R1,#&FF0000
+
+LDR   R1,Long_Label    -> ADD/SUB R1,R15,#Offset AND NOT &FFF
+                          LDR R1,[R1,#Offset AND #&FFF]
+
+
+9.3 PSR setting for auto-expanding
+----------------------------------
+Note that the setting of the PSR is slightly different when using
+auto-expanding instructions, from when using the same instruction with
+the constant in a register. When auto-expanding, the Z, N and V flags will
+be set correctly, but the C flag might be different. This is most easily
+demonstrated with an example:
+
+We assume that R2 contains zero.
+
+SUBS  R1,R2,#&1234 -> SUB   R1,R2,#&1200 ; R1=0-&1200 = -&1200
+                      SUBS  R1,R1,#&34   ; R1=R1-&34  = -&1200-&34 = -&1234
+
+Here the Z, N and V is set right. In the last instruction, the C flag is
+set, because the first operand (-&1200) is unsigned higher than the
+second (&34).
+
+Using the constant in a register, we assume that R2 contains zero and the
+constant is in R3.
+
+SUBS  R1,R2,R3
+
+Here the Z, N and V is also set right, of course. The first operand (0)
+is _not_ unsigned higher than the second (&1234), so the C flag is
+cleared. Here is a difference.
+
+
+For this reason, the compare instructions can not be auto-expanded like
+this:
+
+CMP -> Auto-expanding SUBS, using a temp-register for the result.
+
+However, as shown above, TEQ is auto-expanded differently from the other
+compare instructions. That is because this is possible, with correct PSR,
+since it's a logical instruction, and you may save one instruction that
+way. This can be done as follows:
+
+First, a usual compare
+
+CMP   R1,#&1234 -> MOV   TempReg,R1,#&1200
+                   ORR   TempReg,TempReg,#&34
+                   CMP   R1,TempReg
+
+Instead, if the C flag doesn't have to be set correctly (for EQ/NE tests),
+an auto-expanding TEQ can be used:
+
+TEQ   R1,#&1234 -> EOR   TempReg,R1,#&1200
+                   EORS  TempReg,TempReg,#&34
+
+
+9.4 Auto-expanding instructions
+-------------------------------
+                                        Requires    Requires
+Instruction                             temp-reg    FP temp-reg
+---------------------------------------------------------------
+MOV, MVN, ADD, SUB, RSB, ADC,
+SBC, RSC, AND, ORR, EOR, BIC, ADR
+
+CMP, CMN, TST, TEQ                      x
+
+LDR                                     (x) [1]
+STR                                     x
+
+LDF, LFM                                x
+SDF, SFM                                x
+
+MVF, MNF, ABS, RND, SQT, LOG, LGN,      (x) [3]
+SIN, COS, TAN, ASN, ACS, ATN, URD, NRM
+
+ADF, SUF, RSF, MUF, DVF, RDF,           (x) [3]     (x) [2]
+RMF, POW, RPW, FML, FDV, FRD, POL
+
+
+[1] If using instruction like LDR R1,[R1,#&12344] (Rd=Rn)
+[2] If using instruction like ADFS F1,F1,#123 (Fd=Fn)
+[3] If range to next #fppool is more than 1020 bytes
+
+Quite a lot of Load/Store and ADR auto-expansion can be avoided if you
+have a central variable area (for the "global variables"), and use the
+"relative <Register>" construct to point to it.
+
+
+10. ARM and FPA pie chart instructions
+--------------------------------------
+The instructions in the different groups in the ARM and FPA pie charts
+are as follows:
+
+ARM statistics
+--------------
+Arithmetical - MOV, MVN, ADD, SUB, RSB, ADC, SBC, RSC, MUL, MLA, MRS, MSR
+Logical      - AND, ORR, EOR, BIC
+Compare      - CMP, CMN, TST, TEQ
+Load/Store   - LDR, STR, LDM, STM, SWP
+Branch/BL    - B, BL
+ADR          - ADR (,ADRL)
+SWI          - SWI
+
+FPA statistics
+--------------
+Unops      - MNF, MVF, ABS, SQT, LOG, LGN, EXP, SIN, COS, TAN, ASN, ACS,
+             ATN, RND, URD, NRM
+Binops     - ADF, SUF, RSF, MUF, DVF, RDF, RMF, FML, FDV, FRD, POW, RPW, POL
+Compare    - CMF, CNF, CMFE, CNFE
+Load/Store - LDF, STF, LFM, SFM
+Reg. trans - FIX, FLT, RFS, WFS, RFC, WFC
+
+Unops      - Unary operators
+Binops     - Dyadic operators
+Reg. trans - Register transfer
+
+
+11. ARM2/3/6 Instruction Set
+---------------------------------------------------------------------
+MOV{CC}{S}      Rd, Op2             ; Rd = Op2
+MVN{CC}{S}      Rd, Op2             ; Rd = NOT Op2
+
+ADD{CC}{S}      Rd, Op1, Op2        ; Rd = Op1 + Op2
+SUB{CC}{S}      Rd, Op1, Op2        ; Rd = Op1 - Op2
+RSB{CC}{S}      Rd, Op1, Op2        ; Rd = Op2 - Op1
+ADC{CC}{S}      Rd, Op1, Op2        ; Rd = Op1 + Op2 + Carry
+SBC{CC}{S}      Rd, Op1, Op2        ; Rd = Op1 - Op2 + Carry - 1
+RSC{CC}{S}      Rd, Op1, Op2        ; Rd = Op2 - Op1 + Carry - 1
+AND{CC}{S}      Rd, Op1, Op2        ; Rd = Op1 AND Op2
+ORR{CC}{S}      Rd, Op1, Op2        ; Rd = Op1 OR Op2
+EOR{CC}{S}      Rd, Op1, Op2        ; Rd = Op1 EOR Op2
+BIC{CC}{S}      Rd, Op1, Op2        ; Rd = Op1 AND NOT Op2
+
+CMP{CC}{S}{P}   Op1, Op2            ; Same as SUB, but result is discarded
+CMN{CC}{S}{P}   Op1, Op2            ; Same as ADD, but result is discarded
+TST{CC}{S}{P}   Op1, Op2            ; Same as AND, but result is discarded
+TEQ{CC}{S}{P}   Op1, Op2            ; Same as EOR, but result is discarded
+
+MUL{CC}{S}      Rd, Op1, Op2        ; Rd = Op1 * Op2
+MLA{CC}{S}      Rd, Op1, Op2, Op3   ; Rd = Op1 * Op2 + Op3
+
+LDR{CC}{B}{T}   Rd,<Address>        ; Rd = Data at <address> in memory
+STR{CC}{B}{T}   Rd,<Address>        ; Data at <address> in memory = Rd
+
+LDM{CC}<PU>     Rn{!},<Reglist>{^}  ; Load Registers from Rn in memory
+STM{CC}<PU>     Rn{!},<Reglist>{^}  ; Store Registers to Rn in memory
+
+B{CC}           <Address>           ; Branch
+BL{CC}          <Address>           ; Branch with link
+
+SWI{CC}         <expression>        ; Perform a SoftWare Interrupt
+
+SWP{CC}{B}      Rd,Rm,[Rn]          ; Single data swap (ARM 3 or higher)
+
+MRS{CC}         Rd,<psr>      ; Transfer PSR to register (ARM 6 or higher)
+MSR{CC}         <psr>,Rm      ; Transfer register to PSR (ARM 6 or higher)
+                <psrf>,<Rm | #<expression>>
+
+<CC> ::=        < EQ | NE | GT | GE | LE | LT | HI | HS | LS | LO | CS | CC
+                | MI | PL | VS | VC | AL | NV>
+
+<Address> ::=   <expression>
+                [Rn]{!}
+                [Rn,<#expression>]{!}
+                [Rn,{+/-}Rm{,<shift>}]{!}
+                [Rn],<#expression>
+                [Rn],{+/-}Rm{,<shift>}
+
+<shift> ::=     [ <LSL | ASL | LSR | ASR | ROR> #<expression> | RRX ]
+
+<PU> ::=        FD|ED|FA|EA|IA|IB|DA|DB
+
+<RegList> ::=   {Reg1-Reg2 | ,Reg2}
+
+<psr> ::=       <CPSR | CPSR_all | SPSR | SPSR_all>
+
+                (CPSR and CPSR_all are synonymous, as are SPSR and
+                 SPSR_all)
+
+<psrf> ::=      <CPSR_flg | SPSR_flg>
+
+
+12. FPA10 Instruction Set
+---------------------------------------------------------------------
+MVF{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = Fm
+MNF{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = - Fm
+ABS{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = ABS(Fm)
+SQT{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = square root of (Fm)
+LOG{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = log10 of (Fm)
+LGN{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = loge of (Fm)
+EXP{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = e raised to the power of Fm
+SIN{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = sine of (Fm)
+COS{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = cosine of (Fm)
+TAN{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = tangent of (Fm)
+ASN{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = arc-sine of (Fm)
+ACS{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = arc-cosine of (Fm)
+ATN{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = arc-tangent of (Fm)
+RND{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = integer value of (Fm)
+URD{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = unnormalised round of (Fm)
+NRM{CC}<prec>{round}   Fd,<Fm|#value>    ; Fd = normalise (Fm) (after URD)
+
+ADF{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fn + Fm
+SUF{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fn - Fm
+RSF{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fm - Fn
+MUF{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fn * Fm
+DVF{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fn / Fm
+RDF{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fm / Fn
+RMF{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Remainder of (Fn / Fm)
+FML{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fn * Fm (fast, S prec. only)
+FDV{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fn / Fm (fast, S prec. only)
+FRD{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fm / Fn (fast, S prec. only)
+POW{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fn raised to the power Fm
+RPW{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = Fm raised to the power Fn
+POL{CC}<prec>{round}   Fd,Fn,<Fm|#value> ; Fd = polar angle of (Fn,Fm)
+
+CMF{CC}                Fn,Fm             ; compare Fn with Fm
+CNF{CC}                Fn,Fm             ; compare Fn with -Fm
+CMFE{CC}               Fn,Fm             ; compare Fn with Fm with exception
+CNFE{CC}               Fn,Fm             ; compare Fn with -Fm with exception
+
+LDF{CC}<S|D|E|P>       Fd,<Address>      ; Fd = Data at <address> in memory
+STF{CC}<S|D|E|P>       Fd,<Address>      ; Data at <address> in memory = Fd
+
+LFM{CC}                Fd,<count>,<Address> ; Load FP-Registers from <adr>
+SFM{CC}                Fd,<count>,<Address> ; Store FP-Registers to <adr>
+LFM{CC}<FD | EA>       Fd,<count>,[Rn]{!}   ; Alternative syntax
+SFM{CC}<FD | EA>       Fd,<count>,[Rn]{!}   ; Alternative syntax
+
+FLT{CC}<S|D|E>{P|M|Z}  Fn,Rd             ; Fn = Rd
+FIX{CC}{P|M|Z}         Rd,Fm             ; Rd = Fm
+WFS{CC}                Rd                ; FPSR = Rd
+RFS{CC}                Rd                ; Rd = FPSR
+WFC{CC}                Rd                ; FPCR = Rd (SVC mode only)
+RFC{CC}                Rd                ; Rd = FPCR (SVC mode only)
+
+<prec> ::=             <S | D | E>
+
+<round> ::=            <P | M | Z>
+
+<value> ::=            0.0 | 0.5 | 1.0 | 2.0 | 3.0 | 4.0 | 5.0 | 10.0 |
+                       Any value
+
+<Address> ::=          <expression>
+                       [Rn]
+                       [Rn,<#expression>]{!}
+                       [Rn],<#expression>
+
+<count> ::=            <1 - 4>

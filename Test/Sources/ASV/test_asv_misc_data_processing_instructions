@@ -1,0 +1,317 @@
+
+#name <Tmp$Dir>.^.^.test_asv_misc_data_processing_instructions
+
+#area test,code
+
+; VABA
+
+VABA.S8    Q1,Q2,Q3 ; Q1+=abs(Q2 - Q3) (SIMD, 16*8)
+VABA.S16   Q1,Q2,Q3 ; Q1+=abs(Q2 - Q3) (SIMD, 8*16)
+VABA.S32   Q1,Q2,Q3 ; Q1+=abs(Q2 - Q3) (SIMD, 4*32)
+VABA.U8    Q1,Q2,Q3 ; Q1+=abs(Q2 - Q3) (SIMD, 16*8)
+VABA.U16   Q1,Q2,Q3 ; Q1+=abs(Q2 - Q3) (SIMD, 8*16)
+VABA.U32   Q1,Q2,Q3 ; Q1+=abs(Q2 - Q3) (SIMD, 4*32)
+
+VABA.S8    D1,D2,D3 ; D1+=abs(D2 - D3) (SIMD, 8*8)
+VABA.S16   D1,D2,D3 ; D1+=abs(D2 - D3) (SIMD, 4*16)
+VABA.S32   D1,D2,D3 ; D1+=abs(D2 - D3) (SIMD, 2*32)
+VABA.U8    D1,D2,D3 ; D1+=abs(D2 - D3) (SIMD, 8*8)
+VABA.U16   D1,D2,D3 ; D1+=abs(D2 - D3) (SIMD, 4*16)
+VABA.U32   D1,D2,D3 ; D1+=abs(D2 - D3) (SIMD, 2*32)
+
+; VABAL
+
+VABAL.S8    Q1,D2,D3 ; Q1+=abs(D2 - D3) (SIMD, 8*8)
+VABAL.S16   Q1,D2,D3 ; Q1+=abs(D2 - D3) (SIMD, 4*16)
+VABAL.S32   Q1,D2,D3 ; Q1+=abs(D2 - D3) (SIMD, 2*32)
+VABAL.U8    Q1,D2,D3 ; Q1+=abs(D2 - D3) (SIMD, 8*8)
+VABAL.U16   Q1,D2,D3 ; Q1+=abs(D2 - D3) (SIMD, 4*16)
+VABAL.U32   Q1,D2,D3 ; Q1+=abs(D2 - D3) (SIMD, 2*32)
+
+; VABD
+
+VABD.S8    Q1,Q2,Q3 ; Q1=abs(Q2 - Q3) (SIMD, 16*8)
+VABD.S16   Q1,Q2,Q3 ; Q1=abs(Q2 - Q3) (SIMD, 8*16)
+VABD.S32   Q1,Q2,Q3 ; Q1=abs(Q2 - Q3) (SIMD, 4*32)
+VABD.U8    Q1,Q2,Q3 ; Q1=abs(Q2 - Q3) (SIMD, 16*8)
+VABD.U16   Q1,Q2,Q3 ; Q1=abs(Q2 - Q3) (SIMD, 8*16)
+VABD.U32   Q1,Q2,Q3 ; Q1=abs(Q2 - Q3) (SIMD, 4*32)
+
+VABD.S8    D1,D2,D3 ; D1=abs(D2 - D3) (SIMD, 8*8)
+VABD.S16   D1,D2,D3 ; D1=abs(D2 - D3) (SIMD, 4*16)
+VABD.S32   D1,D2,D3 ; D1=abs(D2 - D3) (SIMD, 2*32)
+VABD.U8    D1,D2,D3 ; D1=abs(D2 - D3) (SIMD, 8*8)
+VABD.U16   D1,D2,D3 ; D1=abs(D2 - D3) (SIMD, 4*16)
+VABD.U32   D1,D2,D3 ; D1=abs(D2 - D3) (SIMD, 2*32)
+
+VABD.F32   Q1,Q2,Q3 ; Q1=abs(Q2 - Q3) (SIMD, 4*32)
+VABD.F32   D1,D2,D3 ; D1=abs(D2 - D3) (SIMD, 2*32)
+
+; VABDL
+
+VABDL.S8    Q1,D2,D3 ; Q1=abs(D2 - D3) (SIMD, 8*8)
+VABDL.S16   Q1,D2,D3 ; Q1=abs(D2 - D3) (SIMD, 4*16)
+VABDL.S32   Q1,D2,D3 ; Q1=abs(D2 - D3) (SIMD, 2*32)
+VABDL.U8    Q1,D2,D3 ; Q1=abs(D2 - D3) (SIMD, 8*8)
+VABDL.U16   Q1,D2,D3 ; Q1=abs(D2 - D3) (SIMD, 4*16)
+VABDL.U32   Q1,D2,D3 ; Q1=abs(D2 - D3) (SIMD, 2*32)
+
+; VABS
+
+VABS.S8     Q1,Q2    ; Q1=abs(Q2) (SIMD, 16*8)
+VABS.S16    Q1,Q2    ; Q1=abs(Q2) (SIMD, 8*16)
+VABS.S32    Q1,Q2    ; Q1=abs(Q2) (SIMD, 4*32)
+VABS.F32    Q1,Q2    ; Q1=abs(Q2) (SIMD, 4*32)
+
+VABS.S8     D1,D2    ; D1=abs(D2) (SIMD, 8*8)
+VABS.S16    D1,D2    ; D1=abs(D2) (SIMD, 4*16)
+VABS.S32    D1,D2    ; D1=abs(D2) (SIMD, 2*32)
+VABS.F32    D1,D2    ; D1=abs(D2) (SIMD, 2*32)
+
+VABS.F64    D1,D2    ; D1=abs(D2) (VFP)
+VABSEQ.F64  D1,D2    ; D1=abs(D2) (VFP)
+
+VABS.F32    S1,S2    ; S1=abs(S2) (VFP)
+VABSEQ.F32  S1,S2    ; S1=abs(S2) (VFP)
+
+; VCLS
+
+VCLS.S8    Q1,Q2 ; Q1=leading_sign_bits(Q2) (SIMD, 16*8)
+VCLS.S16   Q1,Q2 ; Q1=leading_sign_bits(Q2) (SIMD, 8*16)
+VCLS.S32   Q1,Q2 ; Q1=leading_sign_bits(Q2) (SIMD, 4*32)
+
+VCLS.S8    D1,D2 ; D1=leading_sign_bits(D2) (SIMD, 8*8)
+VCLS.S16   D1,D2 ; D1=leading_sign_bits(D2) (SIMD, 4*16)
+VCLS.S32   D1,D2 ; D1=leading_sign_bits(D2) (SIMD, 2*32)
+
+; VCLZ
+
+VCLZ.I8    Q1,Q2 ; Q1=leading_zeros(Q2) (SIMD, 16*8)
+VCLZ.I16   Q1,Q2 ; Q1=leading_zeros(Q2) (SIMD, 8*16)
+VCLZ.I32   Q1,Q2 ; Q1=leading_zeros(Q2) (SIMD, 4*32)
+
+VCLZ.I8    D1,D2 ; D1=leading_zeros(D2) (SIMD, 8*8)
+VCLZ.I16   D1,D2 ; D1=leading_zeros(D2) (SIMD, 4*16)
+VCLZ.I32   D1,D2 ; D1=leading_zeros(D2) (SIMD, 2*32)
+
+; VCNT
+
+VCNT.8     Q1,Q2 ; Q1=bits_set(Q2) (SIMD, 16*8)
+VCNT.8     D1,D2 ; D1=bits_set(D2) (SIMD, 8*8)
+
+; VEXT
+
+VEXT.8     Q1,Q2,Q3,#1 ; Q1=extract(Q2,Q3) (SIMD, 16*8)
+;VEXT.16    Q1,Q2,Q3,#1 ; Q1=extract(Q2,Q3) (SIMD, 8*16)
+;VEXT.32    Q1,Q2,Q3,#1 ; Q1=extract(Q2,Q3) (SIMD, 4*32)
+;VEXT.64    Q1,Q2,Q3,#1 ; Q1=extract(Q2,Q3) (SIMD, 2*64)
+
+VEXT.8     D1,D2,D3,#1 ; D1=extract(D2,D3) (SIMD, 8*8)
+;VEXT.16    D1,D2,D3,#1 ; D1=extract(D2,D3) (SIMD, 4*16)
+;VEXT.32    D1,D2,D3,#1 ; D1=extract(D2,D3) (SIMD, 2*32)
+
+; VMAX
+
+VMAX.S8    Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 16*8)
+VMAX.S16   Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 8*16)
+VMAX.S32   Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 4*32)
+VMAX.U8    Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 16*8)
+VMAX.U16   Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 8*16)
+VMAX.U32   Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 4*32)
+
+VMAX.S8    D1,D2,D3 ; D1=max(D2,D3) (SIMD, 8*8)
+VMAX.S16   D1,D2,D3 ; D1=max(D2,D3) (SIMD, 4*16)
+VMAX.S32   D1,D2,D3 ; D1=max(D2,D3) (SIMD, 2*32)
+VMAX.U8    D1,D2,D3 ; D1=max(D2,D3) (SIMD, 8*8)
+VMAX.U16   D1,D2,D3 ; D1=max(D2,D3) (SIMD, 4*16)
+VMAX.U32   D1,D2,D3 ; D1=max(D2,D3) (SIMD, 2*32)
+
+VMAX.F32   Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 4*32)
+VMAX.F32   D1,D2,D3 ; D1=max(D2,D3) (SIMD, 2*32)
+
+; VMIN
+
+VMIN.S8    Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 16*8)
+VMIN.S16   Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 8*16)
+VMIN.S32   Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 4*32)
+VMIN.U8    Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 16*8)
+VMIN.U16   Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 8*16)
+VMIN.U32   Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 4*32)
+
+VMIN.S8    D1,D2,D3 ; D1=max(D2,D3) (SIMD, 8*8)
+VMIN.S16   D1,D2,D3 ; D1=max(D2,D3) (SIMD, 4*16)
+VMIN.S32   D1,D2,D3 ; D1=max(D2,D3) (SIMD, 2*32)
+VMIN.U8    D1,D2,D3 ; D1=max(D2,D3) (SIMD, 8*8)
+VMIN.U16   D1,D2,D3 ; D1=max(D2,D3) (SIMD, 4*16)
+VMIN.U32   D1,D2,D3 ; D1=max(D2,D3) (SIMD, 2*32)
+
+VMIN.F32   Q1,Q2,Q3 ; Q1=max(Q2,Q3) (SIMD, 4*32)
+VMIN.F32   D1,D2,D3 ; D1=max(D2,D3) (SIMD, 2*32)
+
+; VNEG
+
+VNEG.S8    Q1,Q2 ; Q1=-Q2 (SIMD, 16*8)
+VNEG.S16   Q1,Q2 ; Q1=-Q2 (SIMD, 8*16)
+VNEG.S32   Q1,Q2 ; Q1=-Q2 (SIMD, 4*32)
+VNEG.F32   Q1,Q2 ; Q1=-Q2 (SIMD, 4*32)
+
+VNEG.S8    D1,D2 ; D1=-D2 (SIMD, 8*8)
+VNEG.S16   D1,D2 ; D1=-D2 (SIMD, 4*16)
+VNEG.S32   D1,D2 ; D1=-D2 (SIMD, 2*32)
+VNEG.F32   D1,D2 ; D1=-D2 (SIMD, 2*32)
+
+VNEG.F64   D1,D2 ; D1=-D2 (VFP)
+VNEGEQ.F64 D1,D2 ; D1=-D2 (VFP)
+
+VNEG.F32   S1,S2 ; S1=-S2 (VFP)
+VNEGEQ.F32 S1,S2 ; S1=-S2 (VFP)
+
+; VPMAX
+
+VPMAX.S8   D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 8*8)
+VPMAX.S16  D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 4*16)
+VPMAX.S32  D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 2*32)
+VPMAX.U8   D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 8*8)
+VPMAX.U16  D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 4*16)
+VPMAX.U32  D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 2*32)
+VPMAX.F32  D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 2*32)
+
+; VPMIN
+
+VPMIN.S8   D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 8*8)
+VPMIN.S16  D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 4*16)
+VPMIN.S32  D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 2*32)
+VPMIN.U8   D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 8*8)
+VPMIN.U16  D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 4*16)
+VPMIN.U32  D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 2*32)
+VPMIN.F32  D1,D2,D3 ; D1=pairwise_max(D2,D3) (SIMD, 2*32)
+
+; VRECPE
+
+VRECPE.U32 Q1,Q2 ; Q1=approximate_reciprocal(Q2) (SIMD, 4*32)
+VRECPE.F32 Q1,Q2 ; Q1=approximate_reciprocal(Q2) (SIMD, 4*32)
+
+VRECPE.U32 D1,D2 ; D1=approximate_reciprocal(D2) (SIMD, 2*32)
+VRECPE.F32 D1,D2 ; D1=approximate_reciprocal(D2) (SIMD, 2*32)
+
+; VRECPS
+
+VRECPS.F32 Q1,Q2,Q3 ; Q1=reciprocal_step(Q2,Q3) (SIMD, 4*32)
+VRECPS.F32 D1,D2,D3 ; D1=reciprocal_step(D2,D3) (SIMD, 4*32)
+
+; VRSQRTE
+
+VRSQRTE.U32 Q1,Q2 ; Q1=reciprocal_sqrt_estimate(Q2) (SIMD, 4*32)
+VRSQRTE.F32 Q1,Q2 ; Q1=reciprocal_sqrt_estimate(Q2) (SIMD, 4*32)
+
+VRSQRTE.U32 D1,D2 ; D1=reciprocal_sqrt_estimate(D2) (SIMD, 4*32)
+VRSQRTE.F32 D1,D2 ; D1=reciprocal_sqrt_estimate(D2) (SIMD, 4*32)
+
+; VRSQRTS
+
+VRSQRTS.F32 Q1,Q2,Q3 ; Q1=reciprocal_sqrt_step(Q2,Q3) (SIMD, 4*32)
+VRSQRTS.F32 D1,D2,D3 ; D1=reciprocal_sqrt_step(D2,D3) (SIMD, 4*32)
+
+; VREV16
+
+VREV16.8   Q1,Q2 ; Q1=reverse(Q2) (SIMD, 8*16)
+
+VREV16.8   D1,D2 ; D1=reverse(D2) (SIMD, 4*16)
+
+; VREV32
+
+VREV32.8   Q1,Q2 ; Q1=reverse(Q2) (SIMD, 8*16)
+VREV32.16  Q1,Q2 ; Q1=reverse(Q2) (SIMD, 8*16)
+
+VREV32.8   D1,D2 ; D1=reverse(D2) (SIMD, 4*16)
+VREV32.16  D1,D2 ; D1=reverse(D2) (SIMD, 4*16)
+
+; VREV64
+
+VREV64.8   Q1,Q2 ; Q1=reverse(Q2) (SIMD, 8*16)
+VREV64.16  Q1,Q2 ; Q1=reverse(Q2) (SIMD, 8*16)
+VREV64.32  Q1,Q2 ; Q1=reverse(Q2) (SIMD, 8*16)
+
+VREV64.8   D1,D2 ; D1=reverse(D2) (SIMD, 4*16)
+VREV64.16  D1,D2 ; D1=reverse(D2) (SIMD, 4*16)
+VREV64.32  D1,D2 ; D1=reverse(D2) (SIMD, 4*16)
+
+; VQABS
+
+VQABS.S8     Q1,Q2    ; Q1=abs(Q2) (SIMD, 16*8)
+VQABS.S16    Q1,Q2    ; Q1=abs(Q2) (SIMD, 8*16)
+VQABS.S32    Q1,Q2    ; Q1=abs(Q2) (SIMD, 4*32)
+
+VQABS.S8     D1,D2    ; D1=abs(D2) (SIMD, 8*8)
+VQABS.S16    D1,D2    ; D1=abs(D2) (SIMD, 4*16)
+VQABS.S32    D1,D2    ; D1=abs(D2) (SIMD, 2*32)
+
+; VQMOVN
+
+VQMOVN.S16   D1,Q2 ; D1=Q1 (SIMD, 8*16)
+VQMOVN.S32   D1,Q2 ; D1=Q1 (SIMD, 4*32)
+VQMOVN.S64   D1,Q2 ; D1=Q1 (SIMD, 2*64)
+VQMOVN.U16   D1,Q2 ; D1=Q1 (SIMD, 8*16)
+VQMOVN.U32   D1,Q2 ; D1=Q1 (SIMD, 4*32)
+VQMOVN.U64   D1,Q2 ; D1=Q1 (SIMD, 2*64)
+
+; VQMOVUN
+
+VQMOVUN.S16   D1,Q2 ; D1=Q1 (SIMD, 8*16)
+VQMOVUN.S32   D1,Q2 ; D1=Q1 (SIMD, 4*32)
+VQMOVUN.S64   D1,Q2 ; D1=Q1 (SIMD, 2*64)
+
+; VQNEG
+
+VQNEG.S8   Q1,Q2 ; Q1=-Q2 (SIMD, 16*8)
+VQNEG.S16  Q1,Q2 ; Q1=-Q2 (SIMD, 8*16)
+VQNEG.S32  Q1,Q2 ; Q1=-Q2 (SIMD, 4*32)
+
+VQNEG.S8   D1,D2 ; D1=-D2 (SIMD, 16*8)
+VQNEG.S16  D1,D2 ; D1=-D2 (SIMD, 8*16)
+VQNEG.S32  D1,D2 ; D1=-D2 (SIMD, 4*32)
+
+; VSWP
+
+VSWP       Q1,Q2 ; swap(Q1,Q2) (SIMD)
+VSWP       D1,D2 ; swap(D1,D2) (SIMD)
+
+; VTBL
+
+VTBL.8     D1,{D2},D3 ; D1=table_lookup(D2,D3) (SIMD)
+
+; VTBX
+
+VTBX.8     D1,{D2},D3 ; D1=table_lookup(D2,D3) (SIMD)
+
+; VTRN
+
+VTRN.8     Q1,Q2 ; Q1=transpose(Q2) (SIMD, 8*16)
+VTRN.16    Q1,Q2 ; Q1=transpose(Q2) (SIMD, 4*32)
+VTRN.32    Q1,Q2 ; Q1=transpose(Q2) (SIMD, 2*64)
+
+VTRN.8     D1,D2 ; D1=transpose(D2) (SIMD, 4*16)
+VTRN.16    D1,D2 ; D1=transpose(D2) (SIMD, 2*32)
+VTRN.32    D1,D2 ; D1=transpose(D2) (SIMD, 1*64)
+
+; VUZP
+
+VUZP.8    Q1,Q2 ; unzip(Q1,Q2) (SIMD)
+VUZP.16   Q1,Q2 ; unzip(Q1,Q2) (SIMD)
+VUZP.32   Q1,Q2 ; unzip(Q1,Q2) (SIMD)
+
+VUZP.8    D1,D2 ; unzip(D1,D2) (SIMD)
+VUZP.16   D1,D2 ; unzip(D1,D2) (SIMD)
+VUZP.32   D1,D2 ; unzip(D1,D2) (SIMD)
+
+; VZIP
+
+VZIP.8     Q1,Q2 ; zip(Q1,Q2) (SIMD)
+VZIP.16    Q1,Q2 ; zip(Q1,Q2) (SIMD)
+VZIP.32    Q1,Q2 ; zip(Q1,Q2) (SIMD)
+
+VZIP.8     D1,D2 ; zip(D1,D2) (SIMD)
+VZIP.16    D1,D2 ; zip(D1,D2) (SIMD)
+VZIP.32    D1,D2 ; zip(D1,D2) (SIMD)
+
+#end

@@ -1,0 +1,85 @@
+
+; >-------------------------------------------------------------<
+
+.Decode_Register                       ;_R8 = First char or Blank
+   STMFD    R13!,{R4,R14}              ;~R0 = Register number
+   BL       Skip_Blanks                ;~R1 = Type ("R")
+   MOV      R4,R10                     ;~R8 = Next char
+   BIC      R8,R8,#32                  ;~R14 = Signal error (-2 = Warning, variable not found, but it is first pass, or variable had warning flag set)
+   CMP      R8,#'R'
+   BEQ      DR_Register
+   LDRB     R0,[R10]
+   BIC      R0,R0,#32
+   CMP      R8,#'P'
+   CMPEQ    R0,#'C'
+   BNE      DR_Check_SoftCode
+   MOV      R0,#15
+   ADD      R10,R10,#1
+   LDRB     R8,[R10],#1
+   MOV      R1,#'R'
+   LDMFD    R13!,{R4,R15}
+
+.DR_Register
+   LDRB     R8,[R10],#1
+   BL       Decode_Register_Number
+   CMN      R14,#1
+   BEQ      DR_Check_SoftCode
+
+.DR_Check_Macro
+   ADR      R1,Macro_Level             ; Load Macro_Level, TEMP_Needed_Macro, TEMP_Stacked
+   LDMIA    R1,{R1-R3,R14}             ; and TEMP_Used
+   CMP      R1,#0                      ; Macro_Level=0 or TEMP_Stacked=0 or reg=13 or reg=14
+   CMPNE    R3,#0                      ; or reg=15?
+   CMPNE    R0,#13
+   CMPNE    R0,#14
+   CMPNE    R0,#15
+   MOVEQ    R1,#'R'
+   LDMEQFD  R13!,{R4,R15}
+   MOV      R1,#1
+   TST      R2,R1,LSL R0
+   TSTEQ    R3,R1,LSL R0               ; Is register in TEMP_Needed_Macro, TEMP_Stacked or
+   TSTEQ    R14,R1,LSL R0              ; TEMP_Used?
+   MOVNE    R1,#'R'
+   LDMNEFD  R13!,{R4,R15}
+   MOV      R0,#&57                    ; Asm_Error #&57 = When using stacked temp-registers in macros, only registers in macro header can be used
+   B        Asm_Error
+
+.DR_Check_SoftCode                     ; Not a constant register (no hardcoding)
+   ;------> Check for softcoding...
+   SUB      R10,R4,#1                  ; First char of soft register
+   LDRB     R8,[R10],#1
+   BL       Decode_Value               ;_R0 = Reg
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+
+   CMP      R0,#&F
+   MOVHI    R0,#&09                    ; Asm_Error #&09 = Illegal register
+   BHI      Asm_Error
+
+   B        DR_Check_Macro
+
+; >-------------------------------------------------------------<
+
+.Decode_Register_Number                ;_R8 = First char
+   STMFD    R13!,{R14}                 ;~R0 = Register number
+   LDRB     R1,[R10]                   ;~R8 = Next char
+   CMP      R8,#'0'                    ;~R14 = Signal error, -1 = Error
+   RSBGES   R0,R8,#'9'
+   MVNLT    R14,#0
+   LDMLTFD  R13!,{R15}
+   CMP      R1,#'0'
+   RSBGES   R0,R1,#'9'
+   SUB      R0,R8,#'0'                 ; If two digits, then Reg=(R8-48)*10+R1-48,
+   SUBGE    R1,R1,#'0'                 ; else Reg=R8-48
+   ADDGE    R0,R0,R0,LSL #2
+   ADDGE    R0,R1,R0,LSL #1
+   ADDGE    R10,R10,#1
+   CMP      R0,#15
+   MVNGT    R14,#0
+   MOVLE    R14,#0
+   LDRB     R8,[R10],#1
+   CMP      R8,#'0'
+   RSBGES   R1,R8,#'9'
+   MVNGE    R14,#0
+   LDMFD    R13!,{R15}

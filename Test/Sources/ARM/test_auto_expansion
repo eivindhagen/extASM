@@ -1,0 +1,36 @@
+
+#name <Tmp$Dir>.^.^.test_auto_expansion
+
+#area test,code
+
+; Instruction changing
+;
+; ARM
+
+MOV     R1,#-&AA         ; MVN     R1,#&A9
+MVN     R1,#-&AA         ; MOV     R1,#&A9
+
+ADD     R1,R2,#-&AA      ; SUB     R1,R2,#&AA
+SUB     R1,R2,#-&AA      ; ADD     R1,R2,#&AA
+
+ADC     R1,R2,#-&AA      ; SBC     R1,R2,#&AA
+SBC     R1,R2,#-&AA      ; ADC     R1,R2,#&AA
+
+AND     R1,R2,#&FFFFFF10 ; BIC     R1,R2,#&FF
+BIC     R1,R2,#&FFFFFF10 ; AND     R1,R2,#&FF
+
+CMP     R1,#-&AA         ; CMN     R1,#&AA
+CMN     R1,#-&AA         ; CMP     R1,#&AA
+
+; FPA
+
+MVFS    F1,#-1.0         ; MNFS    F1,#1.0
+MNFS    F1,#-1.0         ; MVFS    F1,#1.0
+
+ADFS    F1,F1,#-1.0      ; SUFS    F1,F1,#1.0
+SUFS    F1,F1,#-1.0      ; ADFS    F1,F1,#1.0
+
+CMF     F1,#-1.0         ; CNF     F1,#1.0
+CNF     F1,#-1.0         ; CMF     F1,#1.0
+
+#end

@@ -1,0 +1,416 @@
+
+; >-------------------------------------------------------------<
+
+; R0 - Size operand 1
+; R1 - Type operand 1
+; R2 - Signed operand 1
+; R3 - Size operand 2
+; R4 - Type operand 2
+; R5 - Signed operand 2
+; R6 - First operand type
+; R7 - Second operand type
+
+.DT_VCVT                               ;_R8 = "V"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   MOV      R9,#0
+   LDRB     R8,[R10],#1
+   CMP      R8,#'R'
+   CMPNE    R8,#'r'
+   MOVEQ    R0,R8
+   MOVNE    R0,#0
+   LDREQB   R8,[R10],#1
+   BIC      R1,R8,#32
+   CMP      R1,#'B'
+   CMPNE    R1,#'T'
+   CMPEQ    R0,#0
+   LDREQB   R8,[R10],#1
+   ORREQ    R0,R0,R1,LSL #8
+   STR      R0,DT_VCVT_Flags
+   BL       Decode_ConditionCode
+   BL       Decode_VFP_Operand_Type
+   ADRL     R4,DT_VCVT_Operand_Types
+   STMIA    R4!,{R0-R2}
+   BL       Decode_VFP_Operand_Type
+   STMIA    R4,{R0-R2}
+   BL       Ensure_Blank
+   BL       Skip_Blanks
+   BL       Decode_VFP_Register
+   ADRL     R4,DT_VCVT_Registers
+   STMIA    R4!,{R0,R2,R3}
+   MOV      R6,R1
+   BL       Ensure_Comma
+   BL       Decode_VFP_Register
+   STMIA    R4,{R0,R2,R3}
+   MOV      R7,R1
+   BL       Skip_Blanks
+   ADRL     R14,DT_VCVT_Operand_Types
+   LDMIA    R14,{R0-R5}
+   CMP      R2,#VFP_Operand_Signed
+   CMPNE    R2,#VFP_Operand_Unsigned
+   CMPEQ    R4,#VFP_Operand_FP
+   BEQ      DT_VCVT_Int_And_FP
+   CMP      R5,#VFP_Operand_Signed
+   CMPNE    R5,#VFP_Operand_Unsigned
+   CMPEQ    R1,#VFP_Operand_FP
+   BEQ      DT_VCVT_Int_And_FP
+   CMP      R1,#VFP_Operand_FP
+   CMPEQ    R4,#VFP_Operand_FP
+   BEQ      DT_VCVT_FP_And_FP
+   B        DT_Illegal_Operand_Type
+
+; >-------------------------------------------------------------<
+
+.DT_VCVT_Int_And_FP
+   CMP      R8,#','
+   BEQ      DT_VCVT_Fixed_Point_And_FP
+   CMP      R6,#'S'
+   BEQ      DT_VCVT_Int_And_FP_VFP
+   CMP      R0,#VFP_Operand_64
+   CMPEQ    R1,#VFP_Operand_FP
+   CMPEQ    R6,#'D'
+   BEQ      DT_VCVT_Int_And_FP_VFP
+   CMP      R0,#VFP_Operand_32
+   CMPEQ    R3,#VFP_Operand_32
+   BNE      DT_Illegal_Operand_Type
+   ; VCVT.<S|U>32.F32 Qd, Qm (SIMD)
+   ; VCVT.<S|U>32.F32 Dd, Dm (SIMD)
+   ; VCVT.F32.<S|U>32 Qd, Qm (SIMD)
+   ; VCVT.F32.<S|U>32 Dd, Dm (SIMD)
+   ;
+   ;------> VCVT             D  sz  [Vd]   opQM [Vm]
+   ORR      R9,R9,#%00000011101110110000011000000000
+   CMP      R6,#'Q'
+   ORREQ    R9,R9,#SIMD_Q_Bit
+   CMP      R1,#VFP_Operand_Int
+   ORREQ    R9,R9,#1 << 8
+   CMP      R2,#VFP_Operand_Unsigned
+   CMPNE    R5,#VFP_Operand_Unsigned
+   ORREQ    R9,R9,#1 << 7
+   MOV      R1,R7
+   BL       Ensure_Equal_SIMD_Register_Types_DM
+   LDR      R0,DT_VCVT_Flags
+   CMP      R0,#0
+   BNE      DT_Unknown
+   BL       Ensure_Unconditional_Instruction
+   B        DT_VCVT_End
+
+; >-------------------------------------------------------------<
+
+.DT_VCVT_Int_And_FP_VFP
+   CMP      R3,#VFP_Operand_32
+   CMPNE    R3,#VFP_Operand_64
+   CMPEQ    R4,#VFP_Operand_FP
+   CMPEQ    R0,#VFP_Operand_32
+   BEQ      DT_VCVT_Int_And_FP_VFP_Operand_Type_Ok
+   CMP      R0,#VFP_Operand_32
+   CMPNE    R0,#VFP_Operand_64
+   CMPEQ    R1,#VFP_Operand_FP
+   CMPEQ    R3,#VFP_Operand_32
+   BNE      DT_Illegal_Operand_Type
+
+.DT_VCVT_Int_And_FP_VFP_Operand_Type_Ok
+   CMP      R0,#VFP_Operand_32
+   CMPEQ    R6,#'S'
+   BEQ      DT_VCVT_Int_And_FP_VFP_First_Operand_Ok
+   CMP      R0,#VFP_Operand_64
+   CMPEQ    R6,#'D'
+   BNE      DT_Illegal_Register
+
+.DT_VCVT_Int_And_FP_VFP_First_Operand_Ok
+   CMP      R3,#VFP_Operand_32
+   CMPEQ    R7,#'S'
+   BEQ      DT_VCVT_Int_And_FP_VFP_Second_Operand_Ok
+   CMP      R3,#VFP_Operand_64
+   CMPEQ    R7,#'D'
+   BNE      DT_Illegal_Register
+
+.DT_VCVT_Int_And_FP_VFP_Second_Operand_Ok
+   ; VCVT[R]<cond>.<S|U>32.F64 Sd, Dm (VFP)
+   ; VCVT[R]<cond>.<S|U>32.F32 Sd, Sm (VFP)
+   ; VCVT<cond>.F64.<S|U>32    Dd, Sm (VFP)
+   ; VCVT<cond>.F32.<S|U>32    Sd, Sm (VFP)
+   ;
+   ;------> VCVT    Cond     D   op2[Vd]   so M [Vm]
+   ORR      R9,R9,#%00001110101110000000101001000000
+   CMP      R1,#VFP_Operand_Int
+   ORREQ    R9,R9,#1 << 18
+   CMPEQ    R2,#VFP_Operand_Signed
+   ORREQ    R9,R9,#1 << 16
+   CMP      R0,#VFP_Operand_64
+   CMPNE    R3,#VFP_Operand_64
+   ORREQ    R9,R9,#VFP_Size_Bit
+   CMP      R1,#VFP_Operand_FP
+   CMPEQ    R5,#VFP_Operand_Signed
+   ORREQ    R9,R9,#1 << 7
+   LDR      R0,DT_VCVT_Flags
+   CMP      R1,#VFP_Operand_Int
+   TSTEQ    R0,#&FF
+   ORREQ    R9,R9,#1 << 7
+   BICS     R0,R0,#&FF
+   BNE      DT_Unknown
+   B        DT_VCVT_End
+
+; >-------------------------------------------------------------<
+
+.DT_VCVT_Fixed_Point_And_FP
+   CMP      R6,#'S'
+   BEQ      DT_VCVT_Fixed_Point_And_FP_VFP
+   CMP      R0,#VFP_Operand_64
+   CMPEQ    R1,#VFP_Operand_FP
+   BEQ      DT_VCVT_Fixed_Point_And_FP_VFP
+   CMP      R3,#VFP_Operand_64
+   CMPEQ    R4,#VFP_Operand_FP
+   BEQ      DT_VCVT_Fixed_Point_And_FP_VFP
+   CMP      R0,#VFP_Operand_32
+   CMPEQ    R3,#VFP_Operand_32
+   BNE      DT_Illegal_Operand_Type
+   CMP      R1,#VFP_Operand_Int
+   CMPEQ    R2,#VFP_Operand_Unknown
+   BEQ      DT_Illegal_Operand_Type
+   CMP      R4,#VFP_Operand_Int
+   CMPEQ    R5,#VFP_Operand_Unknown
+   BEQ      DT_Illegal_Operand_Type
+   ; VCVT.<S|U>32.F32 Qd, Qm, #<bits> (SIMD)
+   ; VCVT.<S|U>32.F32 Dd, Dm, #<bits> (SIMD)
+   ; VCVT.F32.<S|U>32 Qd, Dd, #<bits> (SIMD)
+   ; VCVT.F32.<S|U>32 Dd, Dm, #<bits> (SIMD)
+   ;
+   ;------> VCVT           U D[imm6][Vd]   o QM [Vm]
+   ORR      R9,R9,#%00000010100000000000111000010000
+   CMP      R6,#'Q'
+   ORREQ    R9,R9,#SIMD_Q_Bit
+   CMP      R1,#VFP_Operand_Int
+   ORREQ    R9,R9,#1 << 8
+   CMP      R2,#VFP_Operand_Unsigned
+   CMPNE    R5,#VFP_Operand_Unsigned
+   ORREQ    R9,R9,#1 << SIMD_U_Pos
+   LDRB     R8,[R10],#1
+   BL       Ensure_Pound
+   BL       Decode_Int_Expr
+   CMP      R0,#32
+   RSBGTS   R1,R0,#1
+   MOVGT    R0,#&05                    ; Asm_Error #&05 = Value outside 1-32
+   BGT      Asm_Error
+   RSB      R0,R0,#64
+   ORR      R9,R9,R0,LSL #16
+   MOV      R1,R7
+   BL       Ensure_Equal_SIMD_Register_Types_DM
+   LDR      R0,DT_VCVT_Flags
+   CMP      R0,#0
+   BNE      DT_Unknown
+   BL       Ensure_Unconditional_Instruction
+   B        DT_VCVT_End
+
+; >-------------------------------------------------------------<
+
+.DT_VCVT_Fixed_Point_And_FP_VFP
+   CMP      R0,#VFP_Operand_16
+   CMPNE    R0,#VFP_Operand_32
+   CMPEQ    R1,#VFP_Operand_Int
+   CMPEQ    R3,#VFP_Operand_64
+   CMPEQ    R4,#VFP_Operand_FP
+   CMPEQ    R6,#'D'
+   CMPEQ    R7,#'D'
+   BEQ      DT_VCVT_Fixed_Point_And_FP_VFP_Ok
+   CMP      R0,#VFP_Operand_16
+   CMPNE    R0,#VFP_Operand_32
+   CMPEQ    R1,#VFP_Operand_Int
+   CMPEQ    R3,#VFP_Operand_32
+   CMPEQ    R4,#VFP_Operand_FP
+   CMPEQ    R6,#'S'
+   CMPEQ    R7,#'S'
+   BEQ      DT_VCVT_Fixed_Point_And_FP_VFP_Ok
+   CMP      R3,#VFP_Operand_16
+   CMPNE    R3,#VFP_Operand_32
+   CMPEQ    R4,#VFP_Operand_Int
+   CMPEQ    R0,#VFP_Operand_64
+   CMPEQ    R1,#VFP_Operand_FP
+   CMPEQ    R6,#'D'
+   CMPEQ    R7,#'D'
+   BEQ      DT_VCVT_Fixed_Point_And_FP_VFP_Ok
+   CMP      R3,#VFP_Operand_16
+   CMPNE    R3,#VFP_Operand_32
+   CMPEQ    R4,#VFP_Operand_Int
+   CMPEQ    R0,#VFP_Operand_32
+   CMPEQ    R1,#VFP_Operand_FP
+   CMPEQ    R6,#'S'
+   CMPEQ    R7,#'S'
+   BNE      DT_Illegal_Operand_Type
+
+.DT_VCVT_Fixed_Point_And_FP_VFP_Ok
+   CMP      R1,#VFP_Operand_Int
+   CMPEQ    R2,#VFP_Operand_Unknown
+   BEQ      DT_Illegal_Operand_Type
+   CMP      R4,#VFP_Operand_Int
+   CMPEQ    R5,#VFP_Operand_Unknown
+   BEQ      DT_Illegal_Operand_Type
+   ; VCVT<cond>.<S|U><16|32>.F64 Dd, Dd, #<bits> (VFP)
+   ; VCVT<cond>.<S|U><16|32>.F32 Sd, Sd, #<bits> (VFP)
+   ; VCVT<cond>.F64.<S|U><16|32> Dd, Dd, #<bits> (VFP)
+   ; VCVT<cond>.F32.<S|U><16|32> Sd, Sd, #<bits> (VFP)
+   ;
+   ;------> VCVT    Cond     D   o U[Vd]   fx i imm4
+   ORR      R9,R9,#%00001110101110100000101001000000
+   CMP      R2,#VFP_Operand_Unsigned
+   CMPNE    R5,#VFP_Operand_Unsigned
+   ORREQ    R9,R9,#1 << 16
+   CMP      R0,#VFP_Operand_32
+   CMPEQ    R1,#VFP_Operand_Int
+   ORREQ    R9,R9,#1 << 7
+   CMP      R3,#VFP_Operand_32
+   CMPEQ    R4,#VFP_Operand_Int
+   ORREQ    R9,R9,#1 << 7
+   CMP      R1,#VFP_Operand_Int
+   ORREQ    R9,R9,#1 << 18
+   CMP      R0,#VFP_Operand_64
+   CMPNE    R3,#VFP_Operand_64
+   ORREQ    R9,R9,#1 << 8
+   LDRB     R8,[R10],#1
+   BL       Ensure_Pound
+   BL       Decode_Int_Expr
+   TST      R9,#1 << 7
+   MOVEQ    R1,#16
+   MOVNE    R1,#32
+   CMP      R0,R1
+   MOVHI    R0,#&05                    ; Asm_Error #&01 = Illegal shift
+   BHI      Asm_Error
+   CMP      R1,#32
+   CMPEQ    R0,#0
+   MOVEQ    R0,#&05                    ; Asm_Error #&01 = Illegal shift
+   BEQ      Asm_Error
+   SUB      R0,R1,R0
+   TST      R0,#1
+   ORRNE    R9,R9,#1 << 5
+   ORR      R9,R9,R0,LSR #1
+   LDR      R0,DT_VCVT_Flags
+   CMP      R0,#0
+   BNE      DT_Unknown
+   ADR      R14,DT_VCVT_Registers
+   LDMIA    R14,{R0-R5}
+   CMP      R0,R3
+   BNE      DT_Illegal_Register
+   ORR      R9,R9,R1,LSL #Rd_Pos
+   ORR      R9,R9,R2,LSL #VFP_D_Pos
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VCVT_FP_And_FP
+   CMP      R0,#VFP_Operand_64
+   CMPEQ    R3,#VFP_Operand_32
+   BEQ      DT_VCVT_FP_Single_And_Double
+   CMP      R0,#VFP_Operand_32
+   CMPEQ    R3,#VFP_Operand_64
+   BEQ      DT_VCVT_FP_Single_And_Double
+   CMP      R0,#VFP_Operand_32
+   CMPEQ    R3,#VFP_Operand_16
+   BEQ      DT_VCVT_FP_Single_And_Half
+   CMP      R0,#VFP_Operand_16
+   CMPEQ    R3,#VFP_Operand_32
+   BEQ      DT_VCVT_FP_Single_And_Half
+   B        DT_Illegal_Operand_Type
+
+; >-------------------------------------------------------------<
+
+.DT_VCVT_FP_Single_And_Double
+   CMP      R0,#VFP_Operand_64
+   CMPEQ    R3,#VFP_Operand_32
+   CMPEQ    R6,#'D'
+   CMPEQ    R7,#'S'
+   BEQ      DT_VCVT_FP_Single_And_Double_Ok
+   CMP      R0,#VFP_Operand_32
+   CMPEQ    R3,#VFP_Operand_64
+   CMPEQ    R6,#'S'
+   CMPEQ    R7,#'D'
+   BNE      DT_Illegal_Operand_Type
+
+.DT_VCVT_FP_Single_And_Double_Ok
+   ; VCVT<cond>.F64.F32 Dd, Sm (VFP)
+   ; VCVT<cond>.F32.F64 Sd, Dm (VFP)
+   ;
+   ;------> VCVT    Cond     D      [Vd]   s  M [Vm]
+   ORR      R9,R9,#%00001110101101110000101011000000
+   CMP      R3,#VFP_Operand_64
+   ORREQ    R9,R9,#VFP_Size_Bit
+   LDR      R0,DT_VCVT_Flags
+   CMP      R0,#0
+   BNE      DT_Unknown
+   B        DT_VCVT_End
+
+; >-------------------------------------------------------------<
+
+.DT_VCVT_FP_Single_And_Half
+   CMP      R6,#'S'
+   BEQ      DT_VCVT_FP_Single_And_Half_VFP
+   CMP      R0,#VFP_Operand_32
+   CMPEQ    R3,#VFP_Operand_16
+   CMPEQ    R6,#'Q'
+   CMPEQ    R7,#'D'
+   BEQ      DT_VCVT_FP_Single_And_Half_Ok
+   CMP      R0,#VFP_Operand_16
+   CMPEQ    R3,#VFP_Operand_32
+   CMPEQ    R6,#'D'
+   CMPEQ    R7,#'Q'
+   BNE      DT_Illegal_Operand_Type
+
+.DT_VCVT_FP_Single_And_Half_Ok
+   ; VCVT.F32.F16 Qd, Dm (SIMD)
+   ; VCVT.F16.F32 Dd, Qm (SIMD)
+   ;
+   ;------> VCVT             D  sz  [Vd]   o  M [Vm]
+   ORR      R9,R9,#%00000011101101100000011000000000
+   CMP      R0,#VFP_Operand_32
+   ORREQ    R9,R9,#VFP_Size_Bit
+   LDR      R0,DT_VCVT_Flags
+   CMP      R0,#0
+   BNE      DT_Unknown
+   BL       Ensure_Unconditional_Instruction
+   B        DT_VCVT_End
+
+; >-------------------------------------------------------------<
+
+.DT_VCVT_FP_Single_And_Half_VFP
+   CMP      R6,#'S'
+   CMPEQ    R7,#'S'
+   BNE      DT_Illegal_Register
+   ; VCVT[B|T]<cond>.F32.F16 Sd, Sm (VFP)
+   ; VCVT[B|T]<cond>.F16.F32 Sd, Sm (VFP)
+   ;
+   ;------> VCVT    Cond     D     o[Vd]    T M [Vm]
+   ORR      R9,R9,#%00001110101100100000101001000000
+   CMP      R3,#VFP_Operand_32
+   ORREQ    R9,R9,#1 << 16
+   LDR      R0,DT_VCVT_Flags
+   MOV      R1,R0,LSR #8
+   CMP      R1,#'T'
+   ORREQ    R9,R9,#1 << 7
+   TST      R0,#&FF
+   BNE      DT_Unknown
+   B        DT_VCVT_End
+
+; >-------------------------------------------------------------<
+
+.DT_VCVT_End
+   ADR      R14,DT_VCVT_Registers
+   LDMIA    R14,{R0-R5}
+   ORR      R9,R9,R1,LSL #Rd_Pos
+   ORR      R9,R9,R2,LSL #VFP_D_Pos
+   ORR      R9,R9,R4,LSL #Rm_Pos
+   ORR      R9,R9,R5,LSL #VFP_M_Pos
+   B        DT_Write_Instruction
+
+struct VCVTFlags,#0,1
+{
+   .R_Flag
+   .T_Flag
+   .Pad1
+   .Pad2
+   .Size
+}
+
+.DT_VCVT_Operand_Types DBB   2*OperandType.End
+.DT_VCVT_Registers     DBB   2*VFPRegister.Size
+.DT_VCVT_Flags         DBB   VCVTFlags.Size

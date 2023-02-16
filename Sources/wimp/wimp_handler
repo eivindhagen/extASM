@@ -1,0 +1,1244 @@
+
+; >-------------------------------------------------------------<
+
+.Wimp_Poller                           ;_R0 = Mask null reason (0 = Don't mask, 1 = Mask)
+   STMFD    R13!,{R0,R4-R11,R14}
+
+.Wimp_Poll_Loop
+   ADR      R11,Block
+   BL       Deinstall_Exception_Handler
+   SWI      OS_ReadMonotonicTime
+   ADD      R2,R0,#1                   ; 1 Centisecond return time
+   LDMFD    R13,{R0}
+   ORR      R0,R0,#&1830
+   MOV      R1,R11
+   SWI      Wimp_PollIdle
+   MOV      R4,R0
+   BL       Install_Exception_Handler
+   CMP      R4,#19
+   ADDLS    R15,R15,R4,LSL #2
+   B        Wimp_Poll_Loop
+   B        Wimp_Polled                ; 0 - Null reason
+   B        Wimp_RedrawWindow          ; 1 - Redraw window
+   B        Wimp_OpenWindow            ; 2 - Open window
+   B        Wimp_CloseWindow           ; 3 - Close window
+   B        Wimp_Poll_Loop             ; 4 - Pointer leaving
+   B        Wimp_Poll_Loop             ; 5 - Pointer entering
+   B        Wimp_MouseClick            ; 6 - Mouse click
+   B        Wimp_UserDragBox           ; 7 - User drag box
+   B        Wimp_KeyPressed            ; 8 - Key pressed
+   B        Wimp_MenuSelection         ; 9 - Menu selection
+   B        Wimp_Poll_Loop             ; 10 - Scroll request
+   B        Wimp_Poll_Loop             ; 11 - Lose caret
+   B        Wimp_Poll_Loop             ; 12 - Gain caret
+   B        Wimp_Poll_Loop             ; 13 - Reserved
+   B        Wimp_Poll_Loop             ; 14 - Reserved
+   B        Wimp_Poll_Loop             ; 15 - Reserved
+   B        Wimp_Poll_Loop             ; 16 - Reserved
+   B        Wimp_UserMessage           ; 17 - User message
+   B        Wimp_UserMessageRecorded   ; 18 - User message recorded
+   B        Wimp_Acknowledge           ; 19 - User message acknowledge
+
+.Wimp_Polled
+   LDR      R0,extASM_Pause
+   CMP      R0,#1
+   BEQ      Wimp_Poll_Loop
+   LDMFD    R13!,{R0,R4-R11,R15}
+
+; >-------------------------------------------------------------<
+
+.Wimp_RedrawWindow
+   LDR      R5,[R11]
+   LDR      R8,Handle_STATUS
+   LDR      R9,Handle_STAT_ARM
+   LDR      R10,Handle_STAT_FPA
+   CMP      R5,R8
+   CMPNE    R5,R9
+   CMPNE    R5,R10
+   BNE      Wimp_Poll_Loop
+   MOV      R1,R11
+   SWI      Wimp_RedrawWindow
+   MOV      R4,R0
+   LDR      R0,[R11,#4]                ; Visible min x
+   LDR      R1,[R11,#16]               ; Visible max y
+   LDR      R2,[R11,#20]               ; Scroll x
+   LDR      R3,[R11,#24]               ; Scroll y
+   SUB      R1,R1,#1                   ; Max x,max y is outside window (excluding endpoints)
+   SUB      R6,R0,R2                   ; Work area origin x = Visible min x - Scroll x
+   SUB      R7,R1,R3                   ; Work area origin y = Visible max y - Scroll y
+   CMP      R5,R9
+   CMPNE    R5,R10
+   BEQ      WR_Statistics
+   MOV      R0,#Flex_WimpText
+   BL       Flex_Adr
+   MOV      R8,R0
+   MOV      R0,#Flex_Offset            ; Wimp Text line offset
+   BL       Flex_Adr
+   MOV      R9,R0
+   MOV      R0,R4
+   LDR      R14,Option_Colours
+
+.Wimp_Redraw_Loop
+   CMP      R0,#0
+   BEQ      Wimp_Poll_Loop
+   ;------> REDRAW WINDOW
+   LDR      R4,[R11,#32]               ; Rectangle min y
+   LDR      R5,[R11,#40]               ; Rectangle max y
+   SUB      R5,R5,#1
+   SUB      R4,R7,R4                   ; Visible Work area min y=Origin y - Rectangle min y
+   SUB      R5,R7,R5                   ; Visible Work area max y=Origin y - Rectangle max y
+   MOV      R4,R4,LSR #5               ; Text bottom line
+   MOV      R5,R5,LSR #5               ; Text top line
+   AND      R0,R14,#&F0
+   MOV      R0,R0,LSR #4
+   ORR      R0,R0,#1 << 7
+   SWI      Wimp_SetColour
+   SWI      OS_WriteI+16
+   LDR      R0,Wimp_Text_Lines
+   SUB      R0,R0,#1
+   CMP      R5,R0                      ; Top line > Number of lines?
+   BGT      WR_NextRectangle           ; Starting after End of text -> no redraw today!
+   CMP      R4,R0                      ; Bottom line > Number of lines?
+   MOVGT    R4,R0                      ; Bottom line = Number of lines
+
+.WR_WriteText
+   ;------> Find correct text line
+   MOV      R0,R9
+   LDR      R3,[R0,R5,LSL #3]!         ; R3 = Offset to text line
+   LDR      R10,[R0,#4]
+   ADD      R3,R3,R8
+   ;------> Set text colour
+   MOV      R0,R10,LSR #22
+   MOV      R1,#&F
+   AND      R0,R1,R14,LSR R0
+   SWI      Wimp_SetColour
+   MOV      R0,#4
+   ADD      R1,R6,#X_Margin
+   SUB      R2,R7,R5,LSL #5
+   SWI      OS_Plot
+   MOV      R0,R3
+   BIC      R1,R10,#&FF000000
+   SWI      OS_WriteN
+   ADD      R5,R5,#1
+   CMP      R5,R4
+   BLE      WR_WriteText
+
+.WR_NextRectangle
+   MOV      R1,R11
+   SWI      Wimp_GetRectangle
+   B        Wimp_Redraw_Loop
+
+.WR_Statistics
+   MOV      R0,R4
+
+.WR_Stat_Loop
+   CMP      R0,#0
+   BEQ      Wimp_Poll_Loop
+   CMP      R5,R9
+   ADREQ    R0,ARM_Statistics
+   ADREQ    R1,ARM_Names
+   LDREQ    R8,Previous_ARM_PieRadius
+   ADRNE    R0,FPA_Statistics
+   ADRNE    R1,FPA_Names
+   LDRNE    R8,Previous_FPA_PieRadius
+   ADD      R2,R6,R8
+   ADD      R2,R2,#64
+   SUB      R3,R7,R8
+   SUB      R3,R3,#56
+   STMFD    R13!,{R8}
+   BL       Pie_Chart
+   ADD      R13,R13,#4
+   MOV      R1,R11
+   SWI      Wimp_GetRectangle
+   B        WR_Stat_Loop
+
+.ARM_Names  DCB   "Arithmetical",0,"Logical",0,"Compare",0,"Load/Store",0,"Branch/BL",0
+            DCB   "ADR",0,"SWI",0
+.FPA_Names  DCB   "Unops",0,"Binops",0,"Compare",0,"Load/Store",0,"Reg. trans.",0
+            ALIGN
+
+; >-------------------------------------------------------------<
+
+.Open_Stat_Window                      ;_R0-> Window block
+   ; R4 - Min x
+   ; R5 - Min y
+   ; R6 - Max x
+   ; R7 - Max y
+   ;
+   STMFD    R13!,{R4-R9,R14}
+   MOV      R8,R0
+   MOV      R0,#10
+   LDR      R1,PieRadius_Pointer
+   SWI      XOS_ReadUnsigned
+   MOVVS    R2,#Default_PieRadius
+   LDR      R0,[R8]
+   LDR      R1,Handle_STAT_ARM
+   CMP      R0,R1
+   LDREQ    R3,Previous_ARM_PieRadius
+   LDRNE    R3,Previous_FPA_PieRadius
+   CMP      R2,R3
+   BNE      OSW_Not_Open_Window
+   MOV      R1,R8
+   SWI      Wimp_OpenWindow
+   LDMFD    R13!,{R4-R9,R15}
+
+.OSW_Not_Open_Window
+   CMP      R0,R1
+   STREQ    R2,Previous_ARM_PieRadius
+   STRNE    R2,Previous_FPA_PieRadius
+   MOV      R0,#7
+   MOV      R1,R2
+   mdiv     R6,R1,R0
+   BIC      R6,R6,#1
+   ADD      R6,R6,R6,LSL #1            ; 64+Radius*2+Rect_Offset+3*(Radius/7 AND NOT 1)+
+   ADD      R6,R6,R2,LSL #1            ; 16*12+8 <=>
+   ADD      R6,R6,#Rect_Offset+264     ; 3*(Radius/7 AND NOT 1)+Radius*2+264+Rect_Offset
+   MOV      R4,#0
+   MVN      R5,#119
+   SUB      R5,R5,R2,LSL #1
+   MOV      R7,#0
+   ADD      R1,R8,#44
+   LDR      R0,[R8]
+   STMIA    R1,{R4-R7}
+   SWI      Wimp_SetExtent
+   MOV      R1,R8
+   ; Modify info to open window with full size
+   ;
+   LDMIA    R1,{R0,R4,R5}
+   ADD      R0,R1,#44
+   LDMIA    R0,{R6-R9}
+   SUB      R2,R8,R6
+   SUB      R3,R9,R7
+   ADD      R4,R4,R2
+   ADD      R5,R5,R3
+   MOV      R6,#0
+   MOV      R7,#0
+   ADD      R0,R1,#12
+   STMIA    R0,{R4-R7}
+   SWI      Wimp_OpenWindow
+   LDR      R0,[R1],#44
+   LDMIA    R1,{R1-R4}
+   SWI      Wimp_ForceRedraw
+   LDMFD    R13!,{R4-R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Wimp_OpenWindow
+   MOV      R1,R11
+   SWI      Wimp_OpenWindow
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.Wimp_CloseWindow
+   MOV      R1,R11
+   SWI      Wimp_CloseWindow
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+   ; R4 - Window
+   ; R5 - Icon
+   ; R6 - Button
+   ;
+.Wimp_MouseClick
+   LDR      R4,[R11,#12]
+   LDR      R5,[R11,#16]
+   LDR      R6,[R11,#8]
+   LDR      R0,Handle_BARICON
+   CMN      R4,#2
+   CMPEQ    R5,R0
+   BEQ      WMC_IconBar
+   LDR      R0,Handle_PROCESS
+   CMP      R4,R0
+   BEQ      WMC_Process
+   LDR      R0,Handle_OPTIONS
+   CMP      R4,R0
+   BEQ      WMC_Options
+   LDR      R0,Handle_SAVE
+   CMP      R4,R0
+   BEQ      WMC_Save
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.WMC_IconBar
+   CMP      R6,#4
+   BEQ      WMCIB_Left
+   CMP      R6,#2
+   BEQ      WMCIB_Menu
+   CMP      R6,#1
+   BEQ      WMCIB_Right
+   B        Wimp_Poll_Loop
+
+.WMCIB_Left
+   LDR      R0,Handle_PROCESS
+   BL       Pop_Window
+   B        Wimp_Poll_Loop
+
+.WMCIB_Right
+   LDR      R0,Handle_STATUS
+   BL       Pop_Window
+   B        Wimp_Poll_Loop
+
+.WMCIB_Menu
+   LDR      R2,[R11]
+   SUB      R2,R2,#64
+   MOV      R3,#96+44*7
+   LDR      R1,Main_Menu
+   SWI      Wimp_CreateMenu
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.WMC_Process
+   CMP      R5,#23
+   BNE      WMCP_Not_Reload
+   LDR      R0,Handle_PROCESS
+   MOV      R1,#4
+   BL       Find_IconData
+   BL       Load_Source
+   BL       Start_Assembly
+   B        Wimp_Poll_Loop
+
+.WMCP_Not_Reload
+   CMP      R5,#12
+   CMPEQ    R6,#64
+   BEQ      DragObject
+   CMP      R5,#13
+   BNE      Wimp_Poll_Loop
+   LDR      R0,Handle_PROCESS
+   MOV      R1,#14
+   BL       Find_IconData
+   BL       Save_Object
+   BL       Wimp_Text_Window
+   B        Wimp_Poll_Loop
+
+.WMC_Save
+   CMP      R5,#0
+   CMPEQ    R6,#64
+   BEQ      DragObject
+   CMP      R5,#2
+   BNE      Wimp_Poll_Loop
+   LDR      R0,Handle_SAVE
+   MOV      R1,#1
+   BL       Find_IconData
+   MOV      R4,R0
+   MOV      R1,#'.'
+   BL       StrChrCtrl
+   CMP      R0,#0
+   MOVEQ    R0,#10                     ; Messages_Error #&10 = To save, drag the icon to a directory viewer
+   BEQ      Messages_Error
+   MOV      R0,R4
+   BL       Save_WimpText
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.Start_Assembly
+   STMFD    R13!,{R4,R14}
+   MOV      R0,#0
+   STR      R0,extASM_Pause
+   MOV      R0,#1
+   STR      R0,extASM_Doing
+
+   LDR      R4,Main_Menu
+   MOV      R0,R4
+   MOV      R1,#3
+   MOV      R2,#0
+   BL       Shade_Menu_Item            ; Unshade 'Abort'
+   MOV      R0,R4
+   MOV      R1,#4
+   MOV      R2,#0
+   BL       Shade_Menu_Item            ; Unshade 'Pause'
+   ;------> Start assembly process
+   BL       Wimp_Text_AddBlankLine
+   BL       New_Source_Parse
+   BL       Set_Default_Switches
+   BL       Set_TmpDir_Var
+   BL       Source_Window_Setup
+   BL       PreProcessor
+   BL       MacroScanner
+   BL       Assembler
+   BL       Object_Window_Setup
+   LDR      R0,Errors
+   CMP      R0,#0
+   MOVNE    R0,#0
+   STRNE    R0,extASM_Doing
+   BNE      SA_End
+   LDR      R0,Option_Face             ; Check face option
+   CMP      R0,#1
+   BLEQ     Show_Face
+
+   ;------> AutoSave object if option is set
+   LDR      R0,Options
+   TST      R0,#Option_AutoSave
+   BEQ      SA_Not_Save
+   LDR      R0,Handle_PROCESS
+   MOV      R1,#14
+   BL       Find_IconData
+   BL       Save_Object
+   BL       Print_Save_Info
+   BL       Wimp_Text_Window
+
+.SA_Not_Save
+   MOV      R0,R4
+   MOV      R1,#3
+   MOV      R2,#1
+   BL       Shade_Menu_Item            ; Shade 'Abort'
+   MOV      R0,R4
+   MOV      R1,#4
+   MOV      R2,#1
+   BL       Shade_Menu_Item            ; Shade 'Pause'
+
+   MOV      R0,#0
+   STR      R0,extASM_Doing
+   LDR      R0,Options
+   TST      R0,#Option_AutoRun
+   BEQ      SA_End
+   LDR      R0,Handle_PROCESS
+   MOV      R1,#14
+   BL       Find_IconData
+   ;------> Start task
+   SWI      Wimp_StartTask
+
+.SA_End
+   LDMFD    R13!,{R4,R15}
+
+.Print_Save_Info
+   STMFD    R13!,{R14}
+   ADR      R0,Save_WTLine_1
+   BL       Wimp_Text_AddLine
+   LDR      R0,Object_Filetype
+   CMP      R0,#0
+   BNE      PSI_Filetype
+   LDR      R2,Object_Load
+   CMP      R2,#0
+   ADREQ    R0,Save_WTLine_3
+   BLEQ     Wimp_Text_AddLine
+   LDR      R3,Object_Exec
+   CMP      R3,#0
+   ADREQ    R0,Save_WTLine_4
+   BLEQ     Wimp_Text_AddLine
+
+.PSI_Filetype
+   ADR      R0,Save_WTLine_2
+   LDR      R2,Object_Size
+   BL       Wimp_Text_AddLine
+   LDMFD    R13!,{R15}
+
+.Save_WTLine_1   DCB   "Saving object file",0
+.Save_WTLine_2   DCB   "Object length : %d",0
+.Save_WTLine_3   DCB   "Load address not specified",0
+.Save_WTLine_4   DCB   "Exec address not specified",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.DragObject
+   STR      R4,File_Address
+   ;------> Get window position
+   STR      R4,[R11]
+   MOV      R1,R11
+   SWI      Wimp_GetWindowState
+   LDR      R0,[R11,#4]                ; Visible min x
+   LDR      R1,[R11,#16]               ; Visible max y
+   LDR      R2,[R11,#20]               ; Scroll x
+   LDR      R3,[R11,#24]               ; Scroll y
+   SUB      R6,R0,R2                   ; X=Visible min x - Scroll x (coordinate of Work area
+   SUB      R7,R1,R2                   ; Y=Visible max y - Scroll y  origin)
+   ;------> Get icon pos
+   STR      R5,[R11,#4]
+   MOV      R1,R11
+   SWI      Wimp_GetIconState
+   ADD      R0,R11,#8
+   LDMIA    R0,{R1-R4}
+   MOV      R0,#5                      ; Drag type 5
+   ADD      R1,R1,R6                   ; Min x = X + Icon min x
+   ADD      R2,R2,R7                   ; Min y = Y + Icon min y
+   ADD      R3,R1,#68                  ; Max x = Min x + 68
+   ADD      R4,R2,#68                  ; Max y = Min y + 68
+   MOV      R5,#0
+   MOV      R6,#0
+   LDR      R7,Max_ScreenX
+   LDR      R8,Max_ScreenY
+   LDR      R9,[R11,#32]               ; Read address of validation string
+   ADD      R10,R11,#4
+   STMIA    R10,{R0-R8}
+   ; Check if it is RISC OS 3 and if solid sprite dragging is enabled
+   ;
+   MOV      R0,#161
+   MOV      R1,#28
+   SWI      OS_Byte
+   LDR      R0,RO3_Flag
+   TST      R2,#2                      ; (Num AND 2)=2 AND RO3?
+   CMPNE    R0,#0
+   BNE      WMCPD_Not_DragBox
+   MOV      R1,R11
+   SWI      Wimp_DragBox
+   B        WMCPD_End
+
+.WMCPD_Not_DragBox
+   MOV      R0,#&A0
+   MOV      R1,#1
+   ADD      R2,R9,#1
+   ADD      R3,R11,#8
+   ADD      R4,R11,#24
+   SWI      DragASprite_Start
+
+.WMCPD_End
+   MOV      R0,#1
+   STR      R0,Drag_Flag
+   B        Wimp_Poll_Loop
+
+.Drag_Flag DCD   0
+
+; >-------------------------------------------------------------<
+
+.WMC_Options
+   CMP      R5,#19
+   BLT      WMCO_Not_Save_Options
+   BLGT     Save_Options
+   B        WMCO_Close_Options
+
+.WMCO_Not_Save_Options
+   ADD      R1,R11,#12                 ; R1-> Window handle + Icon handle
+   SWI      Wimp_GetIconState
+   LDR      R0,[R1,#24]                ; R1 = Icon flags
+   ANDS     R0,R0,#1 << 21             ; Isolate select-bit
+   MOVNE    R0,#1                      ; 1=Set, 0=Not set
+   MOV      R1,#1
+   LDR      R2,Options
+   BIC      R2,R2,R1,LSL R5
+   ORR      R2,R2,R0,LSL R5
+   STR      R2,Options
+   B        Wimp_Poll_Loop
+
+.WMCO_Close_Options
+   ADD      R1,R11,#12
+   SWI      Wimp_CloseWindow
+   MVN      R1,#0
+   SWI      Wimp_CreateMenu            ; Close menu
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.Wimp_UserDragBox
+   LDR      R0,Drag_Flag
+   CMP      R0,#1
+   BNE      Wimp_Poll_Loop
+   MOV      R0,#0
+   STR      R0,Drag_Flag
+
+   LDR      R4,File_Address
+   LDR      R0,Handle_PROCESS
+   CMP      R4,R0
+   BNE      WU_Not_PROCESS
+   ; Save object code
+   ;
+   MOV      R5,#Flex_Object
+   LDR      R7,Object_Size
+   LDR      R8,Object_Filetype
+   MOV      R9,#14
+   B        WU_End_Window
+
+.WU_Not_PROCESS
+   ; Save Status Info text
+   ;
+   MVN      R1,#0
+   SWI      Wimp_CreateMenu
+   MOV      R5,#Flex_WimpText
+   LDR      R7,Wimp_Text_Size
+   MOV      R8,#&FFF
+   MOV      R9,#1
+
+.WU_End_Window
+   MOV      R0,R5
+   BL       Flex_Adr
+   MOV      R6,R0
+   MOV      R0,R4
+   MOV      R1,R9
+   BL       Find_IconData
+   BL       Find_LeafName
+   MOV      R9,R0
+   ADR      R0,File_Data
+   STMIA    R0,{R5-R9}
+
+   MOV      R1,R11
+   SWI      Wimp_GetPointerInfo
+   LDR      R6,[R11,#12]               ; Window to send to
+   LDR      R7,[R11,#16]               ; Icon (just in case of iconbar)
+   LDR      R0,Handle_BARICON
+   CMN      R6,#2
+   CMPEQ    R7,R0
+   BEQ      Wimp_Poll_Loop             ; Don't drag to myself
+   LDR      R0,Handle_PROCESS
+   CMP      R6,R0
+   BEQ      Wimp_Poll_Loop             ; Don't drag to myself
+
+   ;------> Send DataSave message
+   MOV      R4,#0
+   MOV      R5,#1                      ; 1 - DataSave
+   LDR      R8,[R11]
+   LDR      R9,[R11,#4]
+   LDR      R10,File_Size
+   LDR      R14,File_Type
+   ADD      R1,R11,#12
+   STMIA    R1!,{R4-R10,R14}
+   LDR      R0,File_Data+16
+   BL       StrCopyCtrl
+   SUB      R0,R1,R11
+   TST      R0,#3
+   BICNE    R0,R0,#3
+   ADDNE    R0,R0,#4                   ; Block size (words)
+   STR      R0,[R11]
+
+   MOV      R0,#18
+   MOV      R1,R11
+   MOV      R2,R6
+   MOV      R3,R7
+   SWI      Wimp_SendMessage
+   LDR      R0,[R11,#8]
+   STR      R0,DataSave_Ref
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.Wimp_KeyPressed
+   ; R4 - Window
+   ; R5 - Icon
+   ; R6 - Character
+   ;
+   LDR      R4,[R11]
+   LDR      R5,[R11,#4]
+   LDR      R6,[R11,#24]
+   LDR      R0,Handle_SAVE
+   CMP      R4,R0
+   CMPEQ    R5,#1
+   CMPEQ    R6,#13
+   BEQ      WKP_Not_ProcessKey
+   MOV      R0,R6
+   SWI      Wimp_ProcessKey
+   B        Wimp_Poll_Loop
+
+.WKP_Not_ProcessKey
+   LDR      R0,Handle_SAVE
+   MOV      R1,#1
+   BL       Find_IconData
+   MOV      R4,R0
+   MOV      R1,#'.'
+   BL       StrChrCtrl
+   CMP      R0,#0
+   MOVEQ    R0,#10                     ; Messages_Error #&10 = To save, drag the icon to a directory viewer
+   BEQ      Messages_Error
+   MOV      R0,R4
+   BL       Save_WimpText
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.Wimp_MenuSelection
+   ADR      R1,Block2
+   SWI      Wimp_GetPointerInfo
+   LDR      R10,[R1,#8]
+   LDR      R0,[R11]
+   CMP      R0,#6
+   ADDLS    R15,R15,R0,LSL #2
+   B        WMS_End
+   B        WMS_Info
+   B        WMS_Options
+   B        WMS_Misc
+   B        WMS_Abort
+   B        WMS_Pause
+   B        WMS_Continue
+   B        Quit
+
+; >-------------------------------------------------------------<
+
+.WMS_Info
+   MOV      R0,#18
+   ADR      R1,StrongHelp_Str
+   SWI      XOS_Module
+   BVC      WMS_Present
+   ADR      R0,StrongHelp_DirVar
+   ADR      R1,Block
+   MOV      R2,#&100
+   MOV      R3,#0
+   SWI      XOS_ReadVarVal
+   BVS      WMS_End
+   MOV      R0,#0
+   STRB     R0,[R1,R2]
+   MOV      R0,R1
+   SWI      XWimp_StartTask
+
+.WMS_Present
+   MOV      R0,#&100
+   STR      R0,[R11]
+   STR      R0,[R11,#12]
+   MOV      R0,#&43B00
+   STR      R0,[R11,#16]
+   ADR      R0,WMSI_Str
+   ADD      R1,R11,#20
+   ADR      R2,extASM_Path
+   BL       Print_String
+   MOV      R0,#17
+   MOV      R1,R11
+   MOV      R2,#0
+   SWI      Wimp_SendMessage
+   B        WMS_End
+
+.WMSI_Str          DCB   "Help_Word %s.extASM !Root",0
+.StrongHelp_Str    DCB   "StrongHelp",0
+.StrongHelp_DirVar DCB   "StrongHelp$Dir",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.WMS_Misc
+   LDR      R0,[R11,#4]
+   CMP      R0,#4
+   ADDLS    R15,R15,R0,LSL #2
+   B        WMS_End
+   B        WMS_End
+   B        WMSM_Colours
+   B        WMSM_Statistics
+   B        WMSM_Statistics
+   B        WMSM_Radius
+
+; >-------------------------------------------------------------<
+
+.WMSM_Colours
+   LDR      R4,[R11,#8]
+   LDR      R5,[R11,#12]
+   CMN      R5,#1
+   BEQ      WMS_End
+   LDR      R0,Menu_Array
+   LDR      R1,Menu_Item_Ticked
+   MOV      R2,#0
+   BL       Tick_Menu_Item
+   MOV      R4,R4,LSL #2
+   LDR      R0,Option_Colours
+   MOV      R1,#&F
+   BIC      R0,R0,R1,LSL R4
+   ORR      R0,R0,R5,LSL R4
+   STR      R0,Option_Colours
+   LDR      R0,Menu_Array
+   MOV      R1,R5
+   MOV      R2,#1
+   STR      R1,Menu_Item_Ticked
+   BL       Tick_Menu_Item
+
+   LDR      R0,Handle_STATUS
+   STR      R0,[R11]
+   MOV      R1,R11
+   SWI      Wimp_GetWindowInfo
+   LDR      R0,Handle_STATUS
+   ADD      R5,R11,#44
+   LDMIA    R5,{R1-R4}
+   SWI      Wimp_ForceRedraw
+   B        WMS_End
+
+; >-------------------------------------------------------------<
+
+.WMSM_Statistics
+   LDR      R1,Stat_Data_Ready
+   CMP      R1,#1
+   BNE      WMS_End
+   MOV      R1,R11
+   CMP      R0,#2
+   LDREQ    R0,Handle_STAT_ARM
+   LDRNE    R0,Handle_STAT_FPA
+   STR      R0,[R1]
+   SWI      Wimp_GetWindowInfo
+   MVN      R0,#0
+   STR      R0,[R1,#28]
+   MOV      R0,R1
+   BL       Open_Stat_Window
+   B        WMS_End
+
+; >-------------------------------------------------------------<
+
+.WMSM_Radius
+   LDR      R0,[R11,#8]
+   CMN      R0,#1
+   BEQ      WMS_End
+   MOV      R1,R11
+   LDR      R0,Handle_STAT_ARM
+   STR      R0,[R1]
+   SWI      Wimp_GetWindowInfo
+   LDR      R0,[R1,#32]
+   TST      R0,#1 << 16
+   BEQ      WMSMR_Not_Open_Stat_Window
+   MOV      R0,R1
+   BL       Open_Stat_Window
+   MOV      R1,R11
+
+.WMSMR_Not_Open_Stat_Window
+   LDR      R0,Handle_STAT_FPA
+   STR      R0,[R1]
+   SWI      Wimp_GetWindowInfo
+   LDR      R0,[R1,#32]
+   TST      R0,#1 << 16
+   MOVNE    R0,R1
+   BLNE     Open_Stat_Window
+   B        WMS_End
+
+; >-------------------------------------------------------------<
+
+.WMS_Options
+   LDR      R0,Handle_OPTIONS
+   BL       Pop_Window
+   B        WMS_End
+
+; >-------------------------------------------------------------<
+
+.WMS_Abort
+   BL       Setup_Error_Context_Info
+
+   TST      R10,#1
+   LDRNE    R1,Main_Menu
+   SWINE    Wimp_CreateMenu
+
+   ADR      R14,Internal_Context
+   LDMIA    R14,{R0,R13}
+   MOV      R15,R0
+
+; >-------------------------------------------------------------<
+
+.WMS_Pause
+   MOV      R2,#1
+   STR      R2,extASM_Pause
+   LDR      R4,Main_Menu
+   MOV      R0,R4
+   MOV      R1,#4
+   BL       Shade_Menu_Item            ; Shade 'Pause'
+   MOV      R0,R4
+   MOV      R1,#5
+   MOV      R2,#0
+   BL       Shade_Menu_Item            ; Unshade 'Continue'
+   B        WMS_End
+
+; >-------------------------------------------------------------<
+
+.WMS_Continue
+   MOV      R2,#0
+   STR      R2,extASM_Pause
+   LDR      R4,Main_Menu
+   MOV      R0,R4
+   MOV      R1,#4
+   BL       Shade_Menu_Item            ; Unshade 'Pause'
+   MOV      R0,R4
+   MOV      R1,#5
+   MOV      R2,#1
+   BL       Shade_Menu_Item            ; Shade 'Continue'
+
+; >-------------------------------------------------------------<
+
+.WMS_End
+   TST      R10,#1
+   BEQ      Wimp_Poll_Loop
+   LDR      R1,Main_Menu
+   SWI      Wimp_CreateMenu
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.Wimp_UserMessage
+.Wimp_UserMessageRecorded
+   LDR      R0,[R11,#16]
+   CMP      R0,#&A
+   BGT      WUM_GreaterThanHexA
+   ADDLE    R15,R15,R0,LSL #2
+   B        Wimp_Poll_Loop
+   B        Quit                       ; 0 - Quit
+   B        DataSave                   ; 1 - DataSave
+   B        DataSaveAck                ; 2 - DataSaveAck
+   B        DataLoad                   ; 3 - DataLoad
+   B        DataLoadAck                ; 4 - DataLoadAck
+   B        DataOpen                   ; 5 - DataOpen
+   B        RAMFetch                   ; 6 - RAMFetch
+   B        RAMTransmit                ; 7 - RAMTransmit
+   B        Wimp_Poll_Loop             ; 8 - PreQuit
+   B        Wimp_Poll_Loop             ; 9 - PaletteChange
+   B        SaveDesktop                ; &A - SaveDesktop
+
+.WUM_GreaterThanHexA
+   TEMP     R1
+   TEQ      R0,#&502
+   BEQ      HelpRequest
+   TEQ      R0,#&400C0
+   BEQ      MenuWarning
+   TEQ      R0,#&400C1
+   BLEQ     Read_Screen_Size
+   LOCK     R1
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.Set_TmpDir_Var
+   STMFD    R13!,{R4-R6,R14}
+   LDR      R0,Source_Filename
+   MOV      R4,R0
+   BL       Find_LeafName
+   CMN      R14,#1
+   BNE      SP_Not_Set_CSD
+   ADR      R0,SetPathError
+   BL       Wimp_Text_AddLine
+   B        SP_Set_CSD
+
+.SP_Not_Set_CSD
+   MOV      R3,#0
+   SUB      R5,R0,#1
+   LDRB     R6,[R5]
+   STRB     R3,[R5]                    ; Terminate path
+   ADR      R0,TmpDir_Var
+   MOV      R1,R4
+   MOV      R4,#0
+   SWI      OS_SetVarVal
+   STRB     R6,[R5]                    ; Un-terminate path
+   LDMFD    R13!,{R4-R6,R15}
+
+.SP_Set_CSD
+   ADR      R0,TmpDir_Var
+   ADR      R1,TmpDir_CSD
+   MOV      R3,#0
+   MOV      R4,#0
+   SWI      OS_SetVarVal
+   LDMFD    R13!,{R4-R6,R15}
+
+.SetPathError DCB   "Unable to set |<Tmp$Dir> (no pathname) - |<Tmp$Dir> set to ""@.""",0
+.TmpDir_CSD   DCB   "@.",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Set_Default_Switches
+   STMFD    R13!,{R14}
+
+   ;------> Reset stuff when loading new source file
+   ADR      R0,Default_Object_Filename
+   STR      R0,Object_Filename         ; Default object filename="<Tmp$Dir>.Object"
+   MOV      R0,#&FF8
+   STR      R0,Object_Filetype         ; Default Type=&FF8
+   MOV      R0,#&8000
+   STR      R0,Object_Base             ; Default Base=&8000
+   MOV      R0,#0
+   STR      R0,Object_Load             ; Default Load address=0
+   STR      R0,Object_Exec             ; Default Exec address=0
+
+   STR      R0,Option_Face             ; Default Smile=Off
+   MOV      R0,#&1100
+   STR      R0,Number_Format           ; Default number format=&1100 (General, 17 digits)
+   MOV      R0,#1024
+   STR      R0,Poll_Lines              ; Default Speed=256 (256*4 for PreProcessor and MacroScanner)
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.New_Source_Parse
+   STMFD    R13!,{R4,R14}
+
+   LDR      R4,Source_Size
+   ADRL     R0,Load_WTLine_1
+   MOV      R2,R4
+   BL       Wimp_Text_AddLine
+
+   ;------> Check source, MUST NOT contain any NULL chars
+   MOV      R0,#Flex_Source
+   BL       Flex_Adr
+   ADD      R0,R0,#1
+   ADD      R1,R0,R4
+   BL       Check_For_NULL
+   CMN      R14,#1
+   LDMNEFD  R13!,{R4,R15}
+
+   ADR      R0,Load_WTLine_2
+   MOV      R1,#TextColour_Errors
+   BL       Wimp_Text_AddColourLine
+
+   ADR      R14,Internal_Context
+   LDMIA    R14,{R0,R13}
+   MOV      R15,R0
+
+.Load_WTLine_2   DCB   "ERROR : Source file contains NULL char!",0
+   ALIGN
+
+.Check_For_NULL                        ;_R0-> Start, _R1-> End, ~R14 = -1 - NULL char found
+   STMFD    R13!,{R4-R8,R14}
+   MOV      R14,#0
+   SUBS     R1,R1,R0
+   LDMEQFD  R13!,{R4-R8,R15}
+   ANDS     R3,R0,#3
+   BEQ      CFN_Words
+   RSB      R3,R3,#4
+   SUBS     R1,R1,R3
+   ADDMI    R3,R3,R1
+
+.CFN_Byte_Loop
+   LDRB     R2,[R0],#1
+   CMP      R2,#&00
+   BEQ      CFN_NULL
+   SUBS     R3,R3,#1
+   BNE      CFN_Byte_Loop
+
+.CFN_Words
+   MOVS     R3,R1,ASR #4
+   BLE      CFN_End_Bytes
+   SUB      R1,R1,R3,LSL #4
+   MOVS     R8,#&FF
+
+.CFN_Word_Loop
+   LDMIA    R0!,{R4-R7}
+   CheckForNULL R4
+   CheckForNULL R5
+   CheckForNULL R6
+   CheckForNULL R7
+   BEQ      CFN_NULL
+   SUBS     R3,R3,#1
+   BNE      CFN_Word_Loop
+
+.CFN_End_Bytes
+   CMP      R1,#0
+   LDMLEFD  R13!,{R4-R8,R15}
+
+.CFN_End_Bytes_Loop
+   LDRB     R2,[R0],#1
+   CMP      R2,#&00
+   BEQ      CFN_NULL
+   SUBS     R1,R1,#1
+   BNE      CFN_End_Bytes_Loop
+   LDMFD    R13!,{R4-R8,R15}
+
+.CFN_NULL
+   MVN      R14,#0
+   LDMFD    R13!,{R4-R8,R15}
+
+; >-------------------------------------------------------------<
+
+.Source_Window_Setup
+   STMFD    R13!,{R4,R5,R14}
+   ;------> Source size
+   LDR      R4,Handle_PROCESS
+   MOV      R0,R4
+   MOV      R1,#5
+   BL       Find_IconData
+   MOV      R1,R0
+   MOV      R2,R1
+   LDR      R0,Source_Size
+   SWI      OS_ConvertInteger4
+   ;------> Source type (icon)
+   MOV      R0,R4
+   MOV      R1,#3
+   BL       Find_IconData
+   MOV      R1,R2
+   ADR      R0,SWS_Validation
+   LDR      R2,Source_Filetype
+   BL       Print_String
+   ;------> Source type (text)
+   MOV      R0,R4
+   MOV      R1,#6
+   BL       Find_IconData
+   MOV      R5,R0
+   MOV      R0,#18
+   LDR      R2,Source_Filetype
+   SWI      OS_FSControl               ; R2+R3 = Filetype string
+   MOV      R0,#4
+
+._Loop
+   STRB     R2,[R5],#1
+   MOV      R2,R2,LSR #8
+   STRB     R3,[R5,#3]
+   MOV      R3,R3,LSR #8
+   SUBS     R0,R0,#1
+   BNE      _Loop
+   ;------> Terminate and strip trailing spaces
+   ADD      R5,R5,#4
+
+._Loop2
+   LDRB     R2,[R5,#-1]!
+   CMP      R2,#' '
+   BEQ      _Loop2
+   MOV      R0,#0
+   STRB     R0,[R5,#1]
+   ;------> Source name
+   MOV      R0,R4
+   MOV      R1,#4
+   BL       Find_IconData
+   MOV      R1,R0
+   LDR      R0,Source_Filename
+   BL       StrCopy
+   MOV      R0,#&0D
+   STRB     R0,[R1,#-1]
+
+   MOV      R0,#0
+   BL       Shade_Source_Icons
+   MOV      R0,#1
+   MOV      R1,#1
+   BL       Shade_Object_Icons
+   MOV      R0,R4
+   MOV      R1,#23
+   MOV      R2,#1
+   BL       Shade_Icon
+
+   ;------> Optional PROCESS-pop
+   LDR      R4,Options
+   TST      R4,#Option_PopProcessWindow
+   MOVNE    R0,R4
+   BLNE     Pop_Window
+
+   ;------> Optional STATUS-pop
+   TST      R4,#Option_PopStatusWindow
+   LDRNE    R0,Handle_STATUS
+   BLNE     Pop_Window
+
+   LDMFD    R13!,{R4,R5,R15}
+
+.SWS_Validation DCB   "sfile_%3x",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Object_Window_Setup
+   STMFD    R13!,{R4-R7,R14}
+   ;------> Object size
+   LDR      R4,Handle_PROCESS
+   MOV      R0,R4
+   MOV      R1,#15
+   BL       Find_IconData
+   MOV      R1,R0
+   MOV      R2,R1
+   LDR      R0,Object_Size
+   SWI      OS_ConvertInteger4
+   ;------> Object type (icon)
+   MOV      R0,R4
+   MOV      R1,#12
+   BL       Find_IconData
+   MOV      R1,R2
+   ADR      R0,SWS_Validation
+   LDR      R6,Object_Filetype
+   MOV      R2,R6
+   BL       Print_String
+   ;------> Object type (text)
+   MOV      R0,R4
+   MOV      R1,#16
+   BL       Find_IconData
+   MOV      R5,R0
+   MOV      R0,#18
+   MOV      R2,R6
+   SWI      OS_FSControl               ; R2+R3 = Filetype string
+   MOV      R0,#4
+
+._Loop
+   STRB     R2,[R5],#1
+   MOV      R2,R2,LSR #8
+   STRB     R3,[R5,#3]
+   MOV      R3,R3,LSR #8
+   SUBS     R0,R0,#1
+   BGT      _Loop
+   ;------> Terminate and strip trailing spaces
+   ADD      R5,R5,#4
+
+._Loop2
+   LDRB     R2,[R5,#-1]!
+   CMP      R2,#' '
+   BEQ      _Loop2
+   MOV      R0,#0
+   STRB     R0,[R5,#1]
+   CMP      R6,#0
+   BEQ      OWS_Load_Exec
+   ; Type is not zero, so no load or exec address
+   ;
+   MOV      R0,R4
+   MOV      R1,#17
+   BL       Find_IconData
+   MOV      R1,#0
+   STRB     R1,[R0]
+   ;------> Exec address
+   MOV      R0,R4
+   MOV      R1,#18
+   BL       Find_IconData
+   MOV      R1,#0
+   STRB     R1,[R0]
+   B        OWS_End_Load_Exec
+
+.OWS_Load_Exec
+   ;------> Load address
+   MOV      R0,R4
+   MOV      R1,#17
+   BL       Find_IconData
+   MOV      R1,R0
+   ADR      R0,OWS_Load_Exec_Adr
+   LDR      R2,Object_Load
+   BL       Print_String
+   ;------> Exec address
+   MOV      R0,R4
+   MOV      R1,#18
+   BL       Find_IconData
+   MOV      R1,R0
+   ADR      R0,OWS_Load_Exec_Adr
+   LDR      R2,Object_Exec
+   BL       Print_String
+
+.OWS_End_Load_Exec
+   ;------> Object name
+   ; Insert source name path, if any
+   ;
+   MOV      R0,R4
+   MOV      R1,#14
+   BL       Find_IconData
+   ;MOV      R5,R0
+   ;MOV      R0,R4
+   ;MOV      R1,#4
+   ;BL       Find_IconData
+   ;MOV      R7,R0
+   ;BL       Find_LeafName
+   ;CMN      R14,#1
+   ;MOVEQ    R1,R5
+   ;BEQ      OWS_No_Path
+   ;SUB      R2,R0,R7
+   ;MOV      R0,R7
+   ;MOV      R1,R5
+   ;BL       StrCopyNum
+   ;SUB      R1,R1,#1
+
+.OWS_No_Path
+   LDR      R1,Object_Filename
+
+.OWS_Loop
+   LDRB     R2,[R1],#1
+   STRB     R2,[R0],#1
+   CMP      R2,#&0A
+   CMPNE    R2,#&00
+   ;CMP      R2,#' '
+   ;CMPNE    R2,#&09
+   ;CMPNE    R2,#':'
+   ;CMPNE    R2,#';'
+   ;CMPNE    R2,#&0A
+   ;CMPNE    R2,#&00
+   BNE      OWS_Loop
+   MOV      R2,#&0D
+   STRB     R2,[R0,#-1]
+
+   MOV      R0,#0
+   CMP      R6,#0
+   MOVEQ    R1,#0
+   MOVNE    R1,#1
+   BL       Shade_Object_Icons
+
+   LDR      R4,Handle_PROCESS
+   MOV      R0,R4
+   MOV      R1,#4
+   BL       Find_IconData
+   MOV      R1,#'.'
+   BL       StrChrCtrl
+   CMP      R0,#0
+   MOVEQ    R2,#1
+   MOVNE    R2,#0
+   MOV      R0,R4
+   MOV      R1,#23
+   BL       Shade_Icon
+
+   LDMFD    R13!,{R4-R7,R15}
+
+.OWS_Load_Exec_Adr  DCB   "&%x",0
+   ALIGN

@@ -1,0 +1,11 @@
+
+; >-------------------------------------------------------------<
+
+.Pop_Window                            ;_R0 = Window Handle
+   ADR      R1,StrBuffer
+   STR      R0,[R1]
+   SWI      Wimp_GetWindowState
+   MVN      R0,#0
+   STR      R0,[R1,#28]
+   SWI      Wimp_OpenWindow
+   MOV      R15,R14

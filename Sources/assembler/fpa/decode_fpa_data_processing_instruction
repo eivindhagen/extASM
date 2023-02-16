@@ -1,0 +1,385 @@
+
+; >-------------------------------------------------------------<
+
+.DT_ABS                                ;_R8 = "B"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   ;------> ABS  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110001000001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ACS                                ;_R8 = "C"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   ;------> ACS  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110110000001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ATN                                ;_R8 = "T"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   ;------> ATN  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110110100001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_CNF_CNFE                           ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   ;------> CNF  Cond    abc eFn         fgh iFm
+   MOVEQ    R9,#%00001110101100001111000100010000
+   BEQ      DT_FPU_CMP
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_COS                                ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   ;------> COS  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110100100001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_DVF                                ;_R8 = "V"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   ;------> DVF  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110010000000000000100000000
+   BEQ      DT_FPU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_EXG_EXP                            ;_R8 = "X"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'G'
+   BEQ      DT_EXG
+   CMP      R8,#'P'
+   ;------> EXP  Cond    abcde   j       fgh i
+   MOVEQ    R9,#%00001110011100001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FRD                                ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   ;------> FRD  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110101100000000000100000000
+   BEQ      DT_FPU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_LGN                                ;_R8 = "G"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   ;------> LGN  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110011000001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_LOCK_LOG                           ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BEQ      DT_LOCK
+   CMP      R8,#'G'
+   ;------> LOG  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110010100001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_MNF                                ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   ;------> MNF  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110000100001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_NRM                                ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   ;------> NRM  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110111100001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_POP_POL_POW                        ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   ;------> POL  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110110000000000000100000000
+   BEQ      DT_FPU_D12
+   CMP      R8,#'P'
+   BEQ      DT_POP
+   CMP      R8,#'W'
+   ;------> POW  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110011000000000000100000000
+   BEQ      DT_FPU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_RDF                                ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   ;------> RDF  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110010100000000000100000000
+   BEQ      DT_FPU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_RMF                                ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   ;------> RMF  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110100000000000000100000000
+   BEQ      DT_FPU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_RND                                ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   ;------> RND  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110001100001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_RPW                                ;_R8 = "P"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'W'
+   ;------> RPW  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110011100000000000100000000
+   BEQ      DT_FPU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SIN                                ;_R8 = "I"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   ;------> SIN  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110100000001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SQT                                ;_R8 = "Q"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ;------> SQT  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110010000001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_TAN                                ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   ;------> TAN  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110101000001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_URD                                ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   ;------> URD  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110111000001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FPU_D2
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DTFD2_No_Stat
+   ADR      R0,Code_Counters+41*4
+   AND      R1,R9,#&F << 20
+   LDR      R2,[R0,R1,LSR #18]
+   ADD      R2,R2,#1
+   STR      R2,[R0,R1,LSR #18]
+
+.DTFD2_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = "S,D,E" or CC
+   BL       Decode_ConditionCode
+   ;------> Check for S,D,E bit (precision)
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BEQ      FPUD2_Precision_Done
+   CMP      R8,#'D'
+   ORREQ    R9,R9,#1 << 7
+   BEQ      FPUD2_Precision_Done
+   CMP      R8,#'E'
+   ORREQ    R9,R9,#1 << 19
+   MOVNE    R0,#&70                    ; Asm_Error #&70 = Floating Point precision must be specified
+   BNE      Asm_Error
+
+.FPUD2_Precision_Done
+   ;------> Rounding mode is optional (P M Z)
+   LDRB     R8,[R10],#1
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   BEQ      FPUD2_Rounding_Done2
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   ORREQ    R9,R9,#1 << 5
+   BEQ      FPUD2_Rounding_Done
+   CMP      R8,#'M'
+   ORREQ    R9,R9,#2 << 5
+   BEQ      FPUD2_Rounding_Done
+   CMP      R8,#'Z'
+   ORREQ    R9,R9,#3 << 5
+   BEQ      FPUD2_Rounding_Done
+   MOV      R0,#&71                    ; Asm_Error #&71 = Illegal Floating Point rounding mode
+   B        Asm_Error
+
+.FPUD2_Rounding_Done
+   LDRB     R8,[R10],#1
+
+.FPUD2_Rounding_Done2
+   BL       Decode_FP_Destination_Register
+   BL       Decode_FP_Operand_Two
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_FPU_D12
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DTFD12_No_Stat
+   ADR      R0,Code_Counters+28*4
+   AND      R1,R9,#&F << 20
+   LDR      R2,[R0,R1,LSR #18]
+   ADD      R2,R2,#1
+   STR      R2,[R0,R1,LSR #18]
+
+.DTFD12_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = "S,D,E" or CC or Blank
+   BL       Decode_ConditionCode
+   ;------> Check for S,D,E bit (precision)
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BEQ      FPUD12_Precision_Done
+   CMP      R8,#'D'
+   ORREQ    R9,R9,#1 << 7
+   BEQ      FPUD12_Precision_Done
+   CMP      R8,#'E'
+   ORREQ    R9,R9,#1 << 19
+   MOVNE    R0,#&70                    ; Asm_Error #&70 = Floating Point precision must be specified
+   BNE      Asm_Error
+
+.FPUD12_Precision_Done
+   ;------> Rounding mode is optional (P M Z)
+   LDRB     R8,[R10],#1
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   BEQ      FPUD12_Rounding_Done2
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   ORREQ    R9,R9,#1 << 5
+   BEQ      FPUD12_Rounding_Done
+   CMP      R8,#'M'
+   ORREQ    R9,R9,#2 << 5
+   BEQ      FPUD12_Rounding_Done
+   CMP      R8,#'Z'
+   ORREQ    R9,R9,#3 << 5
+   BEQ      FPUD12_Rounding_Done
+   MOV      R0,#&71                    ; Asm_Error #&71 = Illegal Floating Point rounding mode
+   B        Asm_Error
+
+.FPUD12_Rounding_Done
+   LDRB     R8,[R10],#1
+
+.FPUD12_Rounding_Done2
+   BL       Decode_FP_Destination_Register
+   BL       Decode_Operand_Register_Fn
+   BL       Decode_FP_Operand_Two
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_FPU_CMP                            ;_R8 = "E" or CC or Blank
+   LDRB     R8,[R10],#1
+   CMP      R8,#'E'
+   CMPNE    R8,#'e'
+   BNE      FPUCMP_NoException
+   ;------> If next char is a "Q" then this is a normal with EQ condition code
+   ;        Else it's a CMP with Exception
+   LDRB     R0,[R10]
+   BIC      R0,R0,#32
+   CMP      R0,#'Q'
+   LDRNEB   R8,[R10],#1
+   ORRNE    R9,R9,#1 << 22
+
+.FPUCMP_NoException                    ; R8 = CC or Blank
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DTFCMP_No_Stat
+   ADR      R0,Code_Counters+57*4
+   AND      R1,R9,#3 << 21
+   LDR      R2,[R0,R1,LSR #19]
+   ADD      R2,R2,#1
+   STR      R2,[R0,R1,LSR #19]
+
+.DTFCMP_No_Stat
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+
+   BL       Decode_FP_Register
+   ORR      R9,R9,R0,LSL #Rn_Pos
+
+   BL       Decode_FP_Operand_Two
+   B        DT_End

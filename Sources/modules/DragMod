@@ -1,0 +1,227 @@
+
+   #name <extASM$Dir>.Resources.DragMod
+   #type &FFA
+
+   ; This module has a command '*Drag <AppName> <Filename>', which sends a DataLoad message
+   ; with <Filename> to the application <AppName>. It gives the iconbar and the
+   ; application's icon number on the iconbar in the DataLoad message.
+   ;
+.Module_Start
+   DCD      0                          ; Start
+   DCD      0                          ; Initialisation
+   DCD      0                          ; Finalisation
+   DCD      0                          ; Service call handler
+   DCD      Title-Module_Start         ; Title string
+   DCD      Help-Module_Start          ; Help string
+   DCD      Commands-Module_Start      ; Help and command keyword table
+   DCD      0                          ; SWI chunk base number
+   DCD      0                          ; SWI handler code
+   DCD      0                          ; SWI decoding table
+   DCD      0                          ; SWI decoding code
+   DCD      0                          ; Messages file
+   DCD      Module_flag-Module_Start   ; Module flags word
+
+.Module_flag
+   DCD      1
+
+.Title
+   DCB      "DragMod",0
+   ALIGN
+
+.Help
+   DCB      "Drag Module",9,"1.00 (16 Aug 1995) © Terje Slettebø",0
+   ALIGN
+
+.Commands
+   DCB      "Drag",0
+   ALIGN
+   DCD      Drag-Module_Start
+   DCD      &020002
+   DCD      Drag_Syntax-Module_Start
+   DCD      Drag_Help-Module_Start
+   DCD      0
+
+.Drag_Help   DCB      "*Drag sends a DataLoad message to an application.",10,13
+.Drag_Syntax DCB      "Syntax: *Drag |<AppName> |<Filename>",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+   ; R0  -> Command tail
+   ; R12 -> Currently preferred instantiation (workspace pointer)
+   ; R13 =  A full, descending stack
+   ;
+   ; R7-R11 must be preserved
+   ;
+   ; Processor is in SVC mode
+   ;
+.Drag
+   STMFD    R13!,{R6-R8,R14}
+   ; Claim memory
+   ;
+   MOV      R7,R0
+   MOV      R0,#6
+   MOV      R3,#&100
+   SWI      XOS_Module                 ; Claim memory from RMA
+   LDMVSFD  R13!,{R6-R8,R15}
+   MOV      R6,R2
+   ; Start task
+   ;
+   MOV      R0,#210
+   LDR      R1,Task_String
+   ADR      R2,Task_Name
+   SWI      XWimp_Initialise           ; Start task
+   STR      R1,Task_Handle
+   ; Copy application name
+   ;
+   MOV      R3,R6
+.Drag_Loop
+   LDRB     R0,[R7],#1
+   STRB     R0,[R3],#1
+   CMP      R0,#' '
+   BGT      Drag_Loop
+   MOV      R0,#0
+   STRB     R0,[R3,#-1]
+   ; Get task handle
+   ;
+   MOV      R8,#0
+.Drag_Loop2
+   MOV      R0,R8
+   ADD      R1,R6,#&80
+   MOV      R2,#16
+   SWI      XTaskManager_EnumerateTasks
+   LDMVSFD  R13!,{R6-R8,R15}
+   CMN      R0,#1
+   BEQ      dragbad
+   MOV      R8,R0
+   LDR      R0,[R6,#&84]
+   MOV      R1,R6
+   BL       StrCmp
+   CMP      R0,#0
+   BNE      Drag_Loop2
+   LDR      R8,[R6,#&80]
+   ; Get number of icons for iconbar
+   ;
+   MVN      R0,#1
+   STR      R0,[R6]
+   ORR      R1,R6,#1
+   SWI      XWimp_GetWindowInfo
+   LDR      R3,[R6,#88]
+   ; Get icon handle for task
+   ;
+   SUB      R3,R3,#1
+.Drag_Loop3
+   MOV      R0,#19
+   MOV      R1,R6
+   MVN      R2,#1
+   SWI      XWimp_SendMessage
+   CMP      R2,R8
+   BEQ      Drag_Found
+   SUBS     R3,R3,#1
+   BGE      Drag_Loop3
+.dragbad
+   ADR      R0,Drag_Error
+   LDMFD    R13!,{R6-R8,R14}
+   TEQ      R15,R15
+   MOVEQ    R15,R14
+   ORRNE    R15,R14,#1 << 28
+.Drag_Found
+   ; Get file type and size
+   ;
+   STR      R3,[R6,#24]
+.Drag_Loop4
+   LDRB     R0,[R7],#1
+   CMP      R0,#' '
+   BEQ      Drag_Loop4
+   MOV      R0,#17
+   SUB      R1,R7,#1
+   SWI      XOS_File
+   LDMVSFD  R13!,{R15}
+   CMP      R0,#0
+   BNE      file_ok
+   ADR      R0,File_Error
+   LDMFD    R13!,{R6-R8,R14}
+   TEQ      R15,R15
+   MOVEQ    R15,R14
+   ORRNE    R15,R14,#1 << 28
+   ; Send DataLoad message
+   ;
+.file_ok
+   MOV      R0,#0
+   STR      R0,[R6,#12]
+   STR      R0,[R6,#28]
+   STR      R0,[R6,#32]
+   MOV      R0,#3
+   STR      R0,[R6,#16]
+   MVN      R0,#1
+   STR      R0,[R6,#20]
+   STR      R4,[R6,#36]
+   MOV      R0,R2,LSL #12
+   MOV      R0,R0,LSR #20
+   STR      R0,[R6,#40]
+   SUB      R2,R7,#1
+   ADD      R3,R6,#44
+.Drag_Loop5
+   LDRB     R0,[R2],#1
+   STRB     R0,[R3],#1
+   CMP      R0,#' '
+   BGT      Drag_Loop5
+   MOV      R0,#0
+   STRB     R0,[R3,#-1]
+   TST      R3,#3
+   BICNE    R3,R3,#3
+   ADDNE    R3,R3,#4
+   SUB      R0,R3,R6
+   STR      R0,[R6]
+   MOV      R0,#17
+   MOV      R1,R6
+   MOV      R2,R8
+   SWI      XWimp_SendMessage
+   ; Release memory
+   ;
+   MOV      R0,#7
+   MOV      R2,R4
+   SWI      XOS_Module                 ; Release claimed memory
+   ; Exit
+   ;
+   LDR      R0,Task_Handle
+   LDR      R1,Task_String
+   SWI      XWimp_CloseDown
+   LDMFD    R13!,{R6-R8,R15}
+
+.Task_String  DCB   "TASK"
+.Task_Handle  DCD   0
+.Task_Name    DCB   "Sender",0
+   ALIGN
+.Drag_Error
+   DCD      0
+   DCB      "Application not present",0
+   ALIGN
+.File_Error
+   DCD      0
+   DCB      "File not found",0
+   ALIGN
+
+   ; This function gives the value zero if the strings are equal,
+   ; -1 if str1<str2 and 1 if str1>str2.
+   ;
+.StrCmp                               ;_R0-> String 1, _R1-> String 2, ~R0 = Result (zero
+.StrCmp_Loop                           ; if str1=str2, -1 if str1<str2 and 1 if str1>str2)
+   LDRB     R2,[R0],#1
+   LDRB     R3,[R1],#1
+   CMP      R2,#0
+   CMPNE    R3,#0
+   BEQ      StrCmp_End
+   CMP      R2,R3
+   BEQ      StrCmp_Loop
+   MVNLT    R0,#0
+   MOVGT    R0,#1
+   MOV      R15,R14
+.StrCmp_End
+   CMP      R2,R3
+   MOVEQ    R0,#0
+   MVNLT    R0,#0
+   MOVGT    R0,#1
+   MOV      R15,R14
+
+.Module_End

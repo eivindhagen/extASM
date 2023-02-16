@@ -1,0 +1,96 @@
+
+; >-------------------------------------------------------------<
+
+.Asm_Error_Return                      ;_R0 = Error number, _R1 = -1 - Don't save filename
+   STMFD    R13!,{R0-R5,R14}           ;_R2 = First parameter, _R3 = Second parameter
+   ADD      R4,R13,#28                 ;_R4-> Filename, _R5-> Leafname, _R6 = Line
+   MOV      R5,R13
+   ADR      R0,AER_Error
+   CMN      R1,#1
+   LDMIA    R4,{R1-R3}
+   MVNEQ    R1,#0
+   BL       Setup_Error_Context
+   LDMIA    R5,{R0-R3}
+   B        Asm_Error
+
+.AER_Error
+   LDR      R0,[R5,#4]
+   BL       Restore_Error_Context
+   LDMFD    R13!,{R0-R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Setup_Error_Context                   ;_R0-> Address to go to after error, _R1-> Filename
+   STR      R0,SEC_Address             ; (or -1 if no change), _R2-> Leafname, _R3 = Line
+   SUB      R0,R13,#64
+   STMFD    R0!,{R4-R12,R14}
+   CMN      R1,#1
+   BEQ      SEC_No_Filename
+   ADR      R4,Source_Filename
+   LDMIA    R4,{R5-R7}
+   STMIA    R4,{R1-R3}
+   STMFD    R13!,{R5-R7}
+
+.SEC_No_Filename
+   ADR      R1,Error_Context
+   LDMIA    R1,{R3-R12,R14}            ; Load old error context
+   STMFD    R13!,{R3-R12,R14}          ; Stack it
+   LDMFD    R0!,{R4-R12,R14}           ; Reload registers
+   LDR      R0,SEC_Address
+   STMIA    R1,{R0,R4-R13}             ; Store it as new error context
+   MOV      R15,R14
+
+.SEC_Address DCD   0
+
+; >-------------------------------------------------------------<
+
+.Restore_Error_Context                 ; R0 = -1 - Not restore filename, etc.
+   SUB      R1,R13,#64
+   STMFD    R1!,{R4-R12,R14}
+   ADR      R2,Error_Context
+   LDMFD    R13!,{R3-R12,R14}          ; Unstack old error context
+   STMIA    R2,{R3-R12,R14}            ; Store it as new error context
+   CMN      R0,#1
+   LDMEQFD  R1!,{R4-R12,R15}
+   ADR      R4,Source_Filename
+   LDMFD    R13!,{R5-R7}
+   STMIA    R4,{R5-R7}
+   LDMFD    R1!,{R4-R12,R15}
+
+; >-------------------------------------------------------------<
+
+.Setup_Error_Context_Info
+   STMFD    R13!,{R4,R14}
+   ADR      R0,Empty_Str
+   STR      R0,Source_LeafName
+   MOV      R0,#0
+   STR      R0,Source_Line             ; Reset source line
+   STR      R0,extASM_Doing
+   STR      R0,extASM_Pause
+   LDR      R4,Main_Menu
+   MOV      R0,R4
+   MOV      R1,#3
+   MOV      R2,#1
+   BL       Shade_Menu_Item            ; Shade 'Abort'
+   MOV      R0,R4
+   MOV      R1,#4
+   MOV      R2,#1
+   BL       Shade_Menu_Item            ; Shade 'Pause'
+   MOV      R0,R4
+   MOV      R1,#5
+   MOV      R2,#1
+   BL       Shade_Menu_Item            ; Shade 'Continue'
+
+   LDR      R4,Handle_PROCESS
+   MOV      R0,R4
+   MOV      R1,#4
+   BL       Find_IconData
+   MOV      R1,#'.'
+   BL       StrChrCtrl
+   CMP      R0,#0
+   MOVEQ    R2,#1
+   MOVNE    R2,#0
+   MOV      R0,R4
+   MOV      R1,#23
+   BL       Shade_Icon
+   LDMFD    R13!,{R4,R15}

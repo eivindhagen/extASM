@@ -1,0 +1,88 @@
+
+; >-------------------------------------------------------------<
+
+.Send_Throwback                        ;_R0-> String, _R1 = Type (0,1,2), _R2 = Flag
+   STMFD    R13!,{R4,R5,R14}           ; (0 = Info, 1 = Error)
+   ADR      R4,Block
+   MOVS     R5,R2
+   MOV      R2,#&42583
+   ADDEQ    R2,R2,#3
+   STR      R2,[R4,#16]
+   LDR      R3,Source_Line
+   STR      R3,[R4,#20]
+   STR      R1,[R4,#24]
+   ADD      R1,R4,#28
+   BL       StrCopy
+   TST      R1,#3
+   BICNE    R1,R1,#3
+   ADDNE    R1,R1,#4
+   SUB      R0,R1,R4
+   STR      R0,[R4]
+   MOV      R0,#0
+   STR      R0,[R4,#12]
+   ADD      R4,R4,#&100
+
+   LDR      R0,Throwback_First_Sent
+   CMP      R0,#1
+   BEQ      ST_First_Sent
+   ; Send DDEUtils_ThrowbackStart
+   ;
+   MOV      R0,#20
+   STR      R0,[R4]
+   MOV      R0,#0
+   STR      R0,[R4,#12]
+   MOV      R0,#&42580
+   STR      R0,[R4,#16]
+   MOV      R0,#17
+   MOV      R1,R4
+   LDR      R2,Throwback_Taskhandle
+   SWI      Wimp_SendMessage
+   ; Send DDEUtils_ProcessingFile
+   ;
+   MOV      R0,#&42581
+   STR      R0,[R4,#16]
+   LDR      R0,Handle_PROCESS
+   MOV      R1,#4
+   BL       Find_IconData
+   ADD      R1,R4,#20
+   BL       StrCopyCtrl
+   TST      R1,#3
+   BICNE    R1,R1,#3
+   ADDNE    R1,R1,#4
+   SUB      R0,R1,R4
+   STR      R0,[R4]
+   MOV      R0,#17
+   MOV      R1,R4
+   LDR      R2,Throwback_Taskhandle
+   SWI      Wimp_SendMessage
+   MOV      R0,#1
+   STR      R0,Throwback_First_Sent
+
+.ST_First_Sent
+   ; Send DDEUtils_ErrorsIn/DDEUtils_InfoForFile
+   ;
+   MOV      R0,#0
+   STR      R0,[R4,#12]
+   MOV      R0,#&42582
+   CMP      R5,#0
+   ADDEQ    R0,R0,#3
+   STR      R0,[R4,#16]
+   LDR      R0,Source_Filename
+   ADD      R1,R4,#20
+   BL       StrCopy
+   TST      R1,#3
+   BICNE    R1,R1,#3
+   ADDNE    R1,R1,#4
+   SUB      R0,R1,R4
+   STR      R0,[R4]
+   MOV      R0,#17
+   MOV      R1,R4
+   LDR      R2,Throwback_Taskhandle
+   SWI      Wimp_SendMessage
+   ; Send DDEUtils_ErrorDetails/DDEUtils_InfoDetails
+   ;
+   MOV      R0,#17
+   SUB      R1,R4,#&100
+   LDR      R2,Throwback_Taskhandle
+   SWI      Wimp_SendMessage
+   LDMFD    R13!,{R4,R5,R15}

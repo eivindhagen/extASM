@@ -1,0 +1,64 @@
+
+macro gmove X:r,Y:r
+{
+   MOV      R0,#Plot_Move
+   MOV      R1,X,ASR #Pie_Shift
+   MOV      R2,Y,ASR #Pie_Shift
+   SWI      OS_Plot
+}
+
+macro line X1:r,Y1:r,X2:r,Y2:r
+{
+   MOV      R0,#Plot_Move
+   MOV      R1,X1,ASR #Pie_Shift
+   MOV      R2,Y1,ASR #Pie_Shift
+   SWI      OS_Plot
+   MOV      R0,#Plot_Draw
+   MOV      R1,X2,ASR #Pie_Shift
+   MOV      R2,Y2,ASR #Pie_Shift
+   SWI      OS_Plot
+}
+
+macro plot Code:r,X:r,Y:r
+{
+   MOV      R0,Code
+   MOV      R1,X,ASR #Pie_Shift
+   MOV      R2,Y,ASR #Pie_Shift
+   SWI      OS_Plot
+}
+
+macro rectangle_fill XStart:r,YStart:r,XSize:r,YSize:r
+{
+   MOV      R0,#Plot_Move
+   MOV      R1,XStart
+   MOV      R2,YStart
+   SWI      OS_Plot
+   MOV      R0,#Plot_RectFill
+   ADD      R1,XStart,XSize
+   ADD      R2,YStart,YSize
+   SWI      OS_Plot
+}
+
+macro rectangle XStart:r,YStart:r,XSize:r,YSize:r
+{
+   MOV      R0,#Plot_Move
+   MOV      R1,XStart
+   MOV      R2,YStart
+   SWI      OS_Plot
+   MOV      R0,#Plot_Draw
+   ADD      R1,XStart,XSize
+   MOV      R2,YStart
+   SWI      OS_Plot
+   MOV      R0,#Plot_Draw
+   ADD      R1,XStart,XSize
+   ADD      R2,YStart,YSize
+   SWI      OS_Plot
+   MOV      R0,#Plot_Draw
+   MOV      R1,XStart
+   ADD      R2,YStart,YSize
+   SWI      OS_Plot
+   MOV      R0,#Plot_Draw
+   MOV      R1,XStart
+   MOV      R2,YStart
+   SWI      OS_Plot
+}

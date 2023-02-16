@@ -1,0 +1,161 @@
+
+; >-------------------------------------------------------------<
+
+.DT_BFC_BFI                            ;_R8 = "F"
+   MOV      R4,#1
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   ;------> BFC  Cond       [msb][Rd][lsb]
+   MOVEQ    R9,#%00000111110000000000000000011111
+   BEQ      DT_Bitfield_Instruction
+   CMP      R8,#'I'
+   ;------> BFI  Cond       [msb][Rd][lsb]   [Rn]
+   MOVEQ    R9,#%00000111110000000000000000010000
+   BEQ      DT_Bitfield_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_CLZ                                ;_R8 = "Z"
+   ;------> CLZ  Cond            [Rd]        [Rm]
+   MOV      R9,#%00000001011011110000111100010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Two_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_RBIT                               ;_R8 = "B"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ;------> RBIT Cond            [Rd]        [Rm]
+   MOVEQ    R9,#%00000110111111110000111100110000
+   BEQ      DT_ALU_D2_Register
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_REV                                ;_R8 = "V"
+   LDRB     R8,[R10]
+   CMP      R8,#'1'
+   ADDEQ    R10,R10,#1
+   BEQ      DT_REV16
+   CMP      R8,#'S'
+   CMPNE    R8,#'s'
+   ADDEQ    R10,R10,#1
+   BEQ      DT_REVSH
+   ;------> REV  Cond            [Rd]        [Rm]
+   MOV      R9,#%00000110101111110000111100110000
+   B        DT_ALU_D2_Register
+
+; >-------------------------------------------------------------<
+
+.DT_REV16                              ;_R8 = "1"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'6'
+   ;------> REV16 Cond            [Rd]        [Rm]
+   MOVEQ    R9,# %00000110101111110000111110110000
+   BEQ      DT_ALU_D2_Register
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_REVSH                              ;_R8 = "S"/"s"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   ;------> REVSH Cond            [Rd]        [Rm]
+   MOVEQ    R9,# %00000110111111110000111110110000
+   BEQ      DT_ALU_D2_Register
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SBFX                               ;_R8 = "F"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'X'
+   MOVEQ    R4,#0
+   ;------> SBFX Cond       width[Rd][lsb]   [Rn]
+   MOVEQ    R9,#%00000111101000000000000001010000
+   BEQ      DT_Bitfield_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SEL                                ;_R8 = "L"
+   ;------> SEL  Cond        [Rn][Rd]        [Rm]
+   MOV      R9,#%00000110100000000000111110110000
+   B        Decode_SIMD_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_UBFX                               ;_R8 = "B"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'X'
+   MOVEQ    R4,#0
+   ;------> UBFX Cond       width[Rd][lsb]   [Rn]
+   MOVEQ    R9,#%00000111111000000000000001010000
+   BEQ      DT_Bitfield_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_USAD                               ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'8'
+   ;------> USAD8 Cond        [Rd]    [Rm]    [Rn]
+   MOVEQ    R9,# %00000111100000001111000000010000
+   BEQ      DT_ALU_Rn_Rm_Rs
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   LDREQB   R8,[R10],#1
+   CMPEQ    R8,#'8'
+   ;------> USADA8 Cond        [Rd][Ra][Rm]    [Rn]
+   MOVEQ    R9,#  %00000111100000000000000000010000
+   BEQ      DT_ALU_Rn_Rm_Rs_Rd
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_Bitfield_Instruction               ; R4 - 0 = Don't add lsb part, 1 = Add lsb part
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   AND      R0,R9,#%1111
+   CMP      R0,#15
+   BEQ      DT_BI_BFC
+   BL       Decode_Operand_Two_Register
+
+.DT_BI_BFC
+   BL       Decode_Operand_Immediate
+   CMP      R0,#31
+   MOVHI    R0,#&01                    ; Asm_Error #&01 = Illegal shift
+   BHI      Asm_Error
+   ORR      R9,R9,R0,LSL #7
+   MOV      R5,R0
+
+   BL       Decode_Operand_Immediate
+   RSB      R1,R5,#32
+   CMP      R0,#1
+   CMPGE    R1,R0
+   MOVLT    R0,#&0C                    ; Asm_Error #&0C = Illegal bitfield
+   BLT      Asm_Error
+   CMP      R4,#1
+   ADDEQ    R0,R0,R5
+   SUB      R0,R0,#1
+   ORR      R9,R9,R0,LSL #16
+   B        DT_Write_Instruction

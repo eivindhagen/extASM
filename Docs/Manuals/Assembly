@@ -1,0 +1,220 @@
+
+Some tips and code examples for ARM assembly
+--------------------------------------------
+
+IF A=1 AND B=2 THEN
+-------------------
+CMP      R1,#1
+CMPEQ    R2,#2
+BEQ      Routine
+
+IF A=1 OR B=2 THEN
+------------------
+CMP      R1,#1
+CMPNE    R2,#2
+BEQ      Routine
+
+IF A>=0 AND A<=10 THEN
+----------------------
+Three ways
+----------
+MOV      R2,#10
+CMP      R1,#0
+CMPGE    R2,R1
+BGE      Routine
+
+CMP      R1,#0
+RSBGES   R2,R1,#10
+BGE      Routine
+
+CMP      R1,#10
+BLS      Routine (!)
+
+You can also string these compares together, e.g.
+IF A=1 AND B=2 AND C=3 ... THEN
+-------------------------------
+CMP      R1,#1
+CMPEQ    R2,#2
+CMPEQ    R3,#3
+...
+BEQ      Routine
+
+You can combine discrete tests and range tests, e.g.
+IF A=10 OR B<=20 THEN
+---------------------
+CMP      R1,#10
+CMPNE    R2,#20
+BLE      Routine
+
+IF A=10 AND B<=20 THEN
+----------------------
+CMP      R2,#20
+CMPLE    R1,#10
+BEQ      Routine
+
+
+You can even combine AND and OR, like this
+IF A=1 AND B=2 OR C=3 OR D=4 THEN
+---------------------------------
+CMP      R1,#1
+CMPEQ    R2,#2
+CMPNE    R3,#3
+CMPNE    R4,#4
+BEQ      Routine
+
+IF (A=1 OR B=2 OR C=3) AND D=4 AND E=5 OR F=6
+---------------------------------------------
+CMP      R1,#1
+CMPNE    R2,#2
+CMPNE    R3,#3
+CMPEQ    R4,#4
+CMPEQ    R5,#5
+CMPNE    R6,#6
+
+Isn't ARM assembly wonderful? Try to do this in 6 S cycles on an Intel
+processor.
+
+
+You can also combine calculations with compares, like
+IF A=1 THEN
+  Var=1
+  IF B=2 THEN Var2=1
+ENDIF
+--------------------
+CMP      R1,#1
+MOVEQ    R10,#1
+CMPEQ    R2,#2
+MOVEQ    R11,#1
+
+
+Jump tables
+-----------
+CASE A OF
+WHEN 0: Routine0
+WHEN 1: Routine1
+...
+OTHERWISE Error
+ENDCASE
+----------------
+CMP      R1,#Max_Value
+ADDLS    R15,R15,R1,LSL #2
+B        Error
+B        Routine0
+B        Routine1
+...
+
+Multiply by 2^n (i.e. 2,4,8,16,32...)
+-------------------------------------
+MOV      R1,R1,LSL #n
+
+Multiply by 2^n+1 (i.e. 3,5,9,17,33...)
+---------------------------------------
+ADD      R1,R1,R1,LSL #n
+
+Multiply by 2^n-1 (i.e. 3,7,15,31...)
+-------------------------------------
+RSB      R1,R1,R1,LSL #n
+
+Multiply by e.g. 10
+-------------------
+ADD      R1,R1,R1,LSL #2     ; Multiply by 5
+MOV      R1,R1,LSL #1        ; Multiply by 2
+
+Shifting down of a number with more than 32 bits
+(for multi-precision arithmetics, like a 64 bit divide)
+-------------------------------------------------------
+128Bit_Number=128Bit_Number >> 1
+--------------------------------
+MOVS     R3,R3,LSR #1
+MOVS     R2,R2,RRX
+MOVS     R1,R1,RRX
+MOV      R0,R0,RRX
+
+Tricks to increase the speed
+----------------------------
+Unrolling the loop (this avoids having a lot of branches,
+in proportion to the rest of the code)
+---------------------------------------------------------
+FOR I=1 TO 100
+(Some calculation)
+NEXT
+------------------
+MOV      R1,#10       ; Count backwards to avoid an extra compare
+.Loop
+#rept 10
+(Some calculation)
+#endr
+SUBS     R1,R1,#1
+BNE      Loop
+
+Jump-out method (for early termination of compare etc.)
+-------------------------------------------------------
+IF A$="T" AND B$="E" AND C$="S" D$="T" THEN
+-------------------------------------------
+CMP      R1,#'T'
+BNE      No_Match
+CMP      R2,#'E'
+BNE      No_Match
+CMP      R3,#'S'
+BNE      No_Match
+CMP      R4,#'T'
+BNE      No_Match
+.Match
+
+Alternatively, if it is not that important to jump out quickly,
+but that the routine is quick
+---------------------------------------------------------------
+CMP      R1,#'T'
+CMPEQ    R2,#'E'
+CMPEQ    R3,#'S'
+CMPEQ    R4,#'T'
+BEQ      Match
+
+
+Taking advantage of the conditional execution. If a branch is used,
+then the pipeline has to be emptied, and instructions will be read
+from the new location. If one can use conditional execution, then the
+pipeline doesn't have to be emptied.
+-------------------------------------------------------------------
+IF A=1 THEN B=1 ELSE B=2
+------------------------
+First attempt
+-------------
+CMP      R1,#1
+BNE      Not_1
+MOV      R2,#1
+B        Done
+.Not_1
+MOV      R2,#2
+.Done
+
+This takes 5 or 7 cycles, depending on A.
+
+Using conditional execution
+---------------------------
+CMP      R1,#1
+MOVEQ    R2,#1
+MOVNE    R2,#2
+
+This takes just 3 cycles, no matter what.
+
+Another example, making upper case letters (doesn't take into account
+the letters above ASCII 127)
+---------------------------------------------------------------------
+CMP      R1,#'a'
+RSBGES   R2,R1,#'z'
+BICGE    R1,R1,#32
+
+You can also implement new instructions, for example the following
+------------------------------------------------------------------
+BL       R0
+
+This can be written as
+----------------------
+MOV      R14,R15
+MOV      R15,R0
+
+
+© Terje Slettebø 1995
+
+This file may be copied freely.

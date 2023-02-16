@@ -1,0 +1,115 @@
+
+Global data
+-----------
+If you have a fair amount of data that is 'global', that is, it should
+be reachable from the whole program, then it can be an advantage to have
+a register pointing to the data. This way, a lot of expansion of ADRs
+and LDR/STRs can be avoided.
+
+This can be set up easily in the extASM assembler with the 'relative'
+statement. Here is an example:
+
+ADR   R12,Global_Data
+...
+
+.Global_Data
+relative R12    ; R12 is the 'global data' pointer
+{
+.Label  DCD   0 ; Label  = 0  These are marked specially that they are
+.Label2 DCD   0 ; Label2 = 4  relative to R12, in ADR and Load/Store.
+...
+}
+
+LDR   R1,Label    --->  LDR R1,[R12,#Label]
+LDR   R2,Label2   --->  LDR R2,[R12,#Label2]
+
+
+If you set up such a data area right, you can have really much data in
+it, without having to auto-expand the instructions pointing to the data.
+This is because the ADD or SUB that an ADR is coded as, can have any
+immediate offset, as long as it can be RORed to an 8-bit quantity.
+
+As often is the case, this can be shown most easily with an example:
+
+relative R12                                 Address
+{                                            ----------------
+.Label        DCD   0       ; Label        = 0    = &00000000
+.Label2       DCD   0       ; Label2       = 4    = &00000004
+...
+.AnotherLabel DCD   0       ; AnotherLabel = 1008 = &000003F0
+ALIGN 256
+.Block1       DBB   1024    ; Block1       = 1024 = &00000400
+.Block2       DBB   4096    ; Block2       = 2048 = &00000800
+}
+
+The 'relative' area is 6 K, but each label is reachable with an ADR
+which is not expanded! This is because the bigger blocks are aligned,
+and is a multiple of the alignment in length. Here the alignment is 256,
+but any alignment may be used. With 256 as alignment, you can have a
+data area with different blocks, to a total of 256*256 = 64 K.
+
+LDR/STR have a 12 bit byte offset, so they can only access +/-4 K from
+the relative register.
+
+
+With extASM you can set up 'virtual' relative areas, which means that no
+code in them is stored, only the variables are set up. This way, you don't
+have to save the data with the object file, if it's not needed. An example
+to illustrate this:
+
+
+#set Position=0         ; This determines where R12, the 'relative'
+                        ; register, will point, in this case at the
+                        ; start of the data area. This can be changed to
+                        ; take advantage of the +/- sign for the ADR's
+                        ; address area.
+
+Code
+----
+ADR   R12,Data+Position ; R12 is the 'relative' register
+...
+ADR   R1,Label          ; An example. Also LDR/STR can be used
+
+Global data area
+----------------
+.Data
+relative R12,#-Position                    ; Relative offset=0
+{                                          ; (what the labels start at)
+.Start
+.Label   DCD   123      ; Label=0          ; The data here
+.Label2  DCD   234      ; Label2=4         ; will be stored
+.End
+}
+
+relative R12,#-Position+End-Start,virtual  ; Relative offset=8
+{
+.Label3  DCD   0        ; Label3=8         ; The data here will not be
+.Label4  DCD   0        ; Label4=12        ; stored, only the labels
+}
+
+
+The alignment can also be done incrementally, so you don't need to
+reserve more memory than necessary. An example:
+
+relative R12                         Address
+{                                    -----------------
+.ByteLabel    DCB   0                0     = &00000000
+.ByteLabel2   DCB   0                1     = &00000001
+ALIGN
+.Label        DCD   0                4     = &00000004
+.Label2       DCD   0                8     = &00000008
+...
+.YetOneLabel  DCD   0                100   = &00000064
+ALIGN 128
+.Block1       DBB   128              128   = &00000080
+.Block2       DBB   align(Size,128)  256   = &00000100
+...
+.YetOneBlock  DBB   128              768   = &00000300
+ALIGN 256
+.BiggerBlock  DBB   256              1024  = &00000400
+.BiggerBlock2 DBB   512              1536  = &00000600
+...
+}
+
+This way, a single, unexpanded 'relative' ADR can address huge amounts of
+memory, as long as the blocks are aligned.

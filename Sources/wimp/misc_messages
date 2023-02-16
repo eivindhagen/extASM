@@ -1,0 +1,72 @@
+
+; >-------------------------------------------------------------<
+
+.SaveDesktop
+   LDR      R6,[R11,#20]
+   ADR      R0,SD_RunStr
+   MOV      R1,R11
+   BL       StrCopy
+   SUB      R1,R1,#1
+   ADR      R0,extASM_DirVar
+   MOV      R2,#&100
+   MOV      R3,#0
+   SWI      OS_ReadVarVal              ; Read extASM$Path
+   MOV      R0,#0
+   STRB     R0,[R1,R2]
+   MOV      R1,R6
+
+._Loop
+   LDRB     R0,[R11],#1
+   CMP      R0,#0
+   SWINE    OS_BPut                    ; Write string
+   BNE      _Loop
+   MOV      R0,#10
+   SWI      OS_BPut
+   B        Wimp_Poll_Loop
+
+.SD_RunStr  DCB   "Run ",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.MenuWarning
+   ADD      R0,R11,#20
+   LDMIA    R0,{R4-R9}
+   CMP      R7,#2
+   BNE      Wimp_Poll_Loop
+   CMP      R8,#2
+   CMPNE    R8,#3
+   BEQ      MW_Statistics
+   CMP      R8,#1
+   BNE      Wimp_Poll_Loop
+   LDR      R1,Menu_Item_Ticked
+   CMN      R1,#1
+   BEQ      MW_No_Tick
+   LDR      R0,Menu_Array
+   MOV      R2,#0
+   BL       Tick_Menu_Item
+   MVN      R0,#0
+   STR      R0,Menu_Item_Ticked
+
+.MW_No_Tick
+   MOV      R0,R9,LSL #2
+   LDR      R1,Option_Colours
+   MOV      R2,#&F
+   AND      R1,R2,R1,LSR R0
+   LDR      R0,Menu_Array
+   MOV      R2,#1
+   STR      R1,Menu_Item_Ticked
+   BL       Tick_Menu_Item
+
+.MW_End
+   MOV      R1,R4
+   MOV      R2,R5
+   MOV      R3,R6
+   SWI      Wimp_CreateSubMenu
+   B        Wimp_Poll_Loop
+
+.MW_Statistics
+   LDR      R0,Stat_Data_Ready
+   CMP      R0,#1
+   BNE      Wimp_Poll_Loop
+   B        MW_End

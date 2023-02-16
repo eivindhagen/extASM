@@ -1,0 +1,28 @@
+
+#name <Tmp$Dir>.^.^.test_misc_fpa_instructions
+
+#area test,code
+
+FLTS    F1,R1 ; F1=R1
+FLTSP   F1,R1
+FLTEQS  F1,R1
+FLTEQSP F1,R1
+
+FIX     R1,F1 ; R1=F1
+FIXP    R1,F1
+FIXEQ   R1,F1
+FIXEQP  R1,F1
+
+WFS     R1    ; FPSR=R1
+WFSEQ   R1
+
+RFS     R1    ; R1=FPSR
+RFSEQ   R1
+
+WFC     R1    ; FPCR=R1
+WFCEQ   R1
+
+RFC     R1    ; R1=FPCR
+RFCEQ   R1
+
+#end

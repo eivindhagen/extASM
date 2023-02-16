@@ -1,0 +1,48 @@
+
+#name <Tmp$Dir>.^.^.test_extra_instructions
+
+#area test,code
+
+ADR     R1,address
+ADRL    R1,address
+ADREQ   R1,address
+ADRLEQ  R1,address
+
+.address
+
+DIV     R1,R2,R3
+DIVEQ   R1,R2,R3
+
+EXG     R1,R2
+EXGEQ   R1,R2
+
+DCB     0
+ALIGN
+DCB     0
+ALIGN   16
+DCB     0
+ALIGN   16,1
+DCB     0
+DCD     &1234
+
+DCB     'A'
+DCB     1,2,3
+DCW     &1234
+ALIGN
+DCD     &12345678
+DCFS    1.23
+DCFD    1.23
+DCFE    1.23
+DCFP    1.23
+DCFEP   1.23
+
+DBB     4,'A'
+DBW     4,&1234
+DBD     4,&12345678
+DBFS    4,1.23
+DBFD    4,1.23
+DBFE    4,1.23
+DBFP    4,1.23
+DBFEP   4,1.23
+
+#end

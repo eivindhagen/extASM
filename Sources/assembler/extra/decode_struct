@@ -1,0 +1,158 @@
+
+; >-------------------------------------------------------------<
+
+   ; STRUCT array
+   ; ------------
+   ; +0 = Name offset 1
+   ; +1 = Name offset 2
+   ; etc.
+   ;
+   ; FirstName.Second.
+   ; ^         ^      ^
+   ; 0         1      2
+   ;
+   ; Read struct header
+   ;
+   ; struct [<Name>] [,#<Offset>] [,<Step>]
+   ;
+.Decode_Struct
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   BL       Skip_Blanks
+   ADR      R0,DTSTRUCT_Error
+   ADR      R4,STRUCT_Array
+   LDR      R5,STRUCT_Level
+   MOV      R6,#0
+   MOV      R7,#0
+   MVN      R1,#0
+   BL       Setup_Error_Context
+   ADD      R3,R5,#1
+   CMP      R6,#16
+   SUBGT    R3,R3,#1
+   MOVGT    R0,#&50                    ; Asm_Error #&50 = Too many nested 'struct's, maximum 16
+   MVNGT    R1,#0
+   BLGT     Asm_Error_Return
+   STR      R3,STRUCT_Level
+   ADD      R4,R4,R5
+   ADR      R9,STRUCT_Name
+   LDRB     R0,[R4,#-1]
+   ADD      R0,R9,R0
+   CMP      R8,#'#'
+   SUBEQ    R0,R0,R9
+   STREQB   R0,[R4]
+   BEQ      DTSTRUCT_No_Name
+   CMP      R8,#';'
+   CMPNE    R8,#&0A
+   SUBEQ    R0,R0,R9
+   STREQB   R0,[R4]
+   MOVEQ    R0,#0
+   BEQ      DTSTRUCT_End_Header
+   ; Read name
+   ;
+   SUB      R10,R10,#1
+   BL       StrCopySource
+   MOV      R1,#'.'
+   STRB     R1,[R0,#-1]
+   SUB      R0,R0,R9
+   STRB     R0,[R4]
+
+   BL       Skip_Blanks
+   CMP      R8,#';'
+   CMPNE    R8,#&0A
+   MOVEQ    R0,#0
+   BEQ      DTSTRUCT_End_Header
+   BL       Ensure_Comma
+   BL       Skip_Blanks
+   CMP      R8,#'#'
+   MOVNE    R0,#&27                    ; Asm_Error #&27 = Missing "#"
+   BNE      Asm_Error
+
+.DTSTRUCT_No_Name
+   ; Read offset
+   ;
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   MOV      R6,R0
+   CMP      R8,#','
+   MOVNE    R0,#0
+   BNE      DTSTRUCT_End_Header
+   ; Read step
+   ;
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   MOV      R7,R0
+   MOV      R0,#0
+   B        DTSTRUCT_End_Header
+
+.DTSTRUCT_Error
+   MOV      R0,#1
+
+.DTSTRUCT_End_Header
+   BL       Find_Brace_Start
+   CMN      R14,#1
+   MOVEQ    R0,#&21                    ; Asm_Error #&21 = Missing "{"
+   MVNEQ    R1,#0
+   BLEQ     Asm_Error_Return
+
+   MVN      R0,#0
+   BL       Restore_Error_Context
+
+   LDR      R0,Object_Size
+   SUB      R1,R0,R7
+   STR      R1,Object_Size
+   CMP      R5,#0
+   BGT      DT_Struct_Asm_Loop
+   LDR      R1,Object_Base
+   STMFD    R13!,{R0,R1}
+   RSB      R0,R0,#0
+   ADD      R0,R0,R6
+   STR      R0,Object_Base
+
+   ADR      R9,Source_Context
+   ADR      R0,Source_Filename
+   LDMIA    R0,{R1-R3}
+   STMIA    R9,{R1-R3}
+   LDR      R4,Enable_Brace_Return
+   ORR      R0,R4,#1
+   STR      R0,Enable_Brace_Return
+   LDR      R6,Virtual_Flag
+   ORR      R0,R6,#1
+   STR      R0,Virtual_Flag
+
+.DT_Struct_Asm_Loop
+   BL       Asm_Line
+   LDR      R0,Object_Size
+   ADD      R0,R0,R7
+   STR      R0,Object_Size
+   CMP      R8,#&00
+   BNE      DT_Struct_Asm_Loop
+
+   STR      R4,Enable_Brace_Return
+   STR      R6,Virtual_Flag
+   LDR      R0,Object_Size
+   SUB      R0,R0,R7,LSL #1
+   STR      R0,Object_Size
+   CMP      R5,#0
+   BNE      DTSTRUCT_Not_Level_Zero
+   LDMFD    R13!,{R0,R1}
+   STR      R0,Object_Size
+   STR      R1,Object_Base
+
+.DTSTRUCT_Not_Level_Zero
+   LDR      R0,Source_Line
+   SUB      R0,R0,#1
+   STR      R0,Source_Line
+   STR      R5,STRUCT_Level
+   LDRB     R0,[R10,#-1]
+   CMP      R0,#&00
+   LDRNEB   R8,[R10],#1
+   BNE      DT_End
+   ADR      R4,Source_Context
+   MOV      R0,#&22                    ; Asm_Error #&22 = Missing "}"
+   LDMIA    R4,{R1-R3}
+   STMFD    R13!,{R1-R3}
+   MOV      R1,#0
+   BL       Asm_Error_Return
+   ADD      R13,R13,#12
+   MVN      R14,#0
+   LDMFD    R13!,{R4-R7,R15}

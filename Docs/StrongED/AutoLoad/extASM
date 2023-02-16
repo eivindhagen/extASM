@@ -1,0 +1,23 @@
+#	Mode file for StrongED 3.50
+#
+#	Assembly may be started with F10.
+#
+#	If you start the labels for the assembly procedures/functions with ':.'
+#	instead of '.' then you can list them easily with shift-F2.
+
+Functions
+	Key	‹F2
+	Menu	List of functions  ‹F2
+	Select	ListOfFound(":.",Text,Whole,Line,NoCase)
+	Help	Click to get a list of all functions.
+
+	Key	F10
+	Menu	Save & Assemble     F10
+	Select	SaveDrag("extASM")
+	Help	Click to Save & Assemble this source.
+
+	Key	‹F10
+	Menu	Save & Make AOF    ‹F10
+	Select	SaveDrag("extAOF")
+	Help	Click to Save & Assemble file to AOF format.
+End

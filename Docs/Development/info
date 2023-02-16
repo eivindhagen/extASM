@@ -1,0 +1,69 @@
+
+extASM register convention
+----------------------------------
+R0-R3 - First four parameters for subroutine calls (any more go on the stack), as well as return values from subroutines, and for general use (these need not be preserved across subroutine calls)
+R4-R7 - For general use (these need to be preserved across subroutine calls)
+R8    - Current character
+R9    - Current instruction
+R10   - Source code pointer
+R11   - Object code pointer
+R12   - Global data pointer
+R13   - Stack pointer
+R14   - Return address for subroutines. May be used for anything otherwise
+R15   - Program counter
+
+General
+--------
+The parsing subroutines expect the first character in R8, and returns the next character in R8.
+
+Variable array structure - 64 Bytes/Record
+------------------------
+There are three types of variables that can be set, integer, floating point and string.
+
+Integer
+-------
+00-03 = Variable value
+04-11 = Not used
+12-15 = Reference count
+16-62 = Variable name (Max 47 chars)
+63    = Flags, bit 0-1 - Type of variable
+                         0 = Integer, 1 = Floating Point, 2 = String
+                   2   - 0 = Ok, 1 = Warning
+                   4-7 - Relative register for variable
+
+Floating Point
+--------------
+00-11 = FP-variable value
+12-15 = Reference count
+16-62 = Variable name (Max 47 chars)
+63    = Flags, bit 0-1 - Type of variable
+                         0 = Integer, 1 = Floating Point, 2 = String
+                   2   - 0 = Ok, 1 = Warning
+                   4-7 - Relative register for variable
+
+String
+------
+00-03 = String chunk
+04-11 = Not used
+12-15 = Reference count
+16-62 = Variable name (Max 47 chars)
+63    = Flags, bit 0-1 - Type of variable
+                         0 = Integer, 1 = Floating Point, 2 = String
+                   2   - 0 = Ok, 1 = Warning
+                   4-7 - Relative register for variable
+
+Strings are stored as follows
+-----------------------------
+The string variable (format above) contains the number of the first string chunk of the
+string data. These chunks are stored in Flex_String, and each chunk is 64 bytes.
+At offset zero of a chunk, there is the number of the next chunk for the string, or
+zero if no more chunks.
+
+Macro array structure - 64 Bytes/Record
+---------------------
+00-03 = Macro address after "macro <name>"
+04-07 = Filename pointer
+08-11 = Macro line number
+12-15 = Reference count
+16-19 = Pointer to next macro
+20-63 = Macro name (Max 44 chars)

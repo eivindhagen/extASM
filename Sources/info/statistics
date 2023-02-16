@@ -1,0 +1,305 @@
+
+; >-------------------------------------------------------------<
+
+.Asm_Statistics
+   STMFD    R13!,{R14}
+   BL       Asm_Code_Stat
+   BL       Asm_CC_Stat
+   BL       Asm_Shift_Stat
+   MOV      R0,#1
+   STR      R0,Stat_Data_Ready
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Asm_Code_Stat
+   ; Print instruction statistics
+   ;
+   STMFD    R13!,{R4-R10,R14}
+   ADR      R4,Code_Counters
+   ADR      R5,CS_Indicies
+   ADR      R6,CS_Text_Start
+   ADD      R7,R6,#CS_Text_End-CS_Text_Start
+   MOV      R8,#0
+   ADR      R10,ARM_Statistics
+   MOV      R0,R10
+   ADD      R1,R10,#52
+
+.ACS_Clear_Loop
+   STR      R8,[R0],#4
+   CMP      R0,R1
+   BNE      ACS_Clear_Loop
+   MVN      R0,#0
+   STR      R0,[R10,#28]
+   STR      R0,[R10,#52]
+
+.ACS_Code_Loop
+   LDRB     R0,[R5],#1
+   CMP      R0,#254
+   MOVEQ    R9,R8
+   MOVEQ    R8,#0
+   ADREQ    R10,FPA_Statistics
+   BEQ      ACS_Code_Loop
+   CMP      R0,#255
+   BEQ      ACS_Blank_Line
+   LDR      R2,[R4,R0,LSL #2]
+   LDRB     R1,[R5],#1
+   LDR      R3,[R10,R1,LSL #2]
+   ADD      R3,R3,R2
+   STR      R3,[R10,R1,LSL #2]
+   ADD      R8,R8,R2
+
+.ACS_Blank_Line
+   MOV      R0,R6
+   MOV      R1,#TextColour_Info
+   BL       Wimp_Text_AddColourLine
+   MOV      R6,R0
+   CMP      R6,R7
+   BNE      ACS_Code_Loop
+
+   ADR      R0,CS_WTLine_1
+   MOV      R1,#TextColour_Info
+   MOV      R2,R9
+   BL       Wimp_Text_AddColourLine
+   ADR      R0,CS_WTLine_2
+   MOV      R1,#TextColour_Info
+   MOV      R2,R8
+   BL       Wimp_Text_AddColourLine
+   ADR      R0,CS_WTLine_3
+   MOV      R1,#TextColour_Info
+   ADD      R2,R8,R9
+   BL       Wimp_Text_AddColourLine
+   LDMFD    R13!,{R4-R10,R15}
+
+.CS_WTLine_1   DCB   "Number of ARM instructions:   %d",0
+.CS_WTLine_2   DCB   "Number of FPA instructions:   %d",0
+.CS_WTLine_3   DCB   "Total number of instructions: %d",0
+   ALIGN
+.CS_Indicies
+   DCB   255,255,255,255,255, 13,0,15,0,255, 4,0,2,0,3,0,5,0,6,0,7,0,16,0,17,0,255
+   DCB   0,1,12,1,1,1,14,1,255, 10,2,11,2,8,2,9,2,255, 19,3,18,3,21,3,20,3,255
+   DCB   22,4,23,4,255, 24,6,255, 25,3,255, 26,0,27,0,255, 71,5,73,0,72,0,255,254
+
+   DCB   255,255, 41,0,42,0,43,0,45,0,46,0,47,0,48,0,49,0,50,0,51,0,52,0,53,0,54,0,44,0,55,0
+   DCB   56,0,255, 28,1,30,1,31,1,29,1,32,1,33,1,36,1,37,1,38,1,39,1,34,1,35,1,40,1,255
+   DCB   57,2,58,2,59,2,60,2,255, 68,3,67,3,70,3,69,3,255, 61,4,62,4,64,4,63,4,66,4,65,4,255
+   ALIGN
+
+.CS_Text_Start
+   DCB   0
+   DCB   "Number of instructions",0
+   DCB   "----------------------",0
+   DCB   "ARM instructions",0
+   DCB   "----------------",0
+   DCB   "MOV     %d",0
+   DCB   "MVN     %d",0
+   DCB   0
+   DCB   "ADD     %d",0
+   DCB   "SUB     %d",0
+   DCB   "RSB     %d",0
+   DCB   "ADC     %d",0
+   DCB   "SBC     %d",0
+   DCB   "RSC     %d",0
+   DCB   "MUL     %d",0
+   DCB   "MLA     %d",0
+   DCB   0
+   DCB   "AND     %d",0
+   DCB   "ORR     %d",0
+   DCB   "EOR     %d",0
+   DCB   "BIC     %d",0
+   DCB   0
+   DCB   "CMP     %d",0
+   DCB   "CMN     %d",0
+   DCB   "TST     %d",0
+   DCB   "TEQ     %d",0
+   DCB   0
+   DCB   "LDR     %d",0
+   DCB   "STR     %d",0
+   DCB   "LDM     %d",0
+   DCB   "STM     %d",0
+   DCB   0
+   DCB   "B       %d",0
+   DCB   "BL      %d",0
+   DCB   0
+   DCB   "SWI     %d",0
+   DCB   0
+   DCB   "SWP     %d",0
+   DCB   0
+   DCB   "MRS     %d",0
+   DCB   "MSR     %d",0
+   DCB   0
+   DCB   "ADR     %d",0
+   DCB   "EXG     %d",0
+   DCB   "DIV     %d",0
+   DCB   0
+   DCB   "FPA instructions",0
+   DCB   "----------------",0
+   DCB   "MVF     %d",0
+   DCB   "MNF     %d",0
+   DCB   "ABS     %d",0
+   DCB   "SQT     %d",0
+   DCB   "LOG     %d",0
+   DCB   "LGN     %d",0
+   DCB   "EXP     %d",0
+   DCB   "SIN     %d",0
+   DCB   "COS     %d",0
+   DCB   "TAN     %d",0
+   DCB   "ASN     %d",0
+   DCB   "ACS     %d",0
+   DCB   "ATN     %d",0
+   DCB   "RND     %d",0
+   DCB   "URD     %d",0
+   DCB   "NRM     %d",0
+   DCB   0
+   DCB   "ADF     %d",0
+   DCB   "SUF     %d",0
+   DCB   "RSF     %d",0
+   DCB   "MUF     %d",0
+   DCB   "DVF     %d",0
+   DCB   "RDF     %d",0
+   DCB   "RMF     %d",0
+   DCB   "FML     %d",0
+   DCB   "FDV     %d",0
+   DCB   "FRD     %d",0
+   DCB   "POW     %d",0
+   DCB   "RPW     %d",0
+   DCB   "POL     %d",0
+   DCB   0
+   DCB   "CMF     %d",0
+   DCB   "CNF     %d",0
+   DCB   "CMFE    %d",0
+   DCB   "CNFE    %d",0
+   DCB   0
+   DCB   "LDF     %d",0
+   DCB   "STF     %d",0
+   DCB   "LFM     %d",0
+   DCB   "SFM     %d",0
+   DCB   0
+   DCB   "FLT     %d",0
+   DCB   "FIX     %d",0
+   DCB   "RFS     %d",0
+   DCB   "WFS     %d",0
+   DCB   "RFC     %d",0
+   DCB   "WFC     %d",0
+   DCB   0
+.CS_Text_End
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Asm_CC_Stat
+   ; Print condition code statistics
+   ;
+   STMFD    R13!,{R4-R8,R14}
+   ADR      R4,CC_Counters
+   ADR      R5,CS_CC_Indicies
+   ADR      R6,CS_CC_Text_Start
+   ADD      R7,R6,#CS_CC_Text_End-CS_CC_Text_Start
+   MOV      R8,#0
+
+.ACS_CC_Loop
+   LDRB     R0,[R5],#1
+   CMP      R0,#255
+   LDRNE    R2,[R4,R0,LSL #2]
+   ADDNE    R8,R8,R2
+   MOV      R0,R6
+   MOV      R1,#TextColour_Info
+   BL       Wimp_Text_AddColourLine
+   MOV      R6,R0
+   CMP      R6,R7
+   BNE      ACS_CC_Loop
+
+   ADR      R0,CS_WTLine_4
+   MOV      R1,#TextColour_Info
+   MOV      R2,R8
+   BL       Wimp_Text_AddColourLine
+   LDMFD    R13!,{R4-R8,R15}
+
+.CS_WTLine_4   DCB   "Total number of condition codes: %d",0
+.CS_CC_Indicies
+   DCB   255,255,255,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,255
+.CS_CC_Text_Start
+   DCB   0
+   DCB   "Number of condition codes",0
+   DCB   "-------------------------",0
+   DCB   "EQ      %d",0
+   DCB   "NE      %d",0
+   DCB   "CS      %d",0
+   DCB   "CC      %d",0
+   DCB   "MI      %d",0
+   DCB   "PL      %d",0
+   DCB   "VS      %d",0
+   DCB   "VC      %d",0
+   DCB   "HI      %d",0
+   DCB   "LS      %d",0
+   DCB   "GE      %d",0
+   DCB   "LT      %d",0
+   DCB   "GT      %d",0
+   DCB   "LE      %d",0
+   DCB   "AL      %d",0
+   DCB   "NV      %d",0
+   DCB   0
+.CS_CC_Text_End
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Asm_Shift_Stat
+   ; Print shift statistics
+   ;
+   STMFD    R13!,{R4-R8,R14}
+   ADR      R4,Shift_Counters
+   ADR      R5,CS_Shift_Indicies
+   ADR      R6,CS_Shift_Text_Start
+   ADD      R7,R6,#CS_Shift_Text_End-CS_Shift_Text_Start
+   MOV      R8,#0
+
+.ACS_Shift_Loop
+   LDRB     R0,[R5],#1
+   CMP      R0,#255
+   LDRNE    R2,[R4,R0,LSL #2]
+   ADDNE    R8,R8,R2
+   MOV      R0,R6
+   MOV      R1,#TextColour_Info
+   BL       Wimp_Text_AddColourLine
+   MOV      R6,R0
+   CMP      R6,R7
+   BNE      ACS_Shift_Loop
+
+   ADR      R0,CS_WTLine_5
+   MOV      R1,#TextColour_Info
+   LDR      R2,[R4,#36]
+   BL       Wimp_Text_AddColourLine
+   ADR      R0,CS_WTLine_6
+   MOV      R1,#TextColour_Info
+   MOV      R2,R8
+   BL       Wimp_Text_AddColourLine
+   BL       Wimp_Text_AddBlankLine
+   LDMFD    R13!,{R4-R8,R15}
+
+.CS_WTLine_5   DCB   "Number of constant shifts: %d",0
+.CS_WTLine_6   DCB   "Total number of number/register shifts: %d",0
+.CS_Shift_Indicies
+   DCB   255,255,255,255,255,0,2,4,6,255,8,255,255,255,1,3,5,7,255
+.CS_Shift_Text_Start
+   DCB   0
+   DCB   "Number of shifts",0
+   DCB   "----------------",0
+   DCB   "Shift by number",0
+   DCB   "---------------",0
+   DCB   "LSL      %d",0
+   DCB   "LSR      %d",0
+   DCB   "ASR      %d",0
+   DCB   "ROR      %d",0
+   DCB   0
+   DCB   "RRX      %d",0
+   DCB   0
+   DCB   "Shift by register",0
+   DCB   "-----------------",0
+   DCB   "LSL      %d",0
+   DCB   "LSR      %d",0
+   DCB   "ASR      %d",0
+   DCB   "ROR      %d",0
+   DCB   0
+.CS_Shift_Text_End
+   ALIGN

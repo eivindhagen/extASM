@@ -1,0 +1,219 @@
+
+; >-------------------------------------------------------------<
+
+.DT_CPS                                ;_R8 = "S"
+   ;                         imod
+   ;------> CPS                M        AIF mode
+   MOV      R9,#%11110001000010000000000000000000
+   LDRB     R8,[R10],#1
+   CMP      R8,#'I'
+   CMPNE    R8,#'i'
+   BNE      DT_CPS_Immediate
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   ORREQ    R9,R9,#1 << 18
+   CMPNE    R8,#'E'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   BL       Skip_Blanks
+   CMP      R8,#'A'
+   CMPNE    R8,#'a'
+   ORREQ    R9,R9,#1 << 8
+   LDREQB   R8,[R10],#1
+   CMP      R8,#'I'
+   CMPNE    R8,#'i'
+   ORREQ    R9,R9,#1 << 7
+   LDREQB   R8,[R10],#1
+   CMP      R8,#'F'
+   CMPNE    R8,#'f'
+   ORREQ    R9,R9,#1 << 6
+   LDREQB   R8,[R10],#1
+   TST      R9,#%111 << 6
+   BEQ      DT_Unknown
+   BL       Skip_Blanks
+   CMP      R8,#','
+   BNE      DT_Write_Instruction
+   LDRB     R8,[R10],#1
+
+.DT_CPS_Immediate
+   BL       Decode_Immediate
+   CMP      R0,#%11111
+   MOVHI    R0,#&0B                    ; Asm_Error #&0B = Illegal mode bits
+   BHI      Asm_Error
+   ORR      R9,R9,#1 << 17
+   ORR      R9,R9,R0
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_MRS                                ;_R8 = "S"
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+26*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+26*4
+   ;------> MRS  Cond     R      [Rd]
+   MOV      R9,#%00000001000011110000000000000000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Destination_Register
+   CMP      R0,#&F
+   MOVEQ    R0,#&31                    ; Asm_Warning #&31 = R15 should not be used as source or destination in MRS or MSR
+   BLEQ     Asm_Warning
+   BL       Ensure_Comma
+   BL       Decode_PSR_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_MSR                                ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+27*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+27*4
+   ;------> MSR  Cond  I  R  mask    [ Operand2 ]
+   MOV      R9,#%00000001001000001111000000000000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_PSR_Register
+   ORR      R9,R9,R0,LSL #16
+   BL       Ensure_Comma
+   BL       Skip_Blanks
+   CMP      R8,#'#'
+   BEQ      DTMSR_Immediate
+   BL       Decode_Register            ;_R0 = [Rm] = Operand two register
+   ORR      R9,R9,R0                   ; Insert Rm bits
+   CMP      R0,#&F
+   MOVEQ    R0,#&31                    ; Asm_Warning #&31 = R15 should not be used as source or destination in MRS or MSR
+   BLEQ     Asm_Warning
+   B        DT_Write_Instruction
+
+.DTMSR_Immediate
+   ORR      R9,R9,#1 << 25
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   BL       Code_Immediate
+   CMN      R14,#1
+   MOVEQ    R0,#&0A                    ; Asm_Error #&0A = Too big constant for MSR
+   BEQ      Asm_Error
+   ORR      R9,R9,R0
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_RFE                                ;_R8 = "E"
+   ;------> RFE         PU W [Rn]
+   MOV      R9,#%11111000000100000000101000000000
+   LDRB     R8,[R10],#1
+   BL       Decode_Load_Store_Multiple_Addressing_Mode
+   ORR      R9,R9,R0,LSL #23
+   BL       Ensure_Blank
+   BL       Decode_Rn_Register
+   BL       Skip_Blanks
+   CMP      R8,#'!'
+   ORREQ    R9,R9,#Write_Back_Bit
+   LDREQB   R8,[R10],#1
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_SMC                                ;_R8 = "C"
+   ;------> SMC  Cond                        imm4
+   MOV      R9,#%00000001011000000000000001110000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Immediate
+   CMP      R0,#&F
+   MOVHI    R0,#&0D                    ; Asm_Error #&0D = Number too big, 4 bit only
+   BHI      Asm_Error
+   ORR      R9,R9,R0
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_SRS                                ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_Unknown
+   ;------> SRS         PU W                mode
+   MOV      R9,#%11111000010011010000010100000000
+   LDRB     R8,[R10],#1
+   BL       Decode_Load_Store_Multiple_Addressing_Mode
+   ORR      R9,R9,R0,LSL #23
+   BL       Ensure_Blank
+   BL       Decode_Register
+   CMP      R0,#13
+   MOVNE    R0,#&09                    ; Asm_Error #&09 = Illegal register
+   BNE      Asm_Error
+   CMP      R8,#'!'
+   ORREQ    R9,R9,#Write_Back_Bit
+   LDREQB   R8,[R10],#1
+   BL       Ensure_Comma
+   BL       Decode_Immediate
+   CMP      R0,#%11111
+   MOVHI    R0,#&0B                    ; Asm_Error #&0B = Illegal mode bits
+   BHI      Asm_Error
+   ORR      R9,R9,R0
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMRS                               ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_Unknown
+   ;------> VMRS Cond        Reg [Rd]
+   MOV      R9,#%00001110111100000000101000010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Skip_Blanks
+   CMP      R8,#'A'
+   BEQ      DT_VMRS_PSR
+   BL       Decode_Register
+   B        DT_VMRS_Done
+
+.DT_VMRS_PSR
+   BL       Decode_PSR_Flags_Register
+
+.DT_VMRS_Done
+   ORR      R9,R9,R0,LSL #Rd_Pos
+   BL       Ensure_Comma
+   BL       Decode_VFP_System_Register
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMSR                               ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   ;------> VMSR Cond        Reg [Rd]
+   MOV      R9,#%00001110111000000000101000010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_VFP_System_Register
+   CMP      R0,#%0000
+   CMPNE    R0,#%0001
+   CMPNE    R0,#%1000
+   CMPNE    R0,#%1001
+   CMPNE    R0,#%1010
+   BNE      DT_Bad_System_Register
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   BL       Decode_Operand_Rd_Register
+   B        DT_Write_Instruction

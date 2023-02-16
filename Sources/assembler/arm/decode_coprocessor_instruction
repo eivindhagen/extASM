@@ -1,0 +1,325 @@
+
+; >-------------------------------------------------------------<
+
+.DT_CDP                                ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DT_Unknown
+   ;------> CDP[2]Cond    Op1 CRn CRd [CP]Op2 CRm
+   MOV      R9,# %00001110000000000000000000000000
+   LDRB     R8,[R10],#1
+   CMP      R8,#'2'
+   LDREQB   R8,[R10],#1
+   ORREQ    R9,R9,#CC_NV << CC_Pos
+   BLNE     Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Coprocessor
+   MOV      R0,#%1111
+   MOV      R1,#20
+   BL       Decode_Coprocessor_Opcode
+   BL       Decode_CRd
+   BL       Decode_CRn
+   BL       Decode_CRm
+   MOV      R0,#%111
+   MOV      R1,#5
+   BL       Decode_Coprocessor_Opcode
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_MCR_MCRR                           ;_R8 = "C"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   CMP      R8,#'R'
+   CMPNE    R8,#'r'
+   BEQ      DT_MCRR
+   ;------> MCR[2]Cond    op1 CRn [Rd][CP]Op2 CRm
+   MOV      R9,# %00001110000000000000000000010000
+   B        DT_MCR_MRC
+
+; >-------------------------------------------------------------<
+
+.DT_MRC                                ;_R8 = "C"
+   LDRB     R8,[R10],#1
+   ;------> MRC[2]Cond    Op1 CRn [Rd][CP]Op2 CRm
+   MOV      R9,# %00001110000100000000000000010000
+   B        DT_MCR_MRC
+
+; >-------------------------------------------------------------<
+
+.DT_MCRR                               ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   ;------> MCRR[2]Cond        Rd2 [Rd][CP]Op1 CRm
+   MOV      R9,#  %00001100010000000000000000000000
+   B        DT_MCRR_MRRC
+
+; >-------------------------------------------------------------<
+
+.DT_MRRC                               ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   ;------> MRRC[2]Cond        Rd2 [Rd][CP]Op1 CRm
+   MOV      R9,#  %00001100010100000000000000000000
+   B        DT_MCRR_MRRC
+
+; >-------------------------------------------------------------<
+
+.DT_MCR_MRC
+   CMP      R8,#'2'
+   LDREQB   R8,[R10],#1
+   ORREQ    R9,R9,#CC_NV << CC_Pos
+   BLNE     Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Coprocessor
+   MOV      R0,#%111
+   MOV      R1,#21
+   BL       Decode_Coprocessor_Opcode
+   BL       Decode_Operand_Rd_Register
+   BL       Decode_CRn
+   BL       Decode_CRm
+   MOV      R0,#%111
+   MOV      R1,#5
+   BL       Decode_Optional_Coprocessor_Opcode
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_MCRR_MRRC
+   CMP      R8,#'2'
+   LDREQB   R8,[R10],#1
+   ORREQ    R9,R9,#CC_NV << CC_Pos
+   BLNE     Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Coprocessor
+   MOV      R0,#%1111
+   MOV      R1,#4
+   BL       Decode_Coprocessor_Opcode
+   BL       Decode_Operand_Rd_Register
+   BL       Decode_Operand_Rn_Register
+   BL       Decode_CRm
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_LDC_STC                            ;_R8 = "C"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'2'
+   BNE      DT_LS_No_2
+   ORR      R9,R9,#CC_NV << CC_Pos
+   LDRB     R8,[R10],#1
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   LDREQB   R8,[R10],#1
+   ORREQ    R9,R9,#1 << 22
+   B        DT_LS_CC_Done
+
+.DT_LS_No_2
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   ORREQ    R9,R9,#CC_AL << CC_Pos
+   BEQ      DT_LS_CC_Done
+   LDRB     R0,[R10]
+   CMP      R0,#' '
+   CMPNE    R0,#&09
+   BNE      DT_LS_CC
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   LDREQB   R8,[R10],#1
+   ORREQ    R9,R9,#(CC_AL << CC_Pos)+(1 << 22)
+   BEQ      DT_LS_CC_Done
+   B        DT_Unknown
+
+.DT_LS_CC
+   LDRB     R0,[R10,#1]
+   CMP      R0,#' '
+   CMPNE    R0,#&09
+   BEQ      DT_LS_Not_L
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   BNE      DT_Unknown
+   ORR      R9,R9,#1 << 22
+   LDRB     R8,[R10],#1
+
+.DT_LS_Not_L
+   BL       Decode_ConditionCode
+
+.DT_LS_CC_Done
+   BL       Ensure_Blank
+   BL       Decode_Coprocessor
+   BL       Decode_CRd
+   BL       Ensure_Comma
+   BL       Skip_Blanks
+   CMP      R8,#'['
+   BNE      DT_LS_Label
+   LDRB     R8,[R10],#1
+   BL       Decode_Rn_Register
+   BL       Skip_Blanks
+   CMP      R8,#','
+   LDREQB   R8,[R10],#1
+   ORREQ    R9,R9,#Preindexed_Bit
+   BEQ      DT_LS_Pre_Post_Indexed
+   ORR      R9,R9,#Add_Bit
+   BL       Ensure_Close_Bracket
+   CMP      R8,#','
+   ORRNE    R9,R9,#Preindexed_Bit
+   BNE      DT_Write_Instruction
+   LDRB     R8,[R10],#1
+   CMP      R8,#'#'
+   BNE      DT_LS_Option
+   ORR      R9,R9,#Write_Back_Bit
+
+.DT_LS_Pre_Post_Indexed
+   BL       Ensure_Pound
+   BL       Decode_Int_Expr
+   CMP      R0,#0
+   RSBLT    R0,R0,#0
+   ORRGE    R9,R9,#Add_Bit
+   BICS     R1,R0,#&3FC
+   MOVNE    R0,#&19                    ; Asm_Error #&19 = Offset must be +/- 1020 (word-aligned)
+   BNE      Asm_Error
+   ORR      R9,R9,R0,LSR #2
+   TST      R9,#Preindexed_Bit
+   BEQ      DT_Write_Instruction
+   BL       Ensure_Close_Bracket
+   BL       Skip_Blanks
+   CMP      R8,#'!'
+   LDREQB   R8,[R10],#1
+   ORREQ    R9,R9,#Write_Back_Bit
+   B        DT_Write_Instruction
+
+.DT_LS_Option
+   BL       Ensure_Open_Brace
+   BL       Decode_Int_Expr
+   CMP      R0,#&FF
+   MOVHI    R0,#&38                    ; Asm_Error #&38 = Number too big, 8 bit only
+   BHI      Asm_Error
+   ORR      R9,R9,R0
+   BL       Ensure_Close_Brace
+   B        DT_Write_Instruction
+
+.DT_LS_Label
+   ORR      R9,R9,#Preindexed_Bit
+   BL       Decode_Int_Expr
+   CMN      R14,#2
+   BEQ      DT_Write_Instruction
+   MOV      R4,R0
+   LDR      R0,RELATIVE_Register_Read
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   CMP      R0,#15
+   MOVNE    R5,R4
+   BNE      DT_LDC_STC_Not_R15
+   LDR      R1,Object_Base
+   LDR      R2,Object_Size
+   ADD      R1,R1,R2                   ; R1 = PC (not pipelined)
+   ADD      R1,R1,#8                   ; R1 = PC (pipelined)
+   SUB      R5,R4,R1                   ; R5 = Offset from PC
+
+.DT_LDC_STC_Not_R15
+   CMP      R5,#0
+   ORRGE    R9,R9,#Add_Bit
+   RSBLT    R5,R5,#0
+   BICS     R0,R5,#&3FC
+   MOVNE    R0,#&19                    ; Asm_Error #&19 = Offset must be +/- 1020 (word-aligned)
+   BNE      Asm_Error
+   ORR      R9,R9,R5,LSR #2
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.Decode_Coprocessor                    ;_R8 = First char or Blank, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   MOVNE    R0,#&B1                    ; Asm_Error #&B1 = Illegal coprocessor
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMP      R0,#15
+   MOVHI    R0,#&B1                    ; Asm_Error #&B1 = Illegal coprocessor
+   BHI      Asm_Error
+   ORR      R9,R9,R0,LSL #8
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Decode_Optional_Coprocessor_Opcode    ;_R8 = First char, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   CMP      R8,#','
+   LDMNEFD  R13!,{R15}
+   BL       Decode_Coprocessor_Opcode
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Decode_Coprocessor_Opcode             ;_R0 = Max value, _R1 = Shift, _R8 = First char, ~R8 = Next char
+   STMFD    R13!,{R4,R5,R14}
+   MOV      R4,R0
+   MOV      R5,R1
+   BL       Ensure_Comma
+   BL       Optional_Pound
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMP      R0,R4
+   MOVHI    R0,#&B0                    ; Asm_Error #&B0 = Illegal coprocessor opcode
+   BHI      Asm_Error
+   ORR      R9,R9,R0,LSL R5
+   LDMFD    R13!,{R4,R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Decode_CRd
+   Decode_Coprocessor_Register_Operand Rd_Pos
+
+; >-------------------------------------------------------------<
+
+.Decode_CRn
+   Decode_Coprocessor_Register_Operand Rn_Pos
+
+; >-------------------------------------------------------------<
+
+.Decode_CRm
+   Decode_Coprocessor_Register_Operand Rm_Pos
+
+; >-------------------------------------------------------------<
+
+.Decode_Coprocessor_Register
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   MOVNE    R0,#&B2                    ; Asm_Error #&B2 = Illegal coprocessor register
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMP      R0,#15
+   MOVHI    R0,#&B2                    ; Asm_Error #&B2 = Illegal coprocessor register
+   BHI      Asm_Error
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+macro Decode_Coprocessor_Register_Operand Shift:i
+{
+   STMFD    R13!,{R14}
+   BL       Ensure_Comma
+   BL       Decode_Coprocessor_Register
+   ORR      R9,R9,R0,LSL #Shift
+   LDMFD    R13!,{R15}
+}

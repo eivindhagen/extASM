@@ -1,0 +1,369 @@
+
+; >-------------------------------------------------------------<
+
+.Code_Start
+.Start
+   ADRL     R12,General_Data+Relative_Position ; Set up workspace pointer
+   ADR      R13,Stack                  ; Set up stack pointer
+   SWI      OS_GetEnv                  ; Check for sufficient memory
+   ADR      R0,Flex_Heap
+   CMP      R0,R1
+   ADRGT    R0,Memory_Error
+   SWIGT    OS_GenerateError
+   ADR      R0,Quit
+   ADR      R14,Internal_Context
+   STMIA    R14,{R0,R13}               ; Store Exceptions context and Messages_Error context
+
+   BL       Initialise
+   BL       Load_Options
+   BL       Read_Templates
+   BL       Insert_Icon_Data
+   BL       Create_Flex_Blocks
+   BL       Load_Messages
+
+   ADR      R0,Main_Menu_Str
+   BL       Create_Menu
+   STR      R0,Main_Menu
+
+   BL       Menu_Init
+   BL       Set_Options
+   BL       Wimp_Text_ClearAll
+   BL       Wimp_Text_AddBlankLine
+   BL       Print_Intro_Text
+   BL       Shade_Icons
+
+   ADR      R0,Set_Error_Context
+   ADR      R14,Internal_Context
+   STMIA    R14,{R0,R13}               ; Store Exceptions context and Messages_Error context
+
+.Set_Error_Context
+   BL       Setup_Error_Context_Info
+   ADR      R0,_Loop
+   ADR      R14,Error_Context
+   STMIA    R14,{R0,R4-R13}            ; Store Asm_Error context
+
+   ;------> Enter semi-infinite loop
+
+._Loop
+   MOV      R0,#1
+   BL       Wimp_Poller
+   B        _Loop
+
+; >-------------------------------------------------------------<
+
+.Quit
+   BL       Deinstall_Exception_Handler
+
+   ADR      R0,TmpDir_Var
+   MVN      R2,#0
+   MOV      R3,#0
+   SWI      XOS_SetVarVal              ; Delete Tmp$Dir variable
+   ADR      R0,extASM_DirVar
+   MVN      R2,#0
+   MOV      R3,#0
+   SWI      XOS_SetVarVal              ; Delete extASM$Dir variable
+
+   LDR      R0,Task_Handle
+   LDR      R1,Task_String
+   SWI      Wimp_CloseDown
+   ;MOV      R0,#4
+   ;ADR      R1,DDEUtilsEm_Module
+   ;SWI      XOS_Module
+   SWI      OS_Exit
+
+.Main_Menu_Str     DCB   "MainMenu",0
+;.DDEUtilsEm_Module DCB   "DDEUtilsEm",0
+   ALIGN
+.Memory_Error
+   DCD      0
+   DCB      "Not enough memory to start application",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Insert_Icon_Data
+   STMFD    R13!,{R14}
+   LDR      R0,Handle_INFO
+   MOV      R1,#5
+   ADR      R2,Info_Line
+   BL       Copy_Icon_Text
+   LDMFD    R13!,{R15}
+
+.Info_Line  DCB   "2.01 (16-Oct-2012)",0
+   ALIGN
+
+   #set Rect_Offset     = 130
+   #set Pie_Shift       = 4
+   #set Plot_Move       = 4
+   #set Plot_Draw       = 5
+   #set Plot_RectFill   = &65
+   #set Plot_Circle     = &95
+   #set Plot_CircleFill = &9D
+   #set Plot_CircleArc  = &A5
+   #set Plot_Sector     = &B5
+
+; >-------------------------------------------------------------<
+
+.Init_Stat_Window                      ;_R1-> Window block, all registers are preserved
+   STMFD    R13!,{R0-R9,R14}
+   LDR      R2,Option_PieRadius
+   STR      R2,Previous_ARM_PieRadius
+   STR      R2,Previous_FPA_PieRadius
+   MOV      R0,#7
+   MOV      R3,R2
+   mdiv     R6,R3,R0
+   BIC      R6,R6,#1
+   ADD      R6,R6,R6,LSL #1            ; 64+Radius*2+Rect_Offset+3*(Radius/7 AND NOT 1)+
+   ADD      R6,R6,R2,LSL #1            ; 16*12+8 <=>
+   ADD      R6,R6,#Rect_Offset+264     ; 3*(Radius/7 AND NOT 1)+Radius*2+264+Rect_Offset
+   MOV      R4,#0
+   MVN      R5,#119
+   SUB      R5,R5,R2,LSL #1
+   MOV      R7,#0
+   ADD      R0,R1,#40
+   STMIA    R0,{R4-R7}
+   ; Modify info to open window with full size
+   ;
+   LDMIA    R1,{R2,R3}
+   SUB      R8,R6,R4
+   SUB      R9,R7,R5
+   ADD      R4,R2,R8
+   ADD      R5,R3,R9
+   STMIA    R1,{R2-R5}
+   LDMFD    R13!,{R0-R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Menu_Init
+   ADR      R3,Block
+   LDR      R0,Option_PieRadius
+   LDR      R1,PieRadius_Pointer
+   MOV      R2,#4
+   SWI      OS_ConvertInteger2
+   MOV      R0,#&0D
+   STRB     R0,[R1]
+   LDR      R0,Option_MinLines
+   LDR      R1,MinLines_Pointer
+   MOV      R2,#4
+   SWI      OS_ConvertInteger2
+   MOV      R0,#&0D
+   STRB     R0,[R1]
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Create_Flex_Blocks
+   STMFD    R13!,{R4,R14}
+   MOV      R4,#Num_Flex_Blocks
+
+.CFB_Loop
+   MOV      R0,#0
+   BL       Flex_Create
+   SUBS     R4,R4,#1
+   BNE      CFB_Loop
+   LDMFD    R13!,{R4,R15}
+
+; >-------------------------------------------------------------<
+
+.Print_Intro_Text
+   STMFD    R13!,{R4,R5,R14}
+
+   ADR      R0,Intro_Text_Start
+   ADR      R4,Intro_Text_End
+
+.PIT_Line_Loop
+   MOV      R1,#TextColour_Info
+   BL       Wimp_Text_AddColourLine
+   CMP      R0,R4
+   BNE      PIT_Line_Loop
+
+   BL       Wimp_Text_Window
+   LDMFD    R13!,{R4,R5,R15}
+
+.Intro_Text_Start
+   DCB   "extASM",0
+   DCB   "Extended Assembler v2.00",0
+   DCB   "© 2010, Eivind Hagen & Terje Slettebø",0
+   ;DCB   "Assembled "+mid$(time$,5,11),0
+.Intro_Text_End
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Show_Face
+   STMFD    R13!,{R4,R5,R14}
+
+   ADR      R0,Face_Start
+   ADR      R4,Face_End
+
+.SF_Line_Loop
+   MOV      R1,#TextColour_Include
+   BL       Wimp_Text_AddColourLine
+   CMP      R0,R4
+   BNE      SF_Line_Loop
+
+   BL       Wimp_Text_Window
+   LDMFD    R13!,{R4,R5,R15}
+
+.Face_Start
+   DCB   0
+   DCB   "              ######      ######   ",0
+   DCB   "             #                  #  ",0
+   DCB   "                ###        ###     ",0
+   DCB   "               #   #      #   #    ",0
+   DCB   "              #  #  # #  #  #  #   ",0
+   DCB   "               #   #  #   #   #    ",0
+   DCB   "                ###  #     ###     ",0
+   DCB   "                     #             ",0
+   DCB   "                     ###           ",0
+   DCB   "             ###              ###  ",0
+   DCB   "            #   ###        ###   # ",0
+   DCB   "           #       ########       #",0
+   DCB   "            #                    # ",0
+   DCB   "              ###            ###   ",0
+   DCB   "                 ############     ",0
+.Face_End
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Load_Messages
+   STMFD    R13!,{R14}
+   ;------> Default header file
+   BL       Load_Header_File
+
+   ;------> Message File 1
+   MOV      R0,#Flex_Error             ; Message File 1
+   ADR      R1,Message_File_1
+   BL       Load_Message
+
+   ;------> Message File 2
+   MOV      R0,#Flex_Warning           ; Message File 2
+   ADR      R1,Message_File_2
+   BL       Load_Message
+
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Load_Message                          ;_R0 = Block number, _R1-> Filename
+   STMFD    R13!,{R4-R7,R14}
+
+   MOV      R6,R0
+   MOV      R7,R1
+   MOV      R0,#17
+   SWI      OS_File                    ; Read file size
+   CMP      R0,#1
+   MOVNE    R0,#&0A                    ; Messages_Error #&0A = File '<Filename>' not found
+   MOVNE    R1,R7
+   BNE      Messages_Error1
+
+   MOV      R0,R6
+   ADD      R1,R4,#1
+   BL       Flex_Resize
+   MOV      R6,R0
+   MOV      R2,R0                      ; R2-> Message block
+
+   MOV      R0,#16
+   MOV      R1,R7
+   MOV      R3,#0
+   SWI      OS_File                    ; Load message file
+   MOV      R0,#0
+   STRB     R0,[R6,R4]
+
+   LDMFD    R13!,{R4-R7,R15}
+
+.Message_File_H   DCB   "|<extASM$Dir>.Resources.Header",0
+.Message_File_1   DCB   "|<extASM$Dir>.Resources.Errors",0
+.Message_File_2   DCB   "|<extASM$Dir>.Resources.Warnings",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Load_Header_File
+   STMFD    R13!,{R4-R7,R14}
+   ADR      R6,Header_Filename
+   ADR      R0,Message_File_H
+   MOV      R1,R6
+   MOV      R2,#&100
+   SWI      OS_GSTrans
+   MOV      R0,R6
+   BL       Find_LeafName
+   STR      R0,Header_Leafname
+
+   MOV      R0,#17
+   MOV      R1,R6
+   SWI      OS_File
+   CMP      R0,#1
+   MOVNE    R0,#&0A                    ; Messages_Error #&0A = File '<Filename>' not found
+   MOVNE    R1,R6
+   BNE      Messages_Error1
+   MOV      R0,#Flex_Header            ; Default header file
+   ADD      R1,R4,#1
+   BL       Flex_Resize
+   MOV      R7,R0
+
+   MOV      R0,#16
+   MOV      R1,R6
+   MOV      R2,R7
+   MOV      R3,#0
+   SWI      OS_File                    ; Load file
+   MOV      R0,#0
+   STRB     R0,[R7,R4]                 ; Zero-terminate source
+   LDMFD    R13!,{R4-R7,R15}
+
+; >-------------------------------------------------------------<
+
+.Shade_Icons
+   STMFD    R13!,{R14}
+   MOV      R0,#1
+   BL       Shade_Source_Icons
+   MOV      R0,#1
+   MOV      R1,#1
+   BL       Shade_Object_Icons
+   LDR      R0,Handle_PROCESS
+   MOV      R1,#23
+   MOV      R2,#1
+   BL       Shade_Icon                 ; Shade 'Reload' button
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Shade_Source_Icons                    ;_R0 = Shade flag (1 = Shade, 0 = Unshade)
+   STMFD    R13!,{R4-R6,R14}
+   LDR      R4,Handle_PROCESS
+   MOV      R5,#3
+   MOV      R6,R0
+
+._Loop
+   MOV      R0,R4
+   MOV      R1,R5
+   MOV      R2,R6
+   BL       Shade_Icon
+   ADD      R5,R5,#1
+   CMP      R5,#6
+   BLE      _Loop
+   LDMFD    R13!,{R4-R6,R15}
+
+; >-------------------------------------------------------------<
+
+.Shade_Object_Icons                    ;_R0 = Shade flag (1 = Shade, 0 = Unshade)
+   STMFD    R13!,{R4-R7,R14}           ;_R1 - 1 = Shade Load and Exec
+   LDR      R4,Handle_PROCESS
+   MOV      R5,#12
+   MOV      R6,R0
+   CMP      R1,#1
+   MOVEQ    R7,#17
+   MOVNE    R7,#0
+
+._Loop
+   MOV      R0,R4
+   MOV      R1,R5
+   MOV      R2,R6
+   BL       Shade_Icon
+   ADD      R5,R5,#1
+   CMP      R5,R7
+   MOVEQ    R6,#1
+   CMP      R5,#18
+   BLE      _Loop
+   LDMFD    R13!,{R4-R7,R15}

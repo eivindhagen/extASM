@@ -1,0 +1,8 @@
+
+#name <Tmp$Dir>.^.test
+
+#area test,code
+
+VMRS R3,FPSCR
+
+#end

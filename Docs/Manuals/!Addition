@@ -1,0 +1,160 @@
+Added features for extASM 1.00
+------------------------------
+This has been done from version 0.60 to 1.00.
+
+TODO: Add information for version 1.00 to 2.00.
+
+User interface
+--------------
+è Changes in the user interface.
+  - Solid sprite dragging
+  - Fixing of the Wimp save/load routines (it wouldn't work with scrapfile
+    save/load, now it does).
+  - Desktop !Boot file saving, this is so that if you save a Desktop !Boot
+    file (from the TaskManager), extASM will start up automatically when
+    the !Boot file is run.
+
+Instructions
+------------
+è Condition code HS added, same as CS.
+è Auto-expanding CMP, CMN, TST and TEQ.
+è Auto-expanding LDR/STR, with a base register and an auto-expanded offset,
+  like:
+  LDR R1,[R2,#&12344]. Same with LDF/STF and LFM/SFM.
+è Load/store instructions (both integer and Floating Point) can be expanded
+  beyond 1 Mbyte.
+
+Extra instructions/statements
+-----------------------------
+è Added DBFS, DBFD, DBFE, DBFP, DBFEP for FP-constant blocks.
+è A new statement 'relative' is added. It starts and ends with braces
+  ('{}') as struct. The labels inside a 'relative' statement are marked
+  as relative to a given register, rather than relative to R15. This can
+  reduce a lot of auto-expansion, as the given register will be closer to
+  the variable than R15.
+è A new instruction variant, 'ADRL'. This is a minimum 16-bit ADR, i.e.
+  it's the same as setting the 'Fast' option for this ADR. Using this for
+  the ADR instructions that needs it can reduce the number of passes.
+  extASM will continue to assemble until the object code of two passes have
+  the same length and all variables are resolved. Therefore, if you specify
+  ADR's as minimum 16-bit then they will auto-expand to that the first time,
+  instead of maybe a later pass, if it uses a forward referencing label.
+
+Auto-expansion
+--------------
+è Auto-expansion of Floating Point instructions is now implemented. If a
+  constant can not be coded in the instruction (e.g. 0.0-5.0, 0.5 or 10.0),
+  the number is stored at the next '#fppool' statement in the source, and
+  an LDF instruction is used to load it. FPTEMP' and 'FPLOCK' are added to
+  specify temporary FP registers.
+
+  Also, for MVF, MNF, ADF, SUF, CMF and CNF, one instruction can be changed
+  to the other if the constant can be coded with that. This effectively
+  sign-extends the range of values that can be coded with these
+  instructions to include 0.0 - -5.0, -0.5 and -10.0.
+
+Variables
+---------
+è Implemented hash-searching for variables and macros. This dramatically
+  reduces the assembly time.
+è Integers, Floating Point values and strings can now be used in
+  expressions. Integers, FP and string variables can also be set, with
+  '#set' (as before), '#fpset' and '#strset'.
+  The expression routine automatically casts between integer and FP values.
+  There is also a range of functions, and most of Basic's mathematical
+  and string functions are supported.
+è All variable types (integer, FP, string) can be local.
+
+Macros
+------
+è New macro routines have been implemented. These can use ordinary variable
+  names for parameters in the macro, and also support macros with condition
+  code following the macro name. The range of macro parameter types is:
+  Register, FP Register, Integer, FP value,
+  String, Temp Register and FP Temp Register.
+
+Switches ('#' statements)
+-------------------------
+è Implemented nestable #if-#else-#endif, nestable #rept-#endr and nestable
+ 'struct'.
+è #append is removed, because it gave problems in the source file
+  organization. If included source files should be put at the end of
+  the source, then you can put #include switches there.
+
+Options
+-------
+è Option for turning Auto-shrink on/off. When it is on, it will try
+  to shrink the code again, if at a later pass it turns out that a
+  smaller or no auto-expansion is needed for a statement. As it is now, a
+  NOP is inserted after a statement if it shrinks, to avoid recalculationg
+  offsets etc. When this option is on it will make the most effecient code,
+  but it may use more passes. It may also not succeed at all, and in this
+  case, a warning will be given and it will temporarily turn off the
+  auto-shrink option (for the current assembling).
+è Option for getting Auto-expansion messages. When it is on it will give
+  a warning when it wants to auto-expand a statement. You can also select
+  to only show auto-expanding of ADR and load/store instructions. It will
+  show a summary of the auto-expansion at the end.
+è Option for warnings when a variable is not used.
+è Options for various statistics, such as:
+  - Code statistics (number used of each instruction, and total number
+    of instructions)
+  - Variable list, optionally sorted, and macro list.
+  - It can also show the number of references to each variable, and the
+    number of times each macro is used.
+  - It can show two pie-charts of the distribution of the instruction
+    types, for the ARM and FPA instructions.
+è Option for specifying labels without period in front of them.
+è Option for generating ARM Object Format file (AOF), for linking with
+  C etc. This is done with the aid of extAOF, which is bundled with extASM.
+  This function will later be incorporated into extASM. The following
+  statements are used added: '#area', '#end', '#import', '#export',
+  '#entry' and '#%'. They are ignored by extASM, but used by the extAOF
+  application.
+è Option for Throwback. If this is on, extASM will also use Throwback to
+  display error, warning and 'output' information messages, so any editor
+  that has Throwback can display them.
+è Option for Autoscroll on/off. When it is off, it won't scroll the
+  Status window to the end when new text is added.
+è Option for auto-expanding all ADR's to minimum 16-bit (two instructions)
+  ('Fast' option).
+  This may reduce the number of passes, at the expence of performance.
+  However, it is more recommended to use the new 'relative' statement to
+  reduce auto-expanding, and then use the new 'ADRL' (16-bit ADR) where
+  it is needed.
+
+Errors
+------
+è The error system has been changed to the following:
+  - Only give one error message per error (previously it could give two or
+    three).
+  - Only give one error per statement. Consequently a number of error
+    messages have been removed because they would only be called after
+    another error message
+  - Give a message about an error only one time. This is so that if an
+    error message comes in one pass, the error message will not be
+    repeated in later passes.
+  - CoreDump file saving is removed. If an exception occurs, now it
+    asks if you want to try to continue with the program. This can be
+    helpful in tracking down what caused the error. If you answer No to
+    the question, the program exits.
+
+Menu
+----
+è Added an 'Abort' option in the menu, to abort an assembly, and also
+  'Pause' and 'Continue'.
+è The Status Info text can be saved.
+è The colours in the Status Info window can be changed.
+è The number of lines for the Status Info window can be changed.
+
+Help
+----
+è Interactive help is implemented (using the !Help application), and also
+  StrongHelp help (click on 'Info' in the menu).
+
+Miscellaneous
+-------------
+è Assembling from Obey file, or command line, can now be done when the
+  program is loaded. Previously it would load the program each time.
+è It has the complete instruction set for ARM2/3/6 and FPA10.
+è Removed various bugs.

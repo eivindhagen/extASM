@@ -1,0 +1,36 @@
+
+; >-------------------------------------------------------------<
+
+.DT_A                                  ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BEQ      DT_ABS
+   CMP      R8,#'C'
+   BEQ      DT_ACS
+   CMP      R8,#'D'
+   BEQ      DT_ADC_ADD_ADF_ADR
+   CMP      R8,#'L'
+   BEQ      DT_ALIGN
+   CMP      R8,#'N'
+   BEQ      DT_AND
+   CMP      R8,#'S'
+   BEQ      DT_ASN_ASR
+   CMP      R8,#'T'
+   BEQ      DT_ATN
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ASN_ASR                            ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   ;------> ASN  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110101100001000000100000000
+   BEQ      DT_FPU_D2
+   CMP      R8,#'R'
+   ;------> ASR             S    [Rd]shift   [Rm]
+   MOVEQ    R9,#%00000001101000000000000001000000
+   BEQ      DT_Shift_Instruction
+   B        DT_Unknown

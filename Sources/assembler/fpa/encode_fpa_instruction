@@ -1,0 +1,296 @@
+
+; >-------------------------------------------------------------<
+
+.Code_FP_Instruction                   ;_F0 = Immediate constant, R9 = Instruction bits
+   STMFD    R13!,{R4,R5,R14}           ;_R0 = (0 = Don't give auto-expansion warning,
+   MOV      R4,R0                      ;       1 = Give auto-expansion warning)
+
+   BL       Code_FP_Immediate
+   CMN      R14,#1
+   BNE      CFPI_End
+   ;------> Alter opcode if possible
+   MOV      R5,R9
+   MVFE     F1,F0
+   BL       Immediate_FP_Turnaround    ; Try to switch instruction
+   BL       Code_FP_Immediate          ; R0 = Immediate Value
+   CMN      R14,#1
+   BNE      CFPI_End
+   ; Immediate failed, 1 Instruction is not enough!
+   ;
+   MOV      R9,R5
+   MVFE     F0,F1
+   BL       AutoExpand_FP
+   LDMFD    R13!,{R4,R5,R15}
+
+.CFPI_End
+   ORR      R9,R9,R0                   ; Insert Operand-Two bits
+   BL       Write_Instruction
+   LDMFD    R13!,{R4,R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Code_FP_Immediate                     ;_F0 = Immediate value to code,
+   STMFD    R13!,{R14}                 ;~R0 = Immediate value bits, ~R14 = Signal error,
+   MOV      R14,#0                     ; -1 = Error, could not be coded as immediate value
+   CMFE     F0,#0
+   MOVEQ    R0,#0
+   LDMEQFD  R13!,{R15}
+   CMFE     F0,#1
+   MOVEQ    R0,#1
+   LDMEQFD  R13!,{R15}
+   CMFE     F0,#2
+   MOVEQ    R0,#2
+   LDMEQFD  R13!,{R15}
+   CMFE     F0,#3
+   MOVEQ    R0,#3
+   LDMEQFD  R13!,{R15}
+   CMFE     F0,#4
+   MOVEQ    R0,#4
+   LDMEQFD  R13!,{R15}
+   CMFE     F0,#5
+   MOVEQ    R0,#5
+   LDMEQFD  R13!,{R15}
+   CMFE     F0,#0.5
+   MOVEQ    R0,#6
+   LDMEQFD  R13!,{R15}
+   CMFE     F0,#10
+   MOVEQ    R0,#7
+   MVNNE    R14,#0
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Immediate_FP_Turnaround               ;_F0 = Immediate value, ~F0 = New immediate value
+   AND      R0,R9,#&F << 20
+   TST      R9,#1 << 15
+   ORRNE    R0,R0,#1 << 19
+
+   CMP      R0,#%00001 << 19           ; MVF
+   CMPNE    R0,#%00011 << 19           ; MNF
+   EOREQ    R9,R9,#%00010 << 19
+   MNFEQE   F0,F0
+   MOVEQ    R15,R14
+
+   CMP      R0,#%00000 << 19           ; ADF
+   CMPNE    R0,#%00100 << 19           ; SUF
+   EOREQ    R9,R9,#%00100 << 19
+   MNFEQE   F0,F0
+
+   CMP      R0,#%10011 << 19           ; CMF
+   CMPNE    R0,#%10111 << 19           ; CNF
+   EOREQ    R9,R9,#%00100 << 19
+   MNFEQE   F0,F0
+
+   CMP      R0,#%11011 << 19           ; CMFE
+   CMPNE    R0,#%11111 << 19           ; CNFE
+   EOREQ    R9,R9,#%00100 << 19
+   MNFEQE   F0,F0
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.AutoExpand_FP                         ;_F0 = Immediate constant
+   ; R4 - FP-constant precision
+   ; R5 - Instruction precision
+   ; R6 - FPTempReg
+   ; R7 - Instruction
+   ;
+   STMFD    R13!,{R4-R7,R14}
+   AND      R0,R9,#&FF << 20           ; Get OpCode
+   CMP      R0,#%11100001 << 20
+   TSTEQ    R9,#1 << 4                 ; Is it MNF?
+   BNE      AEFP_Not_MNF
+   TST      R9,#1 << 15
+   BICNE    R9,R9,#1 << 20             ; Make MVF
+   MNFNEE   F0,F0                      ; Constant=-Constant
+
+.AEFP_Not_MNF
+   ; Try to lower constant precision, without getting inexact result
+   ;
+   RFS      R0
+   BIC      R0,R0,#7 << 2              ; Clear possible exception condition
+   BIC      R1,R0,#7 << 18             ; Clear Overflow, Underflow and Inexact trap bit
+   WFS      R1
+   ; Try double precision
+   ;
+   MVFD     F1,F0
+   RFS      R2
+   TST      R2,#7 << 2
+   MOVNE    R4,#1 << 19                ; Set Extended precision
+   BNE      AEFP_End_Constant_Precision
+   ; Try single precision
+   ;
+   MVFS     F1,F0
+   RFS      R2
+   TST      R2,#7 << 2
+   MOVNE    R4,#1 << 7                 ; Set Double precision
+   MOVEQ    R4,#0                      ; Set Single precision
+
+.AEFP_End_Constant_Precision
+   WFS      R0                         ; Restore trap bits
+   AND      R5,R9,#1 << 7
+   AND      R1,R9,#1 << 19             ; Get instruction precision
+   ORR      R5,R5,R1
+   CMP      R5,R4                      ; Instruction precision greater or equal to
+   BGE      AEFP_End_Precision         ; constant precision?
+   ; Try lowering constant precision to precision in instruction, without overflow
+   ;
+   BIC      R1,R0,#1 << 18             ; Clear Overflow trap bit
+   WFS      R1
+   CMP      R5,#1 << 7                 ; Is instruction precision Double precision
+   BEQ      AEFP_Double_Precision
+   MVFS     F1,F0                      ; Try single precision
+   RFS      R2
+   WFS      R0                         ; Restore trap bits
+   TST      R2,#1 << 2
+   MOVEQ    R4,R5                      ; Constant precision could be lowered
+   BEQ      AEFP_End_Precision
+   MOV      R5,#1 << 7
+
+.AEFP_Double_Precision
+   BIC      R1,R0,#1 << 18
+   WFS      R1
+   MVFD     F1,F0
+   RFS      R2
+   WFS      R0
+   TST      R2,#1 << 2
+   MOVEQ    R4,R5                      ; Constant precision could be lowered
+   MOVNE    R5,R4                      ; Constant precision could not be lowered, rise
+
+.AEFP_End_Precision                    ; instruction precision
+   ; If dyadic instruction and Fd=Fn or compare instruction, get FPTempReg
+   ;
+   BL       Push_FP_Temp_Info
+   AND      R7,R9,#7 << Rn_Pos
+   MOV      R7,R7,LSR #Rn_Pos
+   TST      R9,#1 << 4
+   BNE      AEFP_Get_FPTempReg
+   AND      R0,R9,#7 << Rd_Pos         ; Get Fd
+   MOV      R6,R0,LSR #Rd_Pos          ; FPTempReg=Fd
+   TST      R9,#1 << 15                ; Is it a monadic instruction?
+   MOVNE    R7,#&20                    ; Asm_Warning #&20 = FP Auto-expansion (FPU)
+   BNE      AEFP_No_FPTempReg
+   CMP      R6,R7                      ; Is Fd=Fn?
+   MOVNE    R7,#&20                    ; Asm_Warning #&20 = FP Auto-expansion (FPU)
+   BNE      AEFP_No_FPTempReg          ; If not, FPTempReg=Fd
+
+.AEFP_Get_FPTempReg
+   MOV      R1,#1
+   MOV      R0,R1,LSL R7
+   STR      R0,FPTEMP_Needed
+   LDR      R7,FPTEMP_Stacked
+   BL       Get_FP_Temp_Reg
+   MOV      R6,R0
+   LDR      R0,FPTEMP_Stacked
+   CMP      R0,R7
+   MOVEQ    R7,#&21                    ; Asm_Warning #&21 = FP Auto-expansion, using FPTEMP register (FPU)
+   MOVNE    R7,#&23                    ; Asm_Warning #&23 = FP Auto-expansion, using stacked register (FPU)
+   BL       Push_FP_Temp_Reg
+
+.AEFP_No_FPTempReg
+   STR      R7,FP_AutoExpand_Number
+   ORR      R7,R9,R6
+   LDR      R0,Asm_Pass
+   CMP      R0,#1
+   BNE      AEFP_Not_First_Pass
+   LDR      R0,FPPOOL_Size
+   CMP      R4,#1 << 7
+   ADDLT    R0,R0,#4
+   ADDEQ    R0,R0,#8
+   ADDGT    R0,R0,#12
+   STR      R0,FPPOOL_Size
+   STR      R15,Last_Pass_Valid
+   BL       Write_Instruction
+   B        AEFP_First_Pass
+
+.AEFP_Not_First_Pass
+   ; Make an LDF instruction, with FPTempReg and FP-constant precision
+   ;
+   AND      R9,R9,#&F0000000
+   ;------> LDF            PUYWL[Rn]XFd     [Offset]
+   ORR      R9,R9,#%00001101000100000000000100000000
+   ORR      R9,R9,R6,LSL #Rd_Pos       ; Fd=FPTempReg
+   TST      R4,#1 << 7
+   ORRNE    R9,R9,#1 << 15             ; Insert FP-constant precision
+   TST      R4,#1 << 19
+   ORRNE    R9,R9,#1 << 22
+   MOV      R0,#Flex_Expand
+   BL       Flex_Adr
+   LDR      R1,Expand_Info_Offset
+   ADD      R6,R0,R1
+   LDR      R5,[R6]
+   TST      R5,#1 << 30
+   BICEQ    R0,R5,#1 << 31
+   STREQ    R0,[R6]
+   MOV      R0,R4
+   BL       Store_FP_Constant
+   BL       DT_MEM_F_Expr
+   ORR      R5,R5,#1 << 30
+   STR      R5,[R6]
+
+.AEFP_First_Pass
+   STR      R11,AutoExpand_Pointer
+   AND      R0,R7,#&FF << 20
+   CMP      R0,#%11100000 << 20
+   TSTEQ    R7,#1 << 4
+   BNE      AEFP_Write
+   TST      R7,#1 << 15
+   BNE      AEFP_End
+
+.AEFP_Write
+   BIC      R9,R7,#1 << 3
+   BL       Write_Instruction
+
+.AEFP_End
+   BL       Pop_FP_Temp_Reg
+   BL       Pop_FP_Temp_Info
+   LDR      R0,Options
+   TST      R0,#Option_AutoExpand
+   LDMEQFD  R13!,{R4-R7,R15}
+   LDR      R0,FP_AutoExpand_Number
+   LDR      R2,AutoExpand_Pointer
+   SUB      R2,R11,R2
+   BL       AutoExpand_Message
+   LDMFD    R13!,{R4-R7,R15}
+
+; >-------------------------------------------------------------<
+
+.Store_FP_Constant                     ;_F0 = FP constant, _R0 = Precision, ~R0 = Address
+   STMFD    R13!,{R4,R5,R14}
+   LDR      R1,FPPOOL_Count
+   LDR      R2,FPPOOL_Num
+   CMP      R1,R2
+   MOVEQ    R0,#&73                    ; Asm_Error #&73 = Missing #fppool
+   BEQ      Asm_Error
+   LDR      R1,FPPOOL
+   LDR      R2,[R1]
+   LDR      R3,[R1,#32]
+   ADD      R2,R2,R3
+   LDRB     R4,[R1,#63]
+   MOV      R4,R4,LSR #4
+   MOV      R5,R2
+   CMP      R0,#1 << 7
+   STFLTS   F0,[R2],#4
+   STFEQD   F0,[R2],#8
+   STFGTE   F0,[R2],#12
+   SUB      R2,R2,R5
+   ADD      R2,R2,R3
+   STR      R2,[R1,#32]
+   LDR      R0,[R1,#36]
+   CMP      R2,R0
+   CMPNE    R11,R5
+   STRGT    R15,Last_Pass_Valid
+   LDR      R2,[R1,#12]
+   ADD      R2,R2,#1
+   STR      R2,[R1,#12]
+   STR      R4,RELATIVE_Register_Read
+   CMP      R4,#15
+   LDRNE    R0,[R1,#44]
+   ADDNE    R0,R3,R0
+   LDMNEFD  R13!,{R4,R5,R15}
+   MOV      R0,#Flex_Object
+   BL       Flex_Adr
+   LDR      R1,Object_Base
+   SUB      R0,R5,R0
+   ADD      R0,R0,R1
+   LDMFD    R13!,{R4,R5,R15}

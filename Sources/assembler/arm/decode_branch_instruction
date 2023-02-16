@@ -1,0 +1,58 @@
+
+; >-------------------------------------------------------------<
+
+.DT_BRANCH                             ;_R8 = "L" or CC or Blank
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   BNE      DTB_No_Link                ; B<not L>
+   LDRB     R0,[R10]
+   CMP      R0,#' '
+   CMPNE    R0,#&09
+   BEQ      DTB_With_Link              ; BL<blank>
+   LDRB     R0,[R10,#1]
+   CMP      R0,#' '
+   CMPNE    R0,#&09
+   BEQ      DTB_No_Link                ; BL<non blank><blank>
+
+.DTB_With_Link                         ; R8 = "L"
+   ORR      R9,R9,#1 << 24
+   LDRB     R8,[R10],#1
+
+.DTB_No_Link                           ; R8 = CC or Blank
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DTB_No_Stat
+   ADR      R0,Code_Counters+22*4
+   TST      R9,#1 << 24
+   ADDNE    R0,R0,#4
+   LDR      R1,[R0]
+   ADD      R1,R1,#1
+   STR      R1,[R0]
+
+.DTB_No_Stat
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Int_Expr
+   LDR      R1,Object_Base
+   LDR      R2,Object_Size
+   ADD      R1,R1,R2                   ; R1 = PC (not pipelined)
+   ADD      R1,R1,#8                   ; R1 = PC (pipelined)
+   SUB      R0,R0,R1                   ; R0 = Offset from PC
+   TST      R0,#3                      ; Check lower bits, 00=Word jump
+   BEQ      DTB_No_Warning
+   MOV      R0,#&01                    ; Asm_Warning #&01 = Branch on byte boundary
+   BL       Asm_Warning
+   ADD      R0,R0,#4                   ; Make it to the next word ***
+
+.DTB_No_Warning
+   MOVS     R0,R0,ASR #2               ; R0 = Word offset
+   MOVPL    R1,R0
+   RSBMI    R1,R0,#0
+   TST      R1,#&FF000000
+   MOVNE    R0,#&29                    ; Asm_Error #&29 = Branch or branch with link out of range
+   BNE      Asm_Error
+
+   BIC      R0,R0,#&FF000000           ; Masked Offset
+   ORR      R9,R9,R0
+
+   B        DT_Write_Instruction

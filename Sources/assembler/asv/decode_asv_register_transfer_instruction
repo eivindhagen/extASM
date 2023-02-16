@@ -1,0 +1,530 @@
+
+; >-------------------------------------------------------------<
+
+.DT_VDUP                               ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DT_Unknown
+   MOV      R9,#0
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_VFP_Operand_Type
+   CMP      R0,#VFP_Operand_64
+   BEQ      DVOT_Error
+   MOV      R4,R0
+   BL       Ensure_Blank
+   BL       Decode_VFP_Register
+   BL       Ensure_Comma
+   CMP      R8,#'D'
+   CMPNE    R8,#'d'
+   BEQ      DT_VDUP_Scalar
+   ; VDUP<cond>.<8|16|32> Qd, Rt (SIMD)
+   ; VDUP<cond>.<8|16|32> Dd, Rr (SIMD)
+   ;
+   ;------> VDUP    Cond     bQ [Vd][Rd]    D e
+   ORR      R9,R9,#%00001110100000000000101100010000
+   CMP      R1,#'Q'
+   ORREQ    R9,R9,#1 << 21
+   ORR      R9,R9,R2,LSL #Rn_Pos
+   ORR      R9,R9,R3,LSL #VFP_N_Pos
+   BL       Decode_Rd_Register
+   CMP      R4,#VFP_Operand_8
+   ORREQ    R9,R9,#1 << VFP_D_Pos
+   CMP      R4,#VFP_Operand_16
+   ORREQ    R9,R9,#1 << VFP_M_Pos
+   B        DT_Write_Instruction
+
+.DT_VDUP_Scalar
+   ; VDUP.<8|16|32> Qd, Dm[x] (SIMD)
+   ; VDUP.<8|16|32> Dd, Dm[x] (SIMD)
+   ;
+   ;------> VDUP             D  imm4[Vd]     QM [Vm]
+   ORR      R9,R9,#%00000011101100000000110000000000
+   CMP      R1,#'Q'
+   ORREQ    R9,R9,#SIMD_Q_Bit
+   ORR      R9,R9,R2,LSL #Rd_Pos
+   ORR      R9,R9,R3,LSL #VFP_D_Pos
+   MOV      R0,R4
+   BL       Decode_VFP_Register
+   ORR      R9,R9,R2,LSL #Rm_Pos
+   ORR      R9,R9,R3,LSL #VFP_M_Pos
+   BL       Ensure_Open_Bracket
+   BL       Decode_VFP_Scalar
+   CMP      R4,#VFP_Operand_8
+   MOVEQ    R1,#%0001
+   ORREQ    R1,R1,R0,LSL #1
+   CMP      R4,#VFP_Operand_16
+   MOVEQ    R1,#%0010
+   ORREQ    R1,R1,R0,LSL #2
+   CMP      R4,#VFP_Operand_32
+   MOVEQ    R1,#%0100
+   ORREQ    R1,R1,R0,LSL #3
+   ORR      R9,R9,R1,LSL #Rn_Pos
+   BL       Ensure_Unconditional_Instruction
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV                               ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'V'
+   BNE      DT_Unknown
+   MOV      R9,#0
+   LDRB     R8,[R10],#1
+   LDRB     R0,[R10]
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   CMPEQ    R0,#'.'
+   BEQ      DT_VMOVL
+   CMP      R8,#'N'
+   CMPNE    R8,#'n'
+   CMPEQ    R0,#'.'
+   BEQ      DT_VMOVN
+   BL       Decode_ConditionCode
+   BL       Decode_VFP_Operand_Type
+   MOV      R4,R0
+   MOV      R5,R1
+   STR      R2,DT_VMOV_Signed
+   BL       Ensure_Blank
+   BL       Skip_Blanks
+   CMP      R8,#'R'
+   CMPNE    R8,#'r'
+   BEQ      DT_VMOV_To_Core
+   BL       Decode_VFP_Register        ; First register
+   ADR      R14,DT_VMOV_Registers
+   STMIA    R14,{R0,R2,R3}
+   MOV      R6,R1
+   CMP      R8,#'['
+   BEQ      DT_VMOV_Core_To_Scalar
+   BL       Ensure_Comma
+   BL       Skip_Blanks
+   CMP      R8,#'#'
+   BEQ      DT_VMOV_Imm
+   CMP      R8,#'R'
+   CMPNE    R8,#'r'
+   BEQ      DT_VMOV_From_Core
+   BL       Decode_VFP_Register        ; Second register
+   ADR      R14,DT_VMOV_Registers+VFPRegister.Size
+   STMIA    R14,{R0,R2,R3}
+   MOV      R7,R1
+   BL       Skip_Blanks
+   CMP      R8,#','
+   BEQ      DT_VMOV_From_Double_Core_To_Double_Single
+   ; VMOV                Xd, Xm (SIMD)
+   ; VMOV<cond>.F<32|64> Fd, Fm (VFP)
+   ;
+   CMP      R5,#VFP_Operand_FP
+   BEQ      DT_VMOV_FP_Reg
+   BGT      DT_Illegal_Operand_Type
+   BL       Ensure_Equal_SIMD_Register_Types_DM
+   ; VMOV Xd, Xm (SIMD)
+   ;
+   ;------> VMOV             D  [Vm][Vd]    MQM [Vm]
+   ORR      R9,R9,#%00000010001000000000000100010000
+   CMP      R1,#'Q'
+   ORREQ    R9,R9,#SIMD_Q_Bit
+   ADR      R14,DT_VMOV_Registers
+   LDMIA    R14,{R0-R5}
+   ORR      R9,R9,R1,LSL #Rd_Pos
+   ORR      R9,R9,R2,LSL #VFP_D_Pos
+   ORR      R9,R9,R4,LSL #Rm_Pos
+   ORR      R9,R9,R5,LSL #VFP_M_Pos
+   ORR      R9,R9,R4,LSL #Rn_Pos
+   ORR      R9,R9,R5,LSL #VFP_N_Pos
+   BL       Ensure_Unconditional_Instruction
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_FP_Reg
+   BL       Ensure_Equal_VFP_Register_Types_DM
+   ; VMOV<cond>.F<32|64> Fd, Fm (VFP)
+   ;
+   ;------> VMOV    Cond     D      [Vd]   s  M [Vm]
+   ORR      R9,R9,#%00001110101100000000101001000000
+   CMP      R4,#VFP_Operand_64
+   ORREQ    R9,R9,#VFP_Size_Bit
+   CMP      R4,#VFP_Operand_32
+   BLT      DT_Illegal_Operand_Type
+   ADR      R14,DT_VMOV_Registers
+   LDMIA    R14,{R0-R5}
+   ORR      R9,R9,R1,LSL #Rd_Pos
+   ORR      R9,R9,R2,LSL #VFP_D_Pos
+   ORR      R9,R9,R4,LSL #Rm_Pos
+   ORR      R9,R9,R5,LSL #VFP_M_Pos
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_To_Core
+   ; VMOV[.<S|U><8|16>|32] Rd, Dn[x]          (SIMD)
+   ; VMOV<cond>            Rd, Sn             (VFP)
+   ; VMOV                  Rd1, Rd2, Sm1, Sm2 (SIMD)
+   ; VMOV                  Rd1, Rd2, Dm       (SIMD)
+   ;
+   BL       Decode_Register            ; First register
+   MOV      R6,R0
+   BL       Ensure_Comma
+   BL       Skip_Blanks
+   CMP      R8,#'R'
+   CMPNE    R8,#'r'
+   BEQ      DT_VMOV_To_Double_Core
+   ; VMOV[.<S|U><8|16>|32] Rd, Dn[x] (SIMD)
+   ; VMOV                  Rd, Sn    (VFP)
+   ;
+   BL       Decode_VFP_Register        ; Second register
+   BL       Skip_Blanks
+   CMP      R8,#'['
+   BEQ      DT_VMOV_Scalar_To_Core
+   CMP      R1,#'S'
+   BNE      DT_Illegal_Register
+   ; VMOV<cond> Rd, Sn (VFP)
+   ;
+   ;------> VMOV    Cond       o[Vn][Rd]    N
+   ORR      R9,R9,#%00001110000100000000101000010000
+   ORR      R9,R9,R6,LSL #Rd_Pos
+   ORR      R9,R9,R2,LSL #Rn_Pos
+   ORR      R9,R9,R3,LSL #VFP_N_Pos
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_To_Double_Core
+   ; VMOV Rd1, Rd2, Sm1, Sm2 (VFP)
+   ; VMOV Rd1, Rd2, Dm       (VFP/SIMD)
+   ;
+   BL       Decode_Register            ; Second register
+   MOV      R7,R0
+   BL       Ensure_Comma
+   BL       Decode_VFP_Register        ; Third register
+   BL       Skip_Blanks
+   CMP      R8,#','
+   BEQ      DT_VMOV_From_Double_Single_To_Double_Core
+   CMP      R1,#'D'
+   BNE      DT_Illegal_Register
+   ; VMOV Rd1, Rd2, Dm (VFP/SIMD)
+   ;
+   ;------> VMOV    Cond       o[R2][Rd]      M [Vm]
+   ORR      R9,R9,#%00001100010100000000101100010000
+   ORR      R9,R9,R6,LSL #Rd_Pos
+   ORR      R9,R9,R7,LSL #Rn_Pos
+   ORR      R9,R9,R2,LSL #Rm_Pos
+   ORR      R9,R9,R3,LSL #VFP_M_Pos
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_Scalar_To_Core
+   CMP      R4,#VFP_Operand_64
+   BEQ      DT_Illegal_Operand_Type
+   CMP      R4,#VFP_Operand_Unknown
+   MOVEQ    R4,#VFP_Operand_32
+   CMP      R4,#VFP_Operand_32
+   BEQ      DT_VMOV_Scalar_To_Core_Ok
+   LDR      R14,DT_VMOV_Signed
+   CMP      R14,#VFP_Operand_Unknown
+   BEQ      DT_Illegal_Operand_Type
+
+.DT_VMOV_Scalar_To_Core_Ok
+   CMP      R1,#'D'
+   BNE      DT_Illegal_Register
+   LDRB     R8,[R10],#1
+   ; VMOV[.<S|U><8|16>|32] Rd, Dn[x] (VFP)
+   ;
+   ;------> VMOV    Cond    Uo1 [Vn][Rd]    No2
+   ORR      R9,R9,#%00001110000100000000101100010000
+   CMP      R14,#VFP_Operand_Unsigned
+   ORREQ    R9,R9,#1 << 23
+   CMP      R4,#VFP_Operand_8
+   ORREQ    R9,R9,#1 << 22
+   CMP      R4,#VFP_Operand_16
+   ORREQ    R9,R9,#1 << 5
+   ORR      R9,R9,R6,LSL #Rd_Pos
+   ORR      R9,R9,R2,LSL #Rn_Pos
+   ORR      R9,R9,R3,LSL #VFP_N_Pos
+   MOV      R0,R4
+   BL       Decode_VFP_Scalar
+   AND      R1,R0,#%11
+   MOV      R2,R0,LSR #2
+   AND      R3,R0,#1
+   MOV      R5,R0,LSR #1
+   CMP      R4,#VFP_Operand_8
+   ORREQ    R9,R9,R1,LSL #5
+   ORREQ    R9,R9,R2,LSL #21
+   CMP      R4,#VFP_Operand_16
+   ORREQ    R9,R9,R3,LSL #6
+   ORREQ    R9,R9,R5,LSL #21
+   CMP      R4,#VFP_Operand_32
+   ORREQ    R9,R9,R3,LSL #21
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_From_Double_Single_To_Double_Core
+   CMP      R1,#'S'
+   BNE      DT_Illegal_Register
+   ; VMOV Rd1, Rd2, Sm1, Sm2 (VFP)
+   ;
+   ;------> VMOV    Cond       o[R2][Rd]      M [Vm]
+   ORR      R9,R9,#%00001100010100000000101000010000
+   ORR      R9,R9,R6,LSL #Rd_Pos
+   ORR      R9,R9,R7,LSL #Rn_Pos
+   ORR      R9,R9,R2,LSL #Rm_Pos
+   ORR      R9,R9,R3,LSL #VFP_M_Pos
+   ADD      R4,R0,#1
+   LDRB     R8,[R10],#1
+   BL       Decode_VFP_Register        ; Fourth register
+   CMP      R0,R4
+   CMPEQ    R1,#'S'
+   BNE      DT_Illegal_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_Core_To_Scalar
+   CMP      R4,#VFP_Operand_64
+   BEQ      DT_Illegal_Operand_Type
+   CMP      R4,#VFP_Operand_Unknown
+   MOVEQ    R4,#VFP_Operand_32
+   CMP      R1,#'D'
+   BNE      DT_Illegal_Register
+   LDRB     R8,[R10],#1
+   ; VMOV<cond>[.<8|16|32>] Dd[x], Rd (VFP/SIMD)
+   ;
+   ;------> VMOV    Cond     o1 [Vd][Rd]    Do2
+   ORR      R9,R9,#%00001110000000000000101100010000
+   ORR      R9,R9,R2,LSL #Rn_Pos
+   ORR      R9,R9,R3,LSL #VFP_N_Pos
+   MOV      R0,R4
+   BL       Decode_VFP_Scalar          ; First register scalar
+   AND      R1,R0,#%11
+   MOV      R2,R0,LSR #2
+   AND      R3,R0,#1
+   MOV      R5,R0,LSR #1
+   CMP      R4,#VFP_Operand_8
+   ORREQ    R9,R9,R1,LSL #5
+   ORREQ    R9,R9,R2,LSL #21
+   ORREQ    R9,R9,#1 << 22
+   CMP      R4,#VFP_Operand_16
+   ORREQ    R9,R9,R3,LSL #6
+   ORREQ    R9,R9,R5,LSL #21
+   ORREQ    R9,R9,#1 << 5
+   CMP      R4,#VFP_Operand_32
+   ORREQ    R9,R9,R3,LSL #21
+   BL       Ensure_Comma
+   BL       Decode_Rd_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_Imm
+   ; VMOV.I<8|16|32|64>|F32 Xd, #<immediate> (SIMD)
+   ; VMOV<cond>.F<32|64>    Fd, #<immediate> (VFP)
+   ;
+   CMP      R1,#'S'
+   BEQ      DT_VMOV_Imm_VFP
+   CMP      R1,#'D'
+   CMPEQ    R4,#VFP_Operand_64
+   CMPEQ    R5,#VFP_Operand_FP
+   BEQ      DT_VMOV_Imm_VFP
+   CMP      R5,#VFP_Operand_FP
+   BGT      DT_Illegal_Operand_Type
+   ; VMOV.I<8|16|32|64>|F32 Xd, #<immediate> (SIMD)
+   ;
+   ;------> VMOV           i D   imm[Vd]mode Qo imm4
+   ORR      R9,R9,#%00000010100000000000000000010000
+   CMP      R1,#'Q'
+   ORREQ    R9,R9,#SIMD_Q_Bit
+   ORR      R9,R9,R2,LSL #Rd_Pos
+   ORR      R9,R9,R3,LSL #VFP_D_Pos
+   LDRB     R8,[R10],#1
+   MOV      R0,R4
+   MOV      R1,#0
+   BL       Decode_SIMD_Immediate
+   BL       Ensure_Unconditional_Instruction
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_Imm_VFP
+   CMP      R4,#VFP_Operand_32
+   CMPEQ    R5,#VFP_Operand_FP
+   CMPEQ    R1,#'S'
+   BEQ      DT_VMOV_Imm_FP_Ok
+   CMP      R4,#VFP_Operand_64
+   CMPEQ    R5,#VFP_Operand_FP
+   CMPEQ    R1,#'D'
+   BNE      DT_Illegal_Operand_Type
+
+.DT_VMOV_Imm_FP_Ok
+   ; VMOV<cond>.F<32|64> Fd, #<immediate> (VFP)
+   ;
+   ;------> VMOV    Cond     D  immH[Vd]   s    immL
+   ORR      R9,R9,#%00001110101100000000101000000000
+   CMP      R4,#VFP_Operand_64
+   ORREQ    R9,R9,#VFP_Size_Bit
+   ORR      R9,R9,R2,LSL #Rd_Pos
+   ORR      R9,R9,R3,LSL #VFP_D_Pos
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   CMP      R0,#&FF
+   BHI      DT_Illegal_Immediate_Value
+   AND      R1,R0,#&F
+   ORR      R9,R9,R1
+   MOV      R1,R0,LSR #4
+   ORR      R9,R9,R1,LSL #16
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_From_Core
+   ; VMOV Sn, Rd       (VFP)
+   ; VMOV Dm, Rd1, Rd2 (VFP/SIMD)
+   ;
+   BL       Decode_Register            ; Second register
+   BL       Skip_Blanks
+   CMP      R8,#','
+   BEQ      DT_VMOV_From_Double_Core_To_Doubleword
+   CMP      R6,#'S'
+   BNE      DT_Illegal_Register
+   ; VMOV Sn, Rd (VFP)
+   ;
+   ;------> VMOV    Cond       o[Vn][Rd]    N
+   ORR      R9,R9,#%00001110000000000000101000010000
+   ORR      R9,R9,R0,LSL #Rd_Pos
+   ADR      R14,DT_VMOV_Registers
+   LDMIA    R14,{R0,R2,R3}
+   ORR      R9,R9,R2,LSL #Rn_Pos
+   ORR      R9,R9,R3,LSL #VFP_N_Pos
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_From_Double_Core_To_Doubleword
+   CMP      R6,#'D'
+   BNE      DT_Illegal_Register
+   ; VMOV Dm, Rd1, Rd2 (VFP/SIMD)
+   ;
+   ;------> VMOV    Cond       o[R2][Rd]      M [Vm]
+   ORR      R9,R9,#%00001100010000000000101100010000
+   ORR      R9,R9,R0,LSL #Rd_Pos
+   LDRB     R8,[R10],#1
+   BL       Decode_Rn_Register
+   ADR      R14,DT_VMOV_Registers
+   LDMIA    R14,{R0,R2,R3}
+   ORR      R9,R9,R2,LSL #Rm_Pos
+   ORR      R9,R9,R3,LSL #VFP_M_Pos
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOV_From_Double_Core_To_Double_Single
+   CMP      R6,#'S'
+   CMPEQ    R7,#'S'
+   BNE      DT_Illegal_Register
+   ; VMOV Sm1, Sm2, Rd1, Rd2 (VFP)
+   ;
+   ;------> VMOV    Cond       o[R2][Rd]      M [Vm]
+   ORR      R9,R9,#%00001100010000000000101000010000
+   LDRB     R8,[R10],#1
+   BL       Decode_Rd_Register         ; Third register
+   BL       Ensure_Comma
+   BL       Skip_Blanks
+   BL       Decode_Rn_Register         ; Fourth register
+   ADR      R14,DT_VMOV_Registers
+   LDMIA    R14,{R0-R5}
+   ORR      R9,R9,R1,LSL #Rm_Pos
+   ORR      R9,R9,R2,LSL #VFP_M_Pos
+   ADD      R0,R0,#1
+   CMP      R0,R3
+   BNE      DT_Illegal_Register
+   B        DT_Write_Instruction
+
+.DT_VMOV_Registers DBB   2*VFPRegister.Size
+.DT_VMOV_Signed    DCD   0
+
+; >-------------------------------------------------------------<
+
+.DT_VMOVL                              ;_R8 = "L"/"l"
+   ; VMOVL.<S|U><8|16|32> Qd, Dm (SIMD)
+   ;
+   ;------> VMOVL       U Dimm   [Vd]      M [Vm]
+   MOV      R9,#%11110010100000000000101000010000
+   LDRB     R8,[R10],#1
+   BL       Decode_VFP_Operand_Type
+   CMP      R0,#VFP_Operand_64
+   CMPNE    R2,#VFP_Operand_Unknown
+   BEQ      DT_Illegal_Operand_Type
+   ORR      R9,R9,R2,LSL #SIMD_U_Pos
+   MOV      R1,#1 << 19
+   ORR      R9,R9,R1,LSL R0
+   BL       Ensure_Blank
+   BL       Decode_VFP_Q_Destination_Register
+   BL       Decode_VFP_D_Operand_Two
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VMOVN                              ;_R8 = "N"/"n"
+   ; VMOVN.I<16|32|64> Dd, Qm (SIMD)
+   ;
+   ;------> VMOVN         D  sz  [Vd]      M [Vm]
+   MOV      R9,#%11110011101100100000001000000000
+   LDRB     R8,[R10],#1
+   BL       Decode_VFP_Operand_Type
+   CMP      R0,#VFP_Operand_16
+   CMPNE    R0,#VFP_Operand_32
+   CMPNE    R0,#VFP_Operand_64
+   CMPEQ    R1,#VFP_Operand_Int
+   BNE      DT_Illegal_Operand_Type
+   SUB      R0,R0,#1
+   ORR      R9,R9,R0,LSL #SIMD_Size_Pos_DM
+   BL       Ensure_Blank
+   BL       Decode_VFP_D_Destination_Register
+   BL       Decode_VFP_Q_Operand_Two
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_VQMOVN_VQMOVUN                     ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'V'
+   BNE      DT_Unknown
+   ; VQMOV[U]N.<S|U><16|32|64> Dd, Qm
+   ;
+   ;------> VQMOV[U]N     D  sz  [Vd]    opM [Vm]
+   MOV      R9,#%11110011101100100000001000000000
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'U'
+   ORREQ    R9,R9,#%01 << 6
+   LDREQB   R8,[R10],#1
+   BICEQ    R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BL       Decode_VFP_Operand_Type
+   CMP      R0,#VFP_Operand_8
+   CMPNE    R2,#VFP_Operand_Unknown
+   BEQ      DT_Illegal_Operand_Type
+   CMP      R2,#VFP_Operand_Signed
+   TSTNE    R9,#1 << 6
+   BNE      DT_Illegal_Operand_Type
+   CMP      R2,#VFP_Operand_Signed
+   TSTEQ    R9,#1 << 6
+   ORREQ    R9,R9,#%10 << 6
+   CMP      R2,#VFP_Operand_Unsigned
+   ORREQ    R9,R9,#%11 << 6
+   SUB      R0,R0,#1
+   ORR      R9,R9,R0,LSL #SIMD_Size_Pos_DM
+   BL       Ensure_Blank
+   BL       Decode_VFP_D_Destination_Register
+   BL       Decode_VFP_Q_Operand_Two
+   B        DT_Write_Instruction

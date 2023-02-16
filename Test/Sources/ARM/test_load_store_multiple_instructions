@@ -1,0 +1,106 @@
+
+#name <Tmp$Dir>.^.^.test_load_store_multiple_instructions
+
+#area test,code
+
+; LDM
+
+; LDMIA
+
+LDMIA   R1,{R2}            ; LDM R1,{R2} (R2=[R1])
+LDMEQIA R1,{R2}
+
+LDMFD   R1,{R2}            ; LDM R1,{R2}
+LDMEQFD R1,{R2}
+
+; LDMIB
+
+LDMIB   R1,{R2}
+LDMEQIB R1,{R2}
+
+LDMED   R1,{R2}            ; LDMIB R1,{R2}
+LDMEQED R1,{R2}
+
+; LDMDA
+
+LDMDA   R1,{R2}
+LDMEQDA R1,{R2}
+
+LDMFA   R1,{R2}            ; LDMDA R1,{R2}
+LDMEQFA R1,{R2}
+
+; LDMDB
+
+LDMDB   R1,{R2}
+LDMEQDB R1,{R2}
+
+LDMEA   R1,{R2}            ; LDMDB R1,{R2}
+LDMEQEA R1,{R2}
+
+; Stack operations
+
+POP     {R1}               ; LDM R13!,{R1}
+POPEQ   {R1}
+
+; Variations
+
+LDMFD   R1,{R2}            ; LDM R1,{R2}
+LDMFD   R1,{R2,R3}
+LDMFD   R1,{R2,R3,R4}
+LDMFD   R1,{R2,R4}
+LDMFD   R1,{R1-R4}
+LDMFD   R1,{R1-R4,R8}
+LDMFD   R1,{R2}^
+LDMFD   R1!,{R2}
+
+; STM
+
+; STMIA
+
+STMIA   R1,{R2}            ; STM R1,{R2} (R2=[R1])
+STMEQIA R1,{R2}
+
+STMEA   R1,{R2}            ; STM R1,{R2}
+STMEQEA R1,{R2}
+
+; STMIB
+
+STMIB   R1,{R2}
+STMEQIB R1,{R2}
+
+STMFA   R1,{R2}            ; STMIB R1,{R2}
+STMEQFA R1,{R2}
+
+; STMDA
+
+STMDA   R1,{R2}
+STMEQDA R1,{R2}
+
+STMED   R1,{R2}            ; STMDA R1,{R2}
+STMEQED R1,{R2}
+
+; STMDB
+
+STMDB   R1,{R2}
+STMEQDB R1,{R2}
+
+STMFD   R1,{R2}            ; STMDB R1,{R2}
+STMEQFD R1,{R2}
+
+; Stack operations
+
+PUSH    {R1}               ; STMDB R13!,{R1}
+PUSHEQ  {R1}
+
+; Variations
+
+STMFD   R1,{R2}            ; STMDB R1,{R2}
+STMFD   R1,{R2,R3}
+STMFD   R1,{R2,R3,R4}
+STMFD   R1,{R2,R4}
+STMFD   R1,{R1-R4}
+STMFD   R1,{R1-R4,R8}
+STMFD   R1,{R2}^
+STMFD   R1!,{R2}
+
+#end

@@ -1,0 +1,49 @@
+; Groups
+; ------
+; 0 - General
+; 1 - Auto-expansion
+; 2 - FP Auto-expansion
+; 3 - ARM 6 specific
+;
+#&00 = Unknown warning
+; Alignment and misc.
+;
+#&01 = Branch on byte boundary
+#&02 = Code not word-aligned
+#&03 = Data not word-aligned
+#&04 = Data not halfword-aligned
+#&05 = Variable '%s' defined but not used
+#&06 = AutoShrink temporarily turned off
+; Auto-expansion
+;
+#&10 = Auto-expansion (ALU), %d bytes
+#&11 = Auto-expansion (ADR), %d bytes
+#&12 = Auto-expansion (Load/Store), %d bytes
+#&13 = Auto-expansion, using TEMP register (ALU), %d bytes
+#&14 = Auto-expansion, using TEMP register (Load/Store), %d bytes
+#&15 = Auto-expansion, using TEMP register (macro TR), %d bytes
+#&16 = Auto-expansion, using stacked register (ALU), %d bytes
+#&17 = Auto-expansion, using stacked register (Load/Store), %d bytes
+#&18 = Auto-expansion, using stacked register (macro TR), %d bytes
+#&19 = Auto-expansion (ADRL), %d bytes
+#&1A = Auto-expansion, using NOP (ADRL), %d bytes
+; FP Auto-expansion
+;
+#&20 = FP Auto-expansion (FPU), %d bytes
+#&21 = FP Auto-expansion, using FPTEMP register (FPU), %d bytes
+#&22 = FP Auto-expansion, using FPTEMP register (macro TF), %d bytes
+#&23 = FP Auto-expansion, using stacked register (FPU), %d bytes
+#&24 = FP Auto-expansion, using stacked register (macro TF), %d bytes
+; ARM 6
+;
+#&30 = R15 should not be used as shift register
+#&31 = R15 should not be used as source or destination in MRS or MSR
+#&32 = R15 should not be used as operand or destination for multiplication instructions
+#&33 = Write-back should not be specified if R15 is used as base register (Rn)
+#&34 = R15 should not be used as register offset (Rm)
+#&35 = A post-indexed LDR or STR with Rm=Rn should be avoided (difficult in V-mem. systems)
+#&36 = R15 should not be used as base register in LDM or STM
+#&37 = R15 should not be used as an operand (Rd, Rn or Rs) for SWP
+; Deprecated
+;
+#&40 = Use of NV condition code is deprecated

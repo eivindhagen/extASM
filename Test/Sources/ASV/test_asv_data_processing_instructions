@@ -1,0 +1,22 @@
+
+#name <Tmp$Dir>.^.^.test_asv_data_processing_instructions
+
+#area test,code
+
+; VDIV
+
+VDIV.F64     D1,D2,D3 ; D1=D2 / D3 (VFP)
+VDIVEQ.F64   D1,D2,D3 ; D1=D2 / D3 (VFP)
+
+VDIV.F32     S1,S2,S3 ; S1=S2 / S3 (VFP)
+VDIVEQ.F32   S1,S2,S3 ; S1=S2 / S3 (VFP)
+
+; VSQRT
+
+VSQRT.F64    D1,D2 ; D1=sqrt(D2) (VFP)
+VSQRTEQ.F64  D1,D2 ; D1=sqrt(D2) (VFP)
+
+VSQRT.F32    S1,S2 ; S1=sqrt(S2) (VFP)
+VSQRTEQ.F32  S1,S2 ; S1=sqrt(S2) (VFP)
+
+#end

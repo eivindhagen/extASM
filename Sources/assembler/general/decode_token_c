@@ -1,0 +1,43 @@
+
+; >-------------------------------------------------------------<
+
+.DT_C                                  ;_R8 = "C"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BEQ      DT_CDP
+   CMP      R8,#'L'
+   BEQ      DT_CLREX_CLZ
+   CMP      R8,#'M'
+   BEQ      DT_CMF_CMFE_CMN_CMP
+   CMP      R8,#'N'
+   BEQ      DT_CNF_CNFE
+   CMP      R8,#'O'
+   BEQ      DT_COS
+   CMP      R8,#'P'
+   BEQ      DT_CPS_CPY
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_CLREX_CLZ                          ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BEQ      DT_CLREX
+   CMP      R8,#'Z'
+   BEQ      DT_CLZ
+   B        DT_Unknown
+
+ ; >-------------------------------------------------------------<
+
+.DT_CPS_CPY                            ;_R8 = "P"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BEQ      DT_CPS
+   CMP      R8,#'Y'
+   ;------> CPY  Cond            [Rd]        [Rm]
+   MOVEQ    R9,#%00000001101000000000000000000000
+   BEQ      DT_ALU_D2_Register
+   B        DT_Unknown

@@ -1,0 +1,295 @@
+
+; >-------------------------------------------------------------<
+
+.Asm_Error                             ;_R0 = Error number, _R2 = First parameter,
+   STMFD    R13!,{R2,R3}               ;_R3 = Second parameter
+   MOV      R4,R0
+   LDR      R1,extASM_Doing
+   CMP      R1,#3
+   BNE      AE_Not_Asm
+   MOV      R0,#Flex_Expand
+   BL       Flex_Adr
+   LDR      R1,Expand_Info_Offset
+   LDR      R2,[R0,R1]
+   TST      R2,#1 << 31                ; Has it had an error previously?
+   BNE      AE_End                     ; Then don't display a new error
+   ORR      R2,R2,#1 << 31
+   STR      R2,[R0,R1]                 ; Set error flag
+
+.AE_Not_Asm
+   LDR      R0,Errors
+   ADD      R0,R0,#1
+   STR      R0,Errors
+
+   MOV      R0,R4
+   MOV      R1,#Flex_Error
+   ADR      R5,StrBuffer
+   MOV      R2,R5
+   BL       Asm_Message
+   CMP      R0,#1
+   BNE      AE_No_Parameters
+   MOV      R0,R5
+   ADR      R5,StrBuffer2
+   MOV      R1,R5
+   LDMIA    R13!,{R2,R3}
+   BL       Print_String
+
+.AE_No_Parameters
+   ADR      R0,Asm_Error_Text
+   MOV      R1,#TextColour_Errors
+   LDR      R2,Source_LeafName
+   LDR      R3,Source_Line
+   STMFD    R13!,{R4,R5}
+   BL       Wimp_Text_AddColourLine
+   ADD      R13,R13,#8
+
+   LDR      R0,Options
+   LDR      R1,Throwback_Taskhandle
+   TST      R0,#Option_Throwback
+   CMPNE    R1,#0
+   BEQ      AE_End
+   MOV      R0,R5
+   MOV      R1,#1
+   MOV      R2,#1
+   BL       Send_Throwback
+
+.AE_End
+   MOV      R0,#0
+   STR      R0,TEMP_Needed
+   STR      R0,FPTEMP_Needed
+
+   ADR      R14,Error_Context
+   LDMIA    R14,{R0,R4-R13}
+   MOV      R15,R0
+
+.Asm_Error_Text  DCB   "(%10s) - Line %6d|| Error #%d,  %s",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Asm_Warning                           ;_R0 = Warning number, _R2 = First parameter
+   STMFD    R13!,{R2,R3}               ;_R3 = Second parameter
+   MOV      R2,R13                     ; Any further parameters are on the stack
+   SUB      R13,R13,#&100
+   STMFD    R13!,{R0-R7,R14}
+   MOV      R4,R0
+   MOV      R5,R2
+
+   LDR      R1,extASM_Doing
+   CMP      R1,#3
+   BNE      AW_Not_Asm
+   MOV      R0,#Flex_Expand
+   BL       Flex_Adr
+   LDR      R1,Expand_Info_Offset
+   LDR      R2,[R0,R1]
+   TST      R2,#1 << 31                ; Has the warning been given before?
+   BNE      AW_End
+   ORR      R2,R2,#1 << 31
+   STR      R2,[R0,R1]                 ; Set error flag
+
+.AW_Not_Asm
+   ;LDR      R0,Warnings
+   ;ADD      R0,R0,#1
+   ;STR      R0,Warnings
+
+   MOV      R0,R4
+   MOV      R1,#Flex_Warning
+   ADR      R6,StrBuffer
+   MOV      R2,R6
+   BL       Asm_Message
+   CMN      R14,#1
+   BEQ      AW_End
+
+   CMP      R0,#1
+   BNE      AW_No_Parameters
+   MOV      R0,R6
+   ADR      R6,StrBuffer2
+   MOV      R1,R6
+   MOV      R7,R13
+   MOV      R13,R5
+   LDMIA    R13!,{R2,R3}
+   BL       Print_String
+   MOV      R13,R7
+
+.AW_No_Parameters
+   ADR      R0,Asm_Warning_Text
+   MOV      R1,#TextColour_Errors
+   LDR      R2,Source_LeafName
+   LDR      R3,Source_Line
+   STMFD    R13!,{R4,R6}
+   BL       Wimp_Text_AddColourLine
+   ADD      R13,R13,#8
+
+   LDR      R0,Options
+   LDR      R1,Throwback_Taskhandle
+   TST      R0,#Option_Throwback
+   CMPNE    R1,#0
+   BEQ      AW_End
+   MOV      R0,R6
+   MOV      R1,#0
+   MOV      R2,#1
+   BL       Send_Throwback
+
+.AW_End
+   LDMFD    R13!,{R0-R7,R14}
+   ADD      R13,R13,#&108
+   MOV      R15,R14
+
+.Asm_Warning_Text  DCB   "(%10s) - Line %6d|| Warning #%d,  %s",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.AutoExpand_Message                    ;_R0 = Warning number, _R2 = First parameter
+   STMFD    R13!,{R2,R3}               ;_R3 = Second parameter
+   MOV      R2,R13                     ; Any further parameters are on the stack
+   SUB      R13,R13,#&100
+   STMFD    R13!,{R0-R7,R14}
+   MOV      R4,R0
+   MOV      R5,R2
+
+   MOV      R0,#Flex_Expand
+   BL       Flex_Adr
+   LDR      R1,Expand_Info_Offset
+   LDR      R2,[R0,R1]
+   TST      R2,#1 << 31                ; Has the message been given before?
+   BNE      AEM_End
+   ORR      R2,R2,#1 << 31
+   STR      R2,[R0,R1]                 ; Set error flag
+
+   ADR      R1,Expand_Counters
+   SUB      R2,R4,#&10
+   CMP      R2,#&09
+   CMPNE    R2,#&0A
+   MOVEQ    R2,#&01
+   ADD      R1,R1,R2,LSL #3
+   LDMIA    R1,{R2,R3}
+   LDMIA    R5,{R6}
+   ADD      R2,R2,#1                   ; Increase counter
+   ADD      R3,R3,R6                   ; Increase size
+   STMIA    R1,{R2,R3}
+   LDR      R1,Options
+   TST      R1,#Option_Summary
+   BNE      AW_End
+   TST      R1,#Option_OnlyADRLoadStore
+   BEQ      AEM_All_Messages
+   CMP      R4,#&11
+   CMPNE    R4,#&12
+   CMPNE    R4,#&14
+   CMPNE    R4,#&17
+   CMPNE    R4,#&19
+   CMPNE    R4,#&1A
+   BNE      AW_End
+
+.AEM_All_Messages
+   MOV      R0,R4
+   MOV      R1,#Flex_Warning
+   ADR      R6,StrBuffer
+   MOV      R2,R6
+   BL       Asm_Message
+   CMN      R14,#1
+   BEQ      AEM_End
+
+   MOV      R0,R6
+   ADR      R6,StrBuffer2
+   MOV      R1,R6
+   MOV      R7,R13
+   MOV      R13,R5
+   LDMIA    R13!,{R2,R3}
+   BL       Print_String
+   MOV      R13,R7
+
+   ADR      R0,AutoExpand_Message_Text
+   MOV      R1,#TextColour_Info
+   LDR      R2,Source_LeafName
+   LDR      R3,Source_Line
+   STMFD    R13!,{R6}
+   BL       Wimp_Text_AddColourLine
+   ADD      R13,R13,#4
+
+   LDR      R0,Options
+   LDR      R1,Throwback_Taskhandle
+   TST      R0,#Option_Throwback
+   CMPNE    R1,#0
+   BEQ      AW_End
+   MOV      R0,R6
+   MOV      R1,#0
+   MOV      R2,#0
+   BL       Send_Throwback
+
+.AEM_End
+   LDMFD    R13!,{R0-R7,R14}
+   ADD      R13,R13,#&108
+   MOV      R15,R14
+
+.AutoExpand_Message_Text DCB   "(%10s) - Line %6d|| %s",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Asm_Message                           ;_R0 = MessageNum, _R1 = Flex block holding message
+   ; Format of message files           ;_R2-> String, ~R0 = Parameter flag
+   ;                                   ; (0 = No parameters, 1 = Parameters)
+   ; '#&<Hex number> = [|]<String>'    ;~R14 = Error flag (-1 = Don't display message)
+   ;
+   ; R4 -  Message number
+   ; R5 -  Flex block for message
+   ; R6 -> String
+   ;
+   STMFD    R13!,{R4-R7,R14}
+   MOV      R4,R0
+   MOV      R5,R1
+   MOV      R6,R2
+   MOV      R0,R1
+   BL       Flex_Adr                   ; R0-> First message
+   MOV      R7,R0
+
+._Loop
+   LDRB     R1,[R0],#1
+   LDRB     R2,[R0]
+   CMP      R1,#&00
+   BEQ      AM_Found
+   CMP      R1,#&0A
+   CMPEQ    R2,#'#'
+   BNE      _Loop
+   LDRB     R2,[R0,#2]
+   LDRB     R3,[R0,#3]
+   CMP      R2,#'A'
+   SUBGE    R2,R2,#'A'-10
+   SUBLT    R2,R2,#'0'
+   CMP      R3,#'A'
+   SUBGE    R3,R3,#'A'-10
+   SUBLT    R3,R3,#'0'
+   ADDS     R2,R3,R2,LSL #4
+   MOVEQ    R7,R0
+   CMP      R2,R4
+   BNE      _Loop
+
+.AM_Found
+   CMP      R1,#&00
+   MOVEQ    R0,R7
+   LDRB     R1,[R0,#7]!
+   CMP      R1,#'|'
+   CMPEQ    R5,#Flex_Warning
+   MVNEQ    R14,#0
+   LDMEQFD  R13!,{R4-R7,R15}
+   MOV      R3,#0
+
+._Loop
+   LDRB     R1,[R0],#1
+   STRB     R1,[R6],#1
+   CMP      R1,#'%'
+   BEQ      _AM_Parameter
+   CMP      R1,#&0A
+   BNE      _Loop
+   MOV      R1,#0
+   STRB     R1,[R6,#-1]
+   MOV      R0,R3
+   MOV      R14,#0
+   LDMFD    R13!,{R4-R7,R15}
+
+._AM_Parameter
+   LDRB     R2,[R0,#-2]
+   CMP      R2,#'|'
+   MOVNE    R3,#1
+   B        _Loop

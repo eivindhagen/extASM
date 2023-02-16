@@ -1,0 +1,179 @@
+
+; >-------------------------------------------------------------<
+
+.Code_Instruction                      ;_R0 = Immediate constant
+   STMFD    R13!,{R4-R7,R14}           ;_R1 = (0 = Don't give auto-expansion warning,
+   MOV      R4,R1                      ;       1 = Give auto-expansion warning)
+   BL       Code_Immediate             ;_R0 = Immediate value
+   CMN      R14,#1                     ; Check if coded value is okay
+   BNE      CI_End
+   ;------> Alter opcode if possible
+   MOV      R5,R0
+   MOV      R6,R9
+   BL       Immediate_Turnaround       ; Try to switch instruction
+   BL       Code_Immediate             ;_R0 = Immediate value
+   CMN      R14,#1                     ; Check if coded value is okay
+   BNE      CI_End
+   ; Immediate failed, 1 Instruction is not enough!
+   ;
+   MOV      R0,R5
+   MOV      R9,R6
+   ADD      R7,R11,#4
+   BL       AutoExpand
+   LDR      R0,Options
+   TST      R0,#Option_AutoExpand
+   CMPNE    R4,#0
+   LDMEQFD  R13!,{R4-R7,R15}
+   MOV      R0,#&10                    ; Asm_Warning #&10 = Auto-expansion (ALU)
+   SUB      R2,R11,R7
+   BL       AutoExpand_Message
+   LDMFD    R13!,{R4-R7,R15}
+
+.CI_End
+   ORR      R9,R9,R0                   ; Insert Operand-Two bits
+   BL       Write_Instruction
+   LDMFD    R13!,{R4-R7,R15}
+
+; >-------------------------------------------------------------<
+
+.Code_Immediate                        ;_R0 = Immediate value to code, ~R0 = Immediate value
+   STMFD    R13!,{R14}                 ; bits, ~R14 = Signal error, -1 = Error, can not be
+   ;------> Now, check if it's a valid ; coded in one instruction
+   ;        immediate constant
+   MOV      R1,#0                      ; R1 = ROR value
+._Loop
+   MOV      R2,R0,ROR R1               ; R2 = R0 UN-ROR'ed by R1
+   CMP      R2,#&FF                    ; Remove legal bits, should get zero
+   BLS      CI_Legal                   ; Yepp, I've found a legal combination
+   ADD      R1,R1,#2
+   CMP      R1,#30
+   BLE      _Loop
+   MVN      R14,#0                     ; R14 = -1, Signal error
+   LDMFD    R13!,{R15}
+
+.CI_Legal
+   MOVS     R1,R1,LSR #1
+   RSBNE    R1,R1,#16
+   ORR      R0,R2,R1,LSL #8            ; Insert 8-Bit constant + 4-Bit ROR value
+   MOV      R14,#0
+   LDMEQFD  R13!,{R15}
+
+   LDR      R1,Options
+   TST      R1,#Option_CodeStat
+   LDMEQFD  R13!,{R15}
+   ADR      R1,Shift_Counters
+   LDR      R2,[R1,#36]
+   ADD      R2,R2,#1
+   STR      R2,[R1,#36]
+
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Immediate_Turnaround                  ;_R0 = Immediate value, ~R0 = New Immediate value
+   AND      R1,R9,#&F << ALU_Opcode_Pos; R1 = OpCode
+
+   CMP      R1,#%1101 << ALU_Opcode_Pos    ; MOV
+   CMPNE    R1,#%1111 << ALU_Opcode_Pos    ; MVN
+   EOREQ    R9,R9,#%0010 << ALU_Opcode_Pos
+   MVNEQ    R0,R0
+   MOVEQ    R15,R14
+
+   CMP      R1,#%0100 << ALU_Opcode_Pos    ; ADD
+   CMPNE    R1,#%0010 << ALU_Opcode_Pos    ; SUB
+   EOREQ    R9,R9,#%0110 << ALU_Opcode_Pos 
+   RSBEQ    R0,R0,#0
+   MOVEQ    R15,R14
+
+   CMP      R1,#%0101 << ALU_Opcode_Pos    ; ADC
+   CMPNE    R1,#%0110 << ALU_Opcode_Pos    ; SBC
+   EOREQ    R9,R9,#%0011 << ALU_Opcode_Pos
+   RSBEQ    R0,R0,#0
+   MOVEQ    R15,R14
+
+   CMP      R1,#%0000 << ALU_Opcode_Pos    ; AND
+   CMPNE    R1,#%1110 << ALU_Opcode_Pos    ; BIC
+   EOREQ    R9,R9,#%1110 << ALU_Opcode_Pos
+   MVNEQ    R0,R0
+   MOVEQ    R15,R14
+
+   CMP      R1,#%1010 << ALU_Opcode_Pos    ; CMP
+   CMPNE    R1,#%1011 << ALU_Opcode_Pos    ; CMN
+   EOREQ    R9,R9,#%0001 << ALU_Opcode_Pos
+   RSBEQ    R0,R0,#0
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.AutoExpand                            ;_R0 = Immediate Constant
+   STMFD    R13!,{R4-R6,R14}
+   CMP      R0,#0
+   BLLT     Immediate_Turnaround
+   ;------> If AND then replace with BIC
+   TST      R9,#%1111 << ALU_Opcode_Pos    ; EQ if AND
+   EOREQ    R9,R9,#%1110 << ALU_Opcode_Pos ; Make it a BIC
+   MVNEQ    R0,R0                          ; And invert constant
+   ;------> Now check if the "S" bit is set
+   TST      R9,#Update_PSR_Bit
+   MOVNE    R6,#1
+   MOVEQ    R6,#0
+   BICNE    R9,R9,#Update_PSR_Bit      ; Remove possible "S" bit
+
+   MVN      R5,#0                      ; R5 = Mask (AND) word to get within 8 bit
+   MOV      R4,R0
+
+.AE_First
+   AND      R0,R4,R5                   ; R0 = Masked value
+   BL       Code_Immediate             ;_R0 = Immediate value
+   CMN      R14,#1                     ; Check if coded value is okay
+   MOVEQ    R5,R5,LSL #2               ; Narrow mask
+   BEQ      AE_First                   ; Retry if not okay
+   ORR      R9,R9,R0
+   ;------> If this is the first and last, then check the S_Bit
+   BICS     R4,R4,R5                   ; R4 = Immediate Constant (remaining bits)
+   BNE      AEF_Over
+   ORR      R9,R9,R6,LSL #20           ; Set possible "S" bit in last instruction
+   ;------> Continue and write this instruction
+   BL       Write_Instruction
+   LDMFD    R13!,{R4-R6,R15}
+
+.AEF_Over
+   BL       Write_Instruction
+   AND      R0,R9,#%1111 << ALU_Opcode_Pos ; R0 = OpCode
+   CMP      R0,#%1101 << ALU_Opcode_Pos    ; MOV -> ORR
+   EOREQ    R9,R9,#%0001 << ALU_Opcode_Pos
+   CMP      R0,#%1111 << ALU_Opcode_Pos    ; MVN -> EOR
+   EOREQ    R9,R9,#%1110 << ALU_Opcode_Pos
+   CMP      R0,#%0011 << ALU_Opcode_Pos    ; RSB -> ADD
+   EOREQ    R9,R9,#%0111 << ALU_Opcode_Pos
+   CMP      R0,#%0101 << ALU_Opcode_Pos    ; ADC -> ADD
+   EOREQ    R9,R9,#%0001 << ALU_Opcode_Pos
+   CMP      R0,#%0110 << ALU_Opcode_Pos    ; SBC -> SUB
+   EOREQ    R9,R9,#%0100 << ALU_Opcode_Pos
+   CMP      R0,#%0111 << ALU_Opcode_Pos    ; RSC -> ADD
+   EOREQ    R9,R9,#%0011 << ALU_Opcode_Pos
+   ;------> Setup instruction to use same register for dest. and op1
+   BIC      R9,R9,#&F << Rn_Pos        ; Clear Operand 1
+   AND      R1,R9,#&F << Rd_Pos        ; Extract Destination register
+   ORR      R9,R9,R1,LSL #4            ; Insert Operand 1 ( = Dest. Register )
+
+.AE_Not_Finished_Expr
+   BIC      R9,R9,#&FFF                ; Clear immediate value bits
+   MVN      R5,#0                      ; R5 = Mask (AND) word to get within 8 bit
+
+.AE_Expand_ValueCheck
+   AND      R0,R4,R5                   ; R0 = Masked value
+   BL       Code_Immediate             ;_R0 = Immediate value
+   CMN      R14,#1                     ; Check if coded value is okay
+   MOVEQ    R5,R5,LSL #2               ; Narrow mask
+   BEQ      AE_Expand_ValueCheck       ; Retry if not okay
+   ORR      R9,R9,R0
+   BICS     R4,R4,R5                   ; R0 = Immediate Constant (remaining bits)
+   BNE      AEF_Over2
+   ORR      R9,R9,R6,LSL #20           ; Set possible "S" bit in last instruction
+   BL       Write_Instruction
+   LDMFD    R13!,{R4-R6,R15}
+
+.AEF_Over2
+   BL       Write_Instruction
+   B        AE_Not_Finished_Expr

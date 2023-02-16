@@ -1,0 +1,380 @@
+
+; >-------------------------------------------------------------<
+
+.DataSave
+   LDR      R0,extASM_Doing
+   CMP      R0,#0                      ; Prevent loading while assembling
+   BNE      Wimp_Poll_Loop
+   LDR      R2,[R11,#20]
+   LDR      R3,[R11,#24]
+   LDR      R4,Handle_BARICON
+   LDR      R5,Handle_PROCESS
+   CMN      R2,#2
+   CMPEQ    R3,R4                      ; Window=-2 and Icon=Iconbar icon or Window=Process
+   CMPNE    R2,R5                      ; window?
+   BNE      Wimp_Poll_Loop
+   STR      R2,RAMFetch_Window
+   STR      R3,RAMFetch_Icon
+   LDR      R0,[R11,#40]
+   CMP      R0,#&1000                  ; Is it directory or application?
+   BHS      Wimp_Poll_Loop
+   STR      R0,Source_Filetype
+   BL       Init_Flex_Blocks
+   MOV      R0,#Flex_Source
+   LDR      R4,[R11,#36]
+   ADD      R1,R4,#&100                ; Space for source info, and for inaccuracy in size
+   BL       Flex_Resize
+   MOV      R1,#&01
+   STRB     R1,[R0],#1
+   STR      R0,[R11,#20]
+   ADD      R0,R4,#&100-3
+   STR      R0,[R11,#24]
+   STR      R0,Source_Size
+   ADD      R0,R11,#44
+   BL       Add_Source_Name
+   ;------> Send RamFetch
+   LDR      R0,[R11,#8]
+   STR      R0,[R11,#12]               ; Your ref=My ref
+   MOV      R0,#6                      ; 6 - RamFetch
+   STR      R0,[R11,#16]
+   MOV      R0,#18                     ; Type 18 (reply)
+   MOV      R1,R11
+   LDR      R2,[R11,#4]                ; Handle of Sender
+   STR      R2,RAMFetch_Receiver
+   SWI      Wimp_SendMessage
+   LDR      R0,[R11,#8]
+   STR      R0,RAMFetch_Ref
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.DataSaveAck
+   ; Data to save can be either the object code, or the Status window text.
+   ;
+   LDR      R2,[R11,#12]
+   LDR      R3,DataSave_Ref
+   CMP      R2,R3
+   BNE      Wimp_Poll_Loop
+   MVN      R0,#0
+   STR      R0,DataSave_Ref
+   LDR      R1,File_FlexBlock
+   ADD      R0,R11,#44
+   CMP      R1,#Flex_Object
+   BNE      DSA_Save_WimpText
+   BL       Save_Object
+   LDR      R0,[R11,#36]
+   CMN      R0,#1
+   BEQ      DSA_End_Save
+   LDR      R4,Handle_PROCESS
+   MOV      R0,R4
+   MOV      R1,#14
+   ADD      R2,R11,#44
+   BL       Copy_Icon_Text
+   MOV      R0,R4
+   MOV      R1,#14
+   BL       Update_Icon
+   B        DSA_End_Save
+
+.DSA_Save_WimpText
+   BL       Save_WimpText
+   LDR      R0,[R11,#36]
+   CMN      R0,#1
+   BEQ      DSA_End_Save
+   LDR      R4,Handle_SAVE
+   MOV      R0,R4
+   MOV      R1,#1
+   ADD      R2,R11,#44
+   BL       Copy_Icon_Text
+   MOV      R0,R4
+   MOV      R1,#1
+   BL       Update_Icon
+
+.DSA_End_Save
+   ;------> Send DataLoad message
+   LDR      R0,[R11,#8]                ; My ref
+   STR      R0,[R11,#12]               ; Your ref
+   MOV      R0,#3                      ; 3 - DataLoad
+   STR      R0,[R11,#16]
+   MOV      R0,#18                     ; Type 18
+   MOV      R1,R11
+   LDR      R2,[R11,#4]                ; Handle of Sender
+   SWI      Wimp_SendMessage
+   LDR      R0,[R11,#8]
+   STR      R0,DataLoad_Ref
+   BL       Wimp_Text_Window
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.DataLoad
+   LDR      R0,extASM_Doing
+   CMP      R0,#0                      ; Prevent loading while assembling
+   BNE      Wimp_Poll_Loop
+   LDR      R2,[R11,#20]
+   LDR      R3,Handle_PROCESS
+   CMN      R2,#2
+   CMPNE    R2,R3                      ; Window=-2 or Window=Process window?
+   BNE      Wimp_Poll_Loop
+   LDR      R4,[R11,#12]
+   LDR      R3,DataSaveAck_Ref
+   CMP      R4,R3
+   BEQ      DL_DataSave
+   CMP      R4,#0
+   BNE      Wimp_Poll_Loop
+
+   ; Load from Filer
+   ;
+.DL_Filer
+   LDR      R0,[R11,#40]
+   CMP      R0,#&1000                  ; Is it directory or application?
+   BHS      Wimp_Poll_Loop
+   ADD      R0,R11,#44
+   BL       Load_Source
+   B        DL_End
+
+   ; Load ScrapFile
+   ;
+.DL_DataSave
+   MVN      R0,#0
+   STR      R0,DataSaveAck_Ref         ; DataSaveAck_Ref=-1
+
+   MOV      R0,#17
+   ADD      R1,R11,#44
+   SWI      OS_File                    ; Read size
+   CMP      R0,#1
+   MOVNE    R0,#&14                    ; Messages_Error #&14 = File '<Filename>' not found
+   MOVNE    R1,R11
+   BNE      Messages_Error1
+   LDR      R0,Source_Size
+   SUBS     R1,R4,R0
+   MOV      R0,#Flex_Source
+   BLE      DL_Not_Flex_Adjust
+   BL       Flex_Adjust
+   B        DL_Not_Flex_Adjust_End
+
+.DL_Not_Flex_Adjust
+   BL       Flex_Adr
+
+.DL_Not_Flex_Adjust_End
+   STR      R4,Source_Size
+   MOV      R6,R0
+   MOV      R0,#16
+   ADD      R1,R11,#44
+   ADD      R2,R6,#1
+   MOV      R3,#0
+   SWI      OS_File                    ; Load file
+   ADD      R0,R6,R4
+   LDRB     R1,[R0,#-1]
+   CMP      R1,#&0A
+   MOVNE    R1,#&0A
+   STRNEB   R1,[R0],#1
+   MOV      R1,#&02
+   STRB     R1,[R0],#1
+   MOV      R1,#&0A
+   STRB     R1,[R0],#1
+   MOV      R1,#&00
+   STRB     R1,[R0],#1
+   SUB      R0,R0,R6
+   STR      R0,Source_Size_Data
+
+   ;------> Delete <Wimp$Scrap> file
+   MOV      R0,#6
+   ADD      R1,R11,#44
+   SWI      OS_File
+
+.DL_End
+   ;------> Send DataLoadAck
+   LDR      R0,[R11,#8]
+   STR      R0,[R11,#12]               ; Your_Ref=My_Ref
+   MOV      R0,#4                      ; 4 - DataLoadAck
+   STR      R0,[R11,#16]
+   MOV      R0,#17                     ; Type 17 (no reply)
+   MOV      R1,R11
+   LDR      R2,[R11,#4]                ; Handle of Sender
+   SWI      Wimp_SendMessage
+
+   BL       Start_Assembly
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.DataLoadAck
+   ;------> Receiver has loaded file okay!
+   LDR      R2,[R11,#12]
+   LDR      R3,DataLoad_Ref
+   CMP      R2,R3
+   MVNEQ    R0,#0
+   STREQ    R0,DataLoad_Ref
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.RAMFetch
+   ; Data to save can be either the object code, or the Status window text.
+   ;
+   ; R5 -  Buffer address
+   ; R6 -  Buffer size
+   ; R7 -> File start
+   ; R8 -  File size
+   ; R9 -  DataPointer
+   ;
+   LDR      R2,[R11,#12]
+   LDR      R3,DataSave_Ref
+   LDR      R4,RAMTransmit_Ref
+   CMP      R2,R3
+   CMPNE    R2,R4                      ; Your_Ref=DataSave_Ref or Your_Ref=RAMTransmit_Ref?
+   BNE      Wimp_Poll_Loop
+   MVN      R0,#0
+   CMP      R2,R3
+   STREQ    R0,DataSave_Ref
+   STRNE    R0,RAMTransmit_Ref
+   LDR      R7,File_Address
+   STREQ    R7,RF_DataPointer
+   LDR      R5,[R11,#20]
+   LDR      R6,[R11,#24]
+   LDR      R8,File_Size
+   LDR      R9,RF_DataPointer
+
+   ADD      R4,R7,R8
+   SUB      R4,R4,R9
+   CMP      R4,R6
+   MOVLT    R6,R4
+   MOVLT    R10,#17
+   MOVGE    R10,#18
+   ;------> Transfer as much data as possible
+   LDR      R0,Task_Handle
+   MOV      R1,R9
+   LDR      R2,[R11,#4]
+   MOV      R3,R5
+   MOV      R4,R6
+   SWI      Wimp_TransferBlock
+   ADD      R9,R9,R6
+   STR      R9,RF_DataPointer
+   ;------> Send RamTransmit message
+   LDR      R0,[R11,#8]                ; My ref
+   STR      R0,[R11,#12]               ; Your ref
+   MOV      R0,#7
+   STR      R0,[R11,#16]
+   STR      R6,[R11,#24]
+   MOV      R0,R10
+   MOV      R1,R11
+   LDR      R2,[R11,#4]                ; Handle of Sender
+   SWI      Wimp_SendMessage
+   LDR      R0,[R11,#8]
+   STR      R0,RAMTransmit_Ref
+   B        Wimp_Poll_Loop
+
+; >-------------------------------------------------------------<
+
+.RAMTransmit
+   LDR      R2,[R11,#12]
+   LDR      R3,RAMFetch_Ref
+   CMP      R2,R3                      ; Your_Ref=RAMFetch_Ref?
+   BNE      Wimp_Poll_Loop
+   MVN      R2,#0
+   STR      R2,RAMFetch_Ref            ; RAMFetch_Ref=-1
+   LDR      R4,[R11,#24]
+   LDR      R3,Source_Size
+   CMP      R4,R3                      ; Is the source buffer full?
+   MOVGE    R0,#&13                    ; Messages_Error #&13 = Input buffer overflow, too much data transferred
+   BGE      Messages_Error
+   STR      R4,Source_Size
+   LDR      R5,[R11,#20]
+   ADD      R0,R5,R4
+   LDRB     R1,[R0,#-1]
+   CMP      R1,#&0A
+   MOVNE    R1,#&0A
+   STRNEB   R1,[R0],#1
+   MOV      R1,#&00
+   STRB     R1,[R0],#1
+   SUB      R0,R0,R5
+   STR      R0,Source_Size_Data
+
+   BL       Start_Assembly
+   B        Wimp_Poll_Loop
+
+.DataOpen
+   LDR      R0,extASM_Doing
+   LDR      R1,[R11,#40]
+   LDR      R2,Options
+   TEMP     R3
+   CMP      R0,#0                      ; Prevent loading while assembling
+   TEQEQ    R1,#extASM_FileType
+   BNE      Wimp_Poll_Loop
+   TST      R2,#Option_DoubleClick
+   BEQ      Wimp_Poll_Loop
+   LOCK     R3
+   B        DL_Filer
+
+; >-------------------------------------------------------------<
+
+.Wimp_Acknowledge
+   MVN      R0,#0
+   LDR      R2,[R11,#8]
+   LDR      R3,RAMFetch_Ref
+   CMP      R2,R3                      ; My_Ref=RAMFetch_Ref?
+   BNE      WA_Not_RAMFetch_Ref
+   ; RAMFetch returned
+   ;
+   STR      R0,RAMFetch_Ref            ; RAMFetch_Ref=-1
+   ; Switch to scrapfile
+   ;
+   MOV      R0,#2
+   STR      R0,[R11,#16]
+   LDR      R0,RAMFetch_Window
+   STR      R0,[R11,#20]
+   LDR      R0,RAMFetch_Icon
+   STR      R0,[R11,#24]
+   MVN      R0,#0
+   STR      R0,[R11,#36]
+   ADR      R0,WA_WimpScrap
+   ADD      R1,R11,#44
+   BL       StrCopy
+   SUB      R0,R1,R11
+
+   TST      R0,#3
+   BICNE    R0,R0,#3
+   ADDNE    R0,R0,#4
+   STR      R0,[R11]
+   ; Send DataSaveAck message
+   ;
+   MOV      R0,#18
+   MOV      R1,R11
+   LDR      R2,RAMFetch_Receiver
+   SWI      Wimp_SendMessage
+   LDR      R0,[R11,#8]
+   STR      R0,DataSaveAck_Ref
+   B        Wimp_Poll_Loop
+
+.WA_Not_RAMFetch_Ref
+   ; DataSaveAck returned
+   ;
+   LDR      R3,DataSaveAck_Ref
+   CMP      R2,R3                      ; My_Ref=DataSaveAck_Ref?
+   STREQ    R0,DataSaveAck_Ref         ; DataSaveAck_Ref=-1
+   MOVEQ    R0,#&12                    ; Messages_Error #&12 = Data transfer failed, transmitter dead?
+   BEQ      Messages_Error
+   LDR      R3,DataSave_Ref
+   CMP      R2,R3                      ; My_Ref=DataSave_Ref?
+   ; DataSave returned
+   ;
+   STREQ    R0,DataSave_Ref
+   BEQ      Wimp_Poll_Loop
+   LDR      R3,RAMTransmit_Ref
+   CMP      R2,R3
+   ; RAMTransmit returned
+   ;
+   STREQ    R0,RAMTransmit_Ref
+   MOVEQ    R0,#&11                    ; Messages_Error #&11 = Data transfer failed, receiver dead?
+   BEQ      Messages_Error
+   LDR      R3,DataLoad_Ref
+   CMP      R2,R3
+   BNE      Wimp_Poll_Loop
+   ; DataLoad returned
+   ;
+   STR      R0,DataLoad_Ref
+   MOV      R0,#&11                    ; Messages_Error #&11 = Data transfer failed, receiver dead?
+   B        Messages_Error
+
+.WA_WimpScrap   DCB   "|<Wimp$Scrap>",0
+   ALIGN

@@ -1,0 +1,119 @@
+
+; >-------------------------------------------------------------<
+
+.DT_F                                  ;_R8 = "F"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_FABS_FADD
+   CMP      R8,#'C'
+   BEQ      DT_FCONST_FCMP_FCPY_FCVT
+   CMP      R8,#'D'
+   BEQ      DT_FDV_FDIV
+   CMP      R8,#'I'
+   BEQ      DT_FIX
+   CMP      R8,#'L'
+   BEQ      DT_FLD_FLT
+   CMP      R8,#'M'
+   BEQ      DT_FMAC_FMD_FML_FMR_FMS_FMUL_FMXR
+   CMP      R8,#'N'
+   BEQ      DT_FNEG_FNMAC_FNMSC_FNMUL
+   CMP      R8,#'P'
+   BEQ      DT_FPLOCK_FPTEMP
+   CMP      R8,#'R'
+   BEQ      DT_FRD
+   CMP      R8,#'S'
+   BEQ      DT_FSITO_FSQRT_FST_FSUB
+   CMP      R8,#'T'
+   BEQ      DT_FTOS_FTOUI
+   CMP      R8,#'U'
+   BEQ      DT_FUITO
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FDV_FDIV                           ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BEQ      DT_FDIV
+   CMP      R8,#'V'
+   ;------> FDV  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110101000000000000100000000
+   BEQ      DT_FPU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FLD_FLT                            ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BEQ      DT_FLD
+   CMP      R8,#'T'
+   BEQ      DT_FLT
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FMAC_FMD_FML_FMR_FMS_FMUL_FMXR     ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_FMAC
+   CMP      R8,#'D'
+   BEQ      DT_FMD
+   CMP      R8,#'L'
+   ;------> FML  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110100100000000000100000000
+   BEQ      DT_FPU_D12
+   CMP      R8,#'R'
+   BEQ      DT_FMR
+   CMP      R8,#'S'
+   BEQ      DT_FMS
+   CMP      R8,#'U'
+   BEQ      DT_FMUL
+   CMP      R8,#'X'
+   BEQ      DT_FMXR
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FNEG_FNMAC_FNMSC_FNMUL             ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BEQ      DT_FNEG
+   CMP      R8,#'M'
+   BEQ      DT_FNMAC_FNMSC_FNMUL
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FSITO_FSQRT_FST_FSUB               ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BEQ      DT_FSITO
+   CMP      R8,#'Q'
+   BEQ      DT_FSQRT
+   CMP      R8,#'T'
+   BEQ      DT_FST
+   CMP      R8,#'U'
+   BEQ      DT_FSUB
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FTOS_FTOUI                         ;_R8 = "T"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BEQ      DT_FTOSI
+   CMP      R8,#'U'
+   BEQ      DT_FTOUI
+   B        DT_Unknown

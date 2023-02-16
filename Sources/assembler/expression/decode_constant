@@ -1,0 +1,376 @@
+
+; >-------------------------------------------------------------<
+
+.Decode_Constant                       ;_R8 = First char or Blank
+   STMFD    R13!,{R4,R5,R14}           ;~R0 = Constant (if integer)
+   BL       Skip_Blanks                ;~F0 = Constant (if Floating Point)
+                                       ;~R1 = Type of constant (0 = Integer, 1 = FP-value)
+   CMP      R8,#'+'                    ;~R8 = Next char
+   BNE      DC_Not_Unary_Plus
+   LDRB     R8,[R10],#1
+   BL       Decode_Constant
+   LDMFD    R13!,{R4,R5,R15}
+
+.DC_Not_Unary_Plus
+   CMP      R8,#'-'
+   BNE      DC_Mode
+   LDRB     R8,[R10],#1
+   BL       Decode_Constant
+   CMP      R1,#1
+   MNFEQE   F0,F0
+   RSBLT    R0,R0,#0
+   LDMFD    R13!,{R4,R5,R15}
+
+.DC_Mode
+   SUB      R5,R10,#1
+   MOV      R4,#0                      ; R4 = Number (output)
+   MOV      R1,#0
+   MVN      R14,#0                     ; Default is error
+   CMP      R8,#'&'
+   CMPNE    R8,#'$'
+   BEQ      DC_Hex_Loop
+   CMP      R8,#'@'
+   BEQ      DC_Oct_Loop
+   CMP      R8,#'%'
+   BEQ      DC_Bin_Loop
+   ;------> Char for processing is already here (only for DECIMAL)
+.DC_Dec_Loop
+   ;------> Check new char, should be in "0123456789" or "E/e"
+   CMP      R8,#'E'
+   CMPNE    R8,#'e'
+   BNE      DC_Not_Exponent
+   LDRB     R2,[R10]
+   BIC      R2,R2,#32
+   LDRB     R3,[R10,#1]
+   BIC      R3,R3,#32
+   CMP      R2,#'O'
+   CMPEQ    R3,#'R'
+   BEQ      DC_Not_Exponent
+   LDRB     R8,[R10],#1
+   BL       Decode_Constant            ; Exponent
+   CMP      R1,#0
+   MOVNE    R0,#&3F                    ; Asm_Error #&3F = Only integer after 'E' allowed
+   BNE      Asm_Error
+
+.DC_Exponent_Loop
+   TST      R4,#&E0000000
+   BNE      DC_FP                      ; Number too big, go to FP routine
+   ADDS     R4,R4,R4,LSL #2
+   BVS      DC_FP                      ; Number too big, go to FP routine
+   TST      R4,#&C0000000
+   BNE      DC_FP
+   MOV      R4,R4,LSL #1               ; R4 = R4*10
+   SUBS     R0,R0,#1
+   BNE      DC_Exponent_Loop
+   B        DC_Finished
+
+.DC_Not_Exponent
+   CMP      R8,#'0'
+   RSBGES   R0,R8,#'9'
+   SUBGE    R8,R8,#'0'                 ; R8 = 0..9
+   BGE      DC_Dec_Okay
+   CMP      R8,#'.'
+   BEQ      DC_FP
+   B        DC_Finished
+.DC_Dec_Okay
+   MOV      R14,#0                     ; No error here!
+   ;------> In range "0123456789"
+   TST      R4,#&E0000000
+   BNE      DC_FP                      ; Number too big, go to FP routine
+   ADDS     R4,R4,R4,LSL #2
+   BVS      DC_FP                      ; Number too big, go to FP routine
+   TST      R4,#&C0000000
+   BNE      DC_FP                      ; Number too big, go to FP routine
+   ADDS     R4,R8,R4,LSL #1            ; R4 = Old*10 + New
+   BVS      DC_FP                      ; Number too big, go to FP routine
+   LDRB     R8,[R10],#1                ; R8 = Next char
+   B        DC_Dec_Loop                ; Go on with next char
+
+.DC_Hex_Loop
+   LDRB     R8,[R10],#1                ; R8 = Next char
+
+   ;------> Check new char, should be in "0123456789ABCDEFabcdef"
+   CMP      R8,#'a'
+   BICGE    R8,R8,#32
+   CMP      R8,#'0'
+   RSBGES   R0,R8,#'9'
+   SUBGE    R8,R8,#'0'
+   BGE      DC_Hex_Okay
+   CMP      R8,#'A'
+   RSBGES   R0,R8,#'F'
+   SUBGE    R8,R8,#'A'-10
+   BLT      DC_Finished
+.DC_Hex_Okay
+   MOV      R14,#0                     ; No error here!
+   ;------> In range "0123456789ABCDEFabcdef"
+   TST      R4,#&F0000000
+   MOVNE    R0,#&3A                    ; Asm_Error #&3A = Number too big, 32 bit only
+   BNE      Asm_Error
+   ADDS     R4,R8,R4,LSL #4            ; R4 = R8 + R4 * 16
+   MOVVS    R0,#&3A                    ; Asm_Error #&3A = Number too big, 32 bit only
+   BVS      Asm_Error
+   B        DC_Hex_Loop                ; Go on with next char
+
+.DC_Oct_Loop
+   LDRB     R8,[R10],#1                ; R8 = Next char
+   ;------> Check new char, should be in "01234567"
+   CMP      R8,#'0'
+   RSBGES   R0,R8,#'7'
+   BLT      DC_Finished
+   SUB      R8,R8,#'0'                 ; R8 = 0..7
+
+   MOV      R14,#0                     ; No error here!
+   ;------> In range "01234567"
+   TST      R4,#&E0000000
+   MOVNE    R0,#&3A                    ; Asm_Error #&3A = Number too big, 32 bit only
+   BNE      Asm_Error
+   ADDS     R4,R8,R4,LSL #3            ; R4 = R8 + R4 * 8
+   MOVVS    R0,#&3A                    ; Asm_Error #&3A = Number too big, 32 bit only
+   BVS      Asm_Error
+   B        DC_Oct_Loop                ; Go on with next char
+
+.DC_Bin_Loop
+   LDRB     R8,[R10],#1                ; R8 = Next char
+   ;------> Check new char, should be "0" or "1"
+   CMP      R8,#'0'
+   CMPNE    R8,#'1'
+   BNE      DC_Finished
+   SUB      R8,R8,#'0'                 ; R8 = 0..1
+
+   MOV      R14,#0                     ; No error here!
+   TST      R4,#&80000000
+   MOVNE    R0,#&3A                    ; Asm_Error #&3A = Number too big, 32 bit only
+   BNE      Asm_Error
+   ADD      R4,R8,R4,LSL #1            ; R4 = R8 + R4 * 2
+   B        DC_Bin_Loop                ; Go on with next char
+
+.DC_FP
+   MOV      R10,R5
+   BL       Decode_FP_Constant
+   MOV      R1,#1
+   LDMFD    R13!,{R4,R5,R15}
+
+.DC_Finished
+   CMN      R14,#1
+   MOVEQ    R0,#&36                    ; Asm_Error #&36 = Bad constant
+   BEQ      Asm_Error
+   MOV      R0,R4
+   MOV      R1,#0
+   LDMFD    R13!,{R4,R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Decode_FP_Constant                    ;~F0 = FP Constant (maximum precision)
+   STMFD    R13!,{R4-R7,R14}
+
+   LDRB     R8,[R10],#1
+   MOV      R4,#0                      ; R4 = Exponent adjust
+   MOV      R5,#0                      ; R5 = Decimal point flag
+   STR      R4,DFPC_Block              ; Reset
+   STR      R4,DFPC_Block+4            ; Reset
+   STR      R4,DFPC_Block+8            ; Reset
+   STR      R4,DFPC_Block+12           ; Reset
+   ; Skip leading zeros
+   ;
+.DFPC_LZ                               ; LZ = Leading Zeroes
+   CMP      R8,#'0'
+   LDREQB   R8,[R10],#1
+   BEQ      DFPC_LZ
+
+   ;------> Char for processing is already here
+   ; Char can be "1"-"9", "." or "E/e"
+   ;
+   CMP      R8,#'.'
+   BNE      DFPC_BCD_Digits
+   MOV      R5,#1                      ; Decimal point flag set
+   LDRB     R8,[R10],#1
+
+.DFPC_ZAC                              ; ZAC = Zeroes After Comma
+   CMP      R8,#'0'
+   LDREQB   R8,[R10],#1
+   SUBEQ    R4,R4,#1                   ; Lesser exponent
+   BEQ      DFPC_ZAC
+
+.DFPC_BCD_Digits
+   BL       DFPC_BCD
+   STR      R6,DFPC_Block+4
+   CMN      R14,#1
+   BEQ      DFPC_Finished
+
+   BL       DFPC_BCD
+   STR      R6,DFPC_Block+8
+   CMN      R14,#1
+   BEQ      DFPC_Finished
+
+   BL       DFPC_BCD
+   STR      R6,DFPC_Block+12
+   CMN      R14,#1
+   BEQ      DFPC_Finished
+
+   ; Check for more digits
+   ;
+   ;------> Char for processing is already here
+.DFPC_Loop
+   CMP      R8,#'.'                    ; Decimal floating point
+   BNE      DFPC_Not_Point
+   CMP      R5,#1
+   MOVEQ    R0,#&37                    ; Asm_Error #&37 = Only one decimal point allowed
+   BEQ      Asm_Error
+   MOV      R5,#1
+   LDRB     R8,[R10],#1
+   B        DFPC_Loop
+
+.DFPC_Not_Point
+   CMP      R8,#'E'
+   CMPNE    R8,#'e'
+   BNE      DFPC_Not_Exponent
+   LDRB     R2,[R10]
+   BIC      R2,R2,#32
+   LDRB     R3,[R10,#1]
+   BIC      R3,R3,#32
+   CMP      R2,#'O'
+   CMPEQ    R3,#'R'
+   BEQ      DFPC_Not_Exponent
+   LDRB     R8,[R10],#1
+   BL       Decode_Constant
+   ADD      R4,R4,R0
+   B        DFPC_Loop
+
+.DFPC_Not_Exponent
+   ;------> Check new char, should be in "0123456789"
+   CMP      R8,#'0'
+   RSBGES   R1,R8,#'9'
+   BLT      DFPC_Finished
+   SUB      R8,R8,#'0'                 ; R8 = 0..9
+   ;------> In range "0123456789"
+   CMP      R5,#1
+   ADDNE    R4,R4,#1                   ; Bigger exponent
+   LDRB     R8,[R10],#1
+   B        DFPC_Loop                  ; Go on with next char
+
+.DFPC_Finished
+   ;------> Code Sign + Exponend (BCD)
+   MOV      R6,#0
+   SUBS     R4,R4,#1                   ; R4 = Exponent (INT) First digit is left of comma, so reduce exponent!
+   RSBLT    R4,R4,#0
+   ORRLT    R6,R6,#1 << 30
+
+   MOV      R1,#1000000                ; R1 = 10^6 to get e6
+   CMP      R4,R1
+   BLT      DFPC_Not_Division
+   BL       DFPC_Division              ; R0 = e6, R4 = Exponent remainder (INT)
+   ADD      R6,R6,R0,LSL #24           ; R6 = Sign + e6
+
+.DFPC_Not_Division
+   MOV      R1,#100000                 ; R1 = 10^5 to get e5
+   CMP      R4,R1
+   BLT      DFPC_Not_Division2
+   BL       DFPC_Division              ; R0 = e5, R4 = Exponent remainder (INT)
+   ADD      R6,R6,R0,LSL #20           ; R6 = Sign + e6 + e5
+
+.DFPC_Not_Division2
+   MOV      R1,#10000                  ; R1 = 10^4 to get e4
+   CMP      R4,R1
+   BLT      DFPC_Not_Division3
+   BL       DFPC_Division              ; R0 = e4, R4 = Exponent remainder (INT)
+   ADD      R6,R6,R0,LSL #16           ; R6 = Sign + e6 + e5 + e4
+
+.DFPC_Not_Division3
+   MOV      R1,#1000                   ; R1 = 10^3 to get e3
+   CMP      R4,R1
+   BLT      DFPC_Not_Division4
+   BL       DFPC_Division              ; R0 = 35, R4 = Exponent remainder (INT)
+   ADD      R6,R6,R0,LSL #12           ; R6 = Sign + e6 + e5 + e4 + e3
+
+.DFPC_Not_Division4
+   MOV      R1,#100                    ; R1 = 10^2 to get e2
+   CMP      R4,R1
+   BLT      DFPC_Not_Division5
+   BL       DFPC_Division              ; R0 = 25, R4 = Exponent remainder (INT)
+   ADD      R6,R6,R0,LSL #8            ; R6 = Sign + e6 + e5 + e4 + e3 + e2
+
+.DFPC_Not_Division5
+   MOV      R1,#10                     ; R1 = 10^1 to get e1
+   CMP      R4,R1
+   BLT      DFPC_Not_Division6
+   BL       DFPC_Division              ; R0 = e1, R4 = Exponent remainder (INT)
+   ADD      R6,R6,R0,LSL #4            ; R6 = Sign + e6 + e5 + e4 + e3 + e2 + e1
+
+.DFPC_Not_Division6
+   ADD      R6,R6,R4                   ; R6 = Sign + e6 + e5 + e4 + e3 + e2 + e1 + e0
+   STR      R6,DFPC_Block
+
+   ;------> Set extended precision in FPA
+   RFS      R0
+   ORR      R1,R0,#1 << 11
+   WFS      R1
+   ;------> Load EP Constant into F0
+   LDFP     F0,DFPC_Block
+
+   ;------> Restore extended precision bit
+   WFS      R0
+
+   LDMFD    R13!,{R4-R7,R15}           ; ~F0 = FP Constant
+
+; >-------------------------------------------------------------<
+
+.DFPC_BCD
+   STMFD    R13!,{R14}
+   MOV      R6,#0                      ; R6 = BCD digits
+   MOV      R7,#28                     ; R7 = Number of bit to shift for next insert
+
+.DFPC_BCD_Loop                         ; (0 = Last)
+   ;------> Char for processing is already here
+   CMP      R8,#'.'                    ; Decimal floating point
+   BNE      DFPC_BCD_Not_Point
+   CMP      R5,#1
+   MOVEQ    R0,#&37                    ; Asm_Error #&37 = Only one decimal point allowed
+   BEQ      Asm_Error
+   MOV      R5,#1
+   LDRB     R8,[R10],#1
+   B        DFPC_BCD_Loop
+
+.DFPC_BCD_Not_Point
+   CMP      R8,#'E'
+   CMPNE    R8,#'e'
+   BNE      DFPC_BCD_Not_Exponent
+   LDRB     R2,[R10]
+   BIC      R2,R2,#32
+   LDRB     R3,[R10,#1]
+   BIC      R3,R3,#32
+   CMP      R2,#'O'
+   CMPEQ    R3,#'R'
+   BEQ      DFPC_BCD_Not_Exponent
+   LDRB     R8,[R10],#1
+   BL       Decode_Constant
+   CMP      R1,#0
+   MOVNE    R0,#&3F                    ; Asm_Error #&3F = Only integer after 'E' allowed
+   BNE      Asm_Error
+   ADD      R4,R4,R0
+   MVN      R14,#0
+   LDMFD    R13!,{R15}
+
+.DFPC_BCD_Not_Exponent
+   ;------> Check new char, should be in "0123456789"
+   CMP      R8,#'0'
+   RSBGES   R1,R8,#'9'
+   MVNLT    R14,#0
+   LDMLTFD  R13!,{R15}
+   SUB      R8,R8,#'0'                 ; R8 = 0..9
+   ;------> In range "0123456789"
+   ADD      R6,R6,R8,LSL R7            ; Insert new BCD digit
+   CMP      R5,#1
+   ADDNE    R4,R4,#1                   ; Bigger exponent
+   LDRB     R8,[R10],#1
+   SUBS     R7,R7,#4
+   BGE      DFPC_BCD_Loop              ; Go on with next char
+   MOV      R14,#0
+   LDMFD    R13!,{R15}                 ; Word is full, proceed with next
+
+; >-------------------------------------------------------------<
+
+.DFPC_Division
+   mdiv     R0,R4,R1
+   MOV      R15,R14
+
+.DFPC_Block DBD  4

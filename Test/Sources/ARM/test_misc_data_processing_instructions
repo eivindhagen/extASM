@@ -1,0 +1,46 @@
+
+#name <Tmp$Dir>.^.^.test_misc_data_processing_instructions
+
+#area test,code
+
+BFC      R1,#1,#1          ; BFC Rd,#<lsb>,#<width> - Clear <width> bits from <lsb>
+BFCEQ    R1,#31,#1
+BFC      R1,#0,#32
+
+BFI      R1,R2,#1,#1       ; BFI Rd,Rn,#<lsb>,#<width> - Copy <width> bits from <lsb>
+BFIEQ    R1,R2,#31,#1
+BFI      R1,R2,#0,#32
+
+SBFX     R1,R2,#1,#1       ; SBFX Rd,Rn,#<lsb>,#<width> - Copy <width> bits from <lsb> to the bottom of the destination register, sign-extending it
+SBFXEQ   R1,R2,#31,#1
+SBFX     R1,R2,#0,#32
+
+UBFX     R1,R2,#1,#1       ; SBFX Rd,Rn,#<lsb>,#<width> - Copy <width> bits from <lsb> to the bottom of the destination register, zero-extending it
+UBFXEQ   R1,R2,#31,#1
+UBFX     R1,R2,#0,#32
+
+CLZ      R1,R2             ; R1=leading_zeroes(R2)
+CLZEQ    R1,R2
+
+RBIT     R1,R2             ; R1=reverse_bits(R2)
+RBITEQ   R1,R2
+
+REV      R1,R2             ; R1=reverse_bytes(R2)
+REVEQ    R1,R2
+
+REV16    R1,R2             ; R1=reverse_bytes_in_halfwords(R2)
+REV16EQ  R1,R2
+
+REVSH    R1,R2             ; R1=reverse_byes_in_halfword_and_sign_extend(R2)
+REVSHEQ  R1,R2
+
+SEL      R1,R2,R3          ; R1=select_bytes_from_first_or_second_based_on_ge_flags(R2,R3)
+SELEQ    R1,R2,R3
+
+USAD8    R1,R2,R3          ; R1=unsigned_sum_of_absolute_differences_for_bytes(R2,R3)
+USAD8EQ  R1,R2,R3
+
+USADA8   R1,R2,R3,R4       ; R1=unsigned_sum_of_absolute_differences_accumulate(R2,R3)
+USADA8EQ R1,R2,R3,R4
+
+#end

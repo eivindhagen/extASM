@@ -1,0 +1,200 @@
+# ---------
+# Main menu
+# ---------
+            
+MainMenu:extASM
+#	Info		>>5
+#	Options		>>6
+#	Misc		>MiscMenu
+#	Abort
+#	Pause
+#	Continue
+#	Quit
+
+MiscMenu:Misc
+#	Save Status	>>7
+#	Colours		>ColourMenu
+#	$M;ARM		>>8
+#	$M;FPA		>>9
+#	Radius		>RadiusMenu
+#	Min. lines	>ExtentMenu
+
+ColourMenu:Colours
+#	$M;Forground	>Colours
+#	$M;Background	>>0
+#	$M;Info		>>0
+#	$M;Error	>>0
+#	$M;Include	>>0
+
+RadiusMenu:Radius
+#	$W3
+
+ExtentMenu:Lines
+#	$W3
+
+Colours:Colour
+#	$B0;0
+#	$B1;1 
+#	$B2;2 
+#	$B3;3 
+#	$B4$F0;4 
+#	$B5$F0;5 
+#	$B6$F0;6 
+#	$B7$F0;7 
+#	$B8$F0;8 
+#	$B9;9 
+#	$BA$F0;10 
+#	$BB$F0;11 
+#	$BC;12 
+#	$BD$F0;13 
+#	$BE;14 
+#	$BF;15 
+
+# ----------------
+# Interactive help
+# ----------------
+     
+# ----
+# Menu
+# ----
+
+M0:Click to display StrongHelp help. \Rdisplay information about extASM.
+M1:\Rget to the Options window. Click to open the Options window.
+M2:\Rget to the Miscellaneous menu.
+M3:Click to abort assembly.
+M4:Click to pause assembly.
+M5:Click to resume assembly, after it has been paused.
+M6:Click to quit extASM.
+
+M20:\Rget to the save window for the Status-info text.
+M21:\Rget to the Colours menu.
+M22:\Rdisplay a pie chart of the distribution of the ARM instruction types. The 'Code statistics' option must have been selected for the previous assembly. Click to display the pie chart.
+M23:\Rdisplay a pie chart of the distribution of the FPA instruction types. The 'Code statistics' option must have been selected for the previous assembly. Click to display the pie chart.
+M24:\Rset the radius of the ARM and FPA pie charts.
+M25:\Rset the minimum number of lines in the Status-info window.
+
+M210:\Rset the Status-info forground colour.
+M211:\Rset the Status-info background colour.
+M212:\Rset the Status-info info text colour.
+M213:\Rset the Status-info error and warning colour.
+M214:\Rset the Status-info include file colour.
+
+M240:Type the radius of the pie charts and press RETURN or click.
+M250:Type the minimum number of lines for Status-info window and press RETURN or click.
+
+M21XX:Click to select the colour.
+
+# --------
+# Icon bar
+# --------
+
+IBX:This is the extASM icon. Drag a source file here to load it.|M\Sopen Process window, \Aopen Status-info window.
+
+# -----------
+# Info window
+# -----------
+
+IX:This displays information about extASM.
+
+# -----------
+# Save window
+# -----------
+
+S0:This is the Status Info file icon. Drag this icon to the directory in which you want to save the file. Or, drag it to the program into which you want to transfer the data.
+S1:This shows the filename for the Status Info file, edit it if you want a different name.
+S2:Click to save the Status Info text with the current filename. If it is not a full pathname, you must drag the icon to a directory first.
+SX:This is the Save Status Info window.
+
+# --------------
+# Options window
+# --------------
+
+OX:This is the Options window.
+O0:When this is on, it will try to shrink the code again, if at a later pass it turns out that a smaller or no auto-expansion is needed for a statement.
+O1:When this is on, it will save the object code after assembly.
+O2:When this is on, it will run the object file after assembly.
+O3:When this is on, it will also assemble the file called 'Header' in the 'Resources' directory. This file can be changed if wanted.
+O4:When this is on, the PROCESS window will be opened, if not opened, and put at the top when a file is loaded.
+O5:When this is on, the STATUS window will be opened, if not opened, and put at the top when a file is loaded.
+O6:When this is on, extASM will give a warning when it auto-expands a statement.
+O7:When this is on, and the Auto-expand option is on, only the auto-expansion summary is given, not info about every statement.
+O8:When this is on, and the Auto-expand option is on, only information about auto-expanding ADRs and load/store instructions, is given.
+O9:When this is on, extASM will give a warning about any variables which is not used by the program.
+O10:When this is on, it will display code statistics at the end of the assembly, such as the number used of each instruction, the number of instructions, etc. It also makes it possible to display two pie charts, selectable from the menu.
+O11:When this is on, then also code in macros, when they are called, is counted in the code statistics.
+O12:When this is on, it will display a list of the variables, optionally sorted, and macros. It will also show the number of references to each variable, and the number of times each macro is used.
+O13:When this is on, the variable list will be sorted.
+O14:When this is on, labels can be specified without a period in front of them. All other instructions and statements must then be indented by one or more spaces or TABs.
+O15:When this is on, extASM will produce an object file in ARM Object Format, which can then be linked with e.g. C. This is not implemented in this version, and it is instead done using the extAOF application.
+O16:When this is on, extASM will also use Throwback to display error and warning messages, so any editor which has Throwback can display them.
+O17:When this is on, the STATUS window will scroll to the end, when new messages are added.
+O18:When this is on, ADR instructions will be minimum 16 bit (i.e. 2 instructions). This can sometimes reduce the number of passes, at the expense of more NOPs.
+O19:Click to close the window.
+O20:Click to save the current setting.
+                                   
+# --------------
+# PROCESS window
+# --------------
+
+PX:This is the Process window.
+P0:This part of the window displays information about the source file.
+P1:
+P2:
+P3:This is the source file icon.
+P4:This shows the filename for the source file.
+P5:This shows the size of the source file.
+P6:This shows the file type of the source file.
+P7:
+P8:
+P9:This part of the window displays information about the object file.
+P10:
+P11:
+P12:This is the object file icon. Drag this icon to the directory in which you want to save the file. Or, drag it to the program into which you want to transfer the data.
+P13:Click to save the object file with the current filename. If it is not a full pathname, you must drag the icon to a directory first.
+P14:This shows the filename for the object file, edit it if you want a different name.
+P15:This shows the size of the object code.
+P16:This shows the file type of the object file.
+P17:This shows the load address of the object file (if no file type)
+P18:This shows the exec address of the object file (if no file type)
+P19:
+P20:
+P21:
+P22:
+P23:Click to Reload the last file, and start assembly.
+P24:
+P25:
+P26:
+P27:
+P28:
+P29:
+
+# ------------------
+# STATUS info window
+# ------------------
+
+WX:All messages appear here!
+
+# ------------------------------------------
+# Errors outside assembly or internal errors
+# ------------------------------------------
+
+# Internal errors
+
+Error01:No more room for indirected data
+Error02:Template '%0' not found
+Error03:Menu area full
+Error04:Too many menus
+Error05:Not enough memory to create Flex block
+Error06:Variable or macro array full
+Error07:Unknown conversion specifier '%0'
+Error08:No such Flex block
+Error09:Not enough memory
+Error0A:File '%0' not found
+
+# Errors outside assembly
+
+Error10:To save, drag the icon to a directory viewer
+Error11:Data transfer failed, receiver dead?
+Error12:Data transfer failed, transmitter dead?
+Error13:Input buffer overflow, too much data transferred
+Error14:File '%0' not found

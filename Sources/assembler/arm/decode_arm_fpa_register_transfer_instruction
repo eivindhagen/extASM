@@ -1,0 +1,158 @@
+
+; >-------------------------------------------------------------<
+
+.DT_FIX                                ;_R8 = "I"
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+62*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+62*4
+
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'X'
+   BNE      DT_Unknown
+   ;------> FIX  Cond    abc eFn [Rd]    fgh iFm
+   MOV      R9,#%00001110000100000000000100010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+
+   ;------> Rounding mode is optional (P M Z)
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   BEQ      DTFIX_Rounding_Done2
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   ORREQ    R9,R9,#1 << 5
+   BEQ      DTFIX_Rounding_Done
+   CMP      R8,#'M'
+   ORREQ    R9,R9,#2 << 5
+   BEQ      DTFIX_Rounding_Done
+   CMP      R8,#'Z'
+   ORREQ    R9,R9,#3 << 5
+   BEQ      DTFIX_Rounding_Done
+   MOV      R0,#&71                    ; Asm_Error #&71 = Illegal Floating Point rounding mode
+   B        Asm_Error
+
+.DTFIX_Rounding_Done
+   LDRB     R8,[R10],#1
+
+.DTFIX_Rounding_Done2
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Register_Fm
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FLT                                ;_R8 = "T"
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+61*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+61*4
+
+   ;------> FLT  Cond    abc eFn [Rd]    fgh iFm
+   MOV      R9,#%00001110000000000000000100010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BEQ      FTFLT_Precision_Done
+   CMP      R8,#'D'
+   ORREQ    R9,R9,#1 << 7
+   BEQ      FTFLT_Precision_Done
+   CMP      R8,#'E'
+   ORREQ    R9,R9,#1 << 19
+   MOVNE    R0,#&70                    ; Asm_Error #&70 = Floating Point precision must be specified
+   BNE      Asm_Error
+
+.FTFLT_Precision_Done
+   ;------> Rounding mode is optional (P M Z)
+   LDRB     R8,[R10],#1
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   BEQ      DTFLT_Rounding_Done2
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   ORREQ    R9,R9,#1 << 5
+   BEQ      DTFLT_Rounding_Done
+   CMP      R8,#'M'
+   ORREQ    R9,R9,#2 << 5
+   BEQ      DTFLT_Rounding_Done
+   CMP      R8,#'Z'
+   ORREQ    R9,R9,#3 << 5
+   BEQ      DTFLT_Rounding_Done
+   MOV      R0,#&71                    ; Asm_Error #&71 = Illegal Floating Point rounding mode
+   B        Asm_Error
+
+.DTFLT_Rounding_Done
+   LDRB     R8,[R10],#1
+
+.DTFLT_Rounding_Done2
+   BL       Ensure_Blank
+
+   BL       Decode_FP_Register
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   BL       Decode_Operand_Rd_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_RFC                                ;_R8 = "F"
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+66*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+66*4
+   ;------> RFC  Cond    abc eFn [Rd]    fgh iFm
+   MOV      R9,#%00001110010100000000000100010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_RFS                                ;_R8 = "F"
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+64*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+64*4
+   ;------> RFS  Cond    abc eFn [Rd]    fgh iFm
+   MOV      R9,#%00001110001100000000000100010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_WFC                                ;_R8 = "C"
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+65*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+65*4
+   ;------> WFC  Cond    abc eFn [Rd]    fgh iFm
+   MOV      R9,#%00001110010000000000000100010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_WFS                                ;_R8 = "S"
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+63*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+63*4
+   ;------> WFS  Cond    abc eFn [Rd]    fgh iFm
+   MOV      R9,#%00001110001000000000000100010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   B        DT_Write_Instruction

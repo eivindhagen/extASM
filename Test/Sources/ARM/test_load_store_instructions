@@ -1,0 +1,256 @@
+
+#name <Tmp$Dir>.^.^.test_load_store_instructions
+
+#area test,code
+
+; LDR
+
+LDRB     R1,[R2]           ; R1=[R2] (load byte, zero-extended)
+LDREQB   R1,[R2]
+LDRB     R1,[R2,R3]
+LDRB     R1,[R2,+R3]
+LDRB     R1,[R2,-R3]
+LDRB     R1,[R2,R3,LSL #1]
+LDRB     R1,[R2,R3]!
+LDRB     R1,[R2],R3
+LDRB     R1,[R2],-R3
+LDRB     R1,[R2],R3,LSL #1
+LDRB     R1,[R2,#&123]
+LDRB     R1,[R2,#-&123]
+LDRB     R1,[R2,#&123]!
+LDRB     R1,[R2],#&123
+LDRB     R1,[R2],#-&123
+LDRB     R1,ldr_address
+
+LDRSB    R1,[R2]           ; R1=[R2] (load byte, sign-extended)
+LDREQSB  R1,[R2]
+LDRSB    R1,[R2,R3]
+LDRSB    R1,[R2,+R3]
+LDRSB    R1,[R2,-R3]
+LDRSB    R1,[R2,R3]!
+LDRSB    R1,[R2],R3
+LDRSB    R1,[R2],-R3
+LDRSB    R1,[R2],#&AA
+LDRSB    R1,[R2],#-&AA
+
+LDRBT    R1,[R2]           ; R1=[R2] (load byte, zero-extended, user mode access)
+LDREQBT  R1,[R2]
+LDRBT    R1,[R2],#&123
+LDRBT    R1,[R2],#-&123
+LDRBT    R1,[R2],R3
+LDRBT    R1,[R2],+R3
+LDRBT    R1,[R2],-R3
+LDRBT    R1,[R2],R3,LSL #1
+
+LDRSBT   R1,[R2]           ; R1=[R2] (load byte, sign-extended, user mode access)
+LDREQSBT R1,[R2]
+LDRSBT   R1,[R2],#&AA
+LDRSBT   R1,[R2],#-&AA
+LDRSBT   R1,[R2],R3
+LDRSBT   R1,[R2],+R3
+LDRSBT   R1,[R2],-R3
+
+LDREXB   R1,[R2]           ; R1=[R2] (load byte, exclusive)
+LDREQEXB R1,[R2]
+
+LDRH     R1,[R2]           ; R1=[R2] (load halfword, zero-extended)
+LDREQH   R1,[R2]
+LDRH     R1,[R2,R3]
+LDRH     R1,[R2,-R3]
+LDRH     R1,[R2,R3]!
+LDRH     R1,[R2],R3
+LDRH     R1,[R2],+R3
+LDRH     R1,[R2],-R3
+LDRH     R1,[R2,#&AA]
+LDRH     R1,[R2,#-&AA]
+LDRH     R1,[R2,#&AA]!
+LDRH     R1,[R2],#&AA
+LDRH     R1,[R2],#-&AA
+
+LDRSH    R1,[R2]           ; R1=[R2] (load halfword, sign-extended)
+LDREQSH  R1,[R2]
+LDRSH    R1,[R2,R3]
+LDRSH    R1,[R2,+R3]
+LDRSH    R1,[R2,-R3]
+LDRSH    R1,[R2,R3]!
+LDRSH    R1,[R2],R3
+LDRSH    R1,[R2],-R3
+LDRSH    R1,[R2,#&AA]
+LDRSH    R1,[R2,#-&AA]
+LDRSH    R1,[R2,#&AA]!
+LDRSH    R1,[R2],#&AA
+LDRSH    R1,[R2],#-&AA
+
+LDRHT    R1,[R2]           ; R1=[R2] (load halfword, zero-extended, user mode access)
+LDREQHT  R1,[R2]
+LDRHT    R1,[R2],#&AA
+LDRHT    R1,[R2],#-&AA
+LDRHT    R1,[R2],R3
+LDRHT    R1,[R2],+R3
+LDRHT    R1,[R2],-R3
+
+LDRSHT   R1,[R2],#0        ; R1=[R2] (load halfword, sign-extended, user mode access)
+LDREQSHT R1,[R2],#0
+LDRSHT   R1,[R2],#&AA
+LDRSHT   R1,[R2],#-&AA
+LDRSHT   R1,[R2],R3
+LDRSHT   R1,[R2],+R3
+LDRSHT   R1,[R2],-R3
+
+LDREXH   R1,[R2]           ; R1=[R2] (load halfword, zero-extended, exclusive)
+LDREQEXH R1,[R2]
+
+LDR      R1,[R2]           ; R1=[R2] (load word)
+LDREQ    R1,[R2]
+LDR      R1,[R2,R3]
+LDR      R1,[R2,R3,LSL #1]
+LDR      R1,[R2,+R3]
+LDR      R1,[R2,-R3]
+LDR      R1,[R2,R3]!
+LDR      R1,[R2],R3
+LDR      R1,[R2],+R3
+LDR      R1,[R2],-R3
+LDR      R1,[R2],R3,LSL #1
+LDR      R1,[R2,#&123]
+LDR      R1,[R2,#-&123]
+LDR      R1,[R2,#&123]!
+LDR      R1,[R2],#&123
+LDR      R1,[R2],#-&123
+LDR      R1,ldr_address
+
+LDRT     R1,[R2]           ; R1=[R2] (load word, user mode access)
+LDREQT   R1,[R2]
+LDRT     R1,[R2],#&123
+LDRT     R1,[R2],#-&123
+LDRT     R1,[R2],R3
+LDRT     R1,[R2],+R3
+LDRT     R1,[R2],-R3
+LDRT     R1,[R2],R3,LSL #1
+
+LDREX    R1,[R2]           ; R1=[R2] (load word, exclusive)
+LDREQEX  R1,[R2]
+
+LDRD     R0,R1,[R3,R4]     ; R0=[R3+R4], R1=[R3+R4+4] (load doubleword)
+LDRD     R0,R1,[R3,+R4]
+LDREQD   R0,R1,[R3,-R4]
+LDRD     R0,R1,[R3,R4]!
+LDRD     R0,R1,[R3],R4
+LDRD     R0,R1,[R3],+R4
+LDRD     R0,R1,[R3],-R4
+LDRD     R0,R1,[R3,#&AA]
+LDRD     R0,R1,[R3,#-&AA]
+LDRD     R0,R1,[R3,#&AA]!
+LDRD     R0,R1,[R3],#&AA
+LDRD     R0,R1,[R3],#-&AA
+
+LDREXD   R0,R1,[R3]        ; R1=[R3], R2=[R3,#4] (load doubleword, exclusive)
+LDREQEXD R0,R1,[R3]
+
+.ldr_address
+
+; STR
+
+STRB     R1,[R2]           ; [R2]=R1 (store byte)
+STREQB   R1,[R2]
+STRB     R1,[R2,R3]
+STRB     R1,[R2,+R3]
+STRB     R1,[R2,-R3]
+STRB     R1,[R2,R3,LSL #1]
+STRB     R1,[R2,R3]!
+STRB     R1,[R2],R3
+STRB     R1,[R2],+R3
+STRB     R1,[R2],-R3
+STRB     R1,[R2],R3,LSL #1
+STRB     R1,[R2,#&123]
+STRB     R1,[R2,#-&123]
+STRB     R1,[R2,#&123]!
+STRB     R1,[R2],#&123
+STRB     R1,[R2],#-&123
+STRB     R1,str_address
+
+STRBT    R1,[R2]           ; [R2]=R1 (store byte, user mode access)
+STREQBT  R1,[R2]
+STRBT    R1,[R2],#&123
+STRBT    R1,[R2],#-&123
+STRBT    R1,[R2],R3
+STRBT    R1,[R2],+R3
+STRBT    R1,[R2],-R3
+STRBT    R1,[R2],R3,LSL #1
+
+STREXB   R1,R2,[R3]        ; [R2]=R1 (store byte, exclusive)
+STREQEXB R1,R2,[R3]
+
+STRH     R1,[R2]           ; [R2]=R1 (store halfword)
+STREQH   R1,[R2]
+STRH     R1,[R2,R3]
+STRH     R1,[R2,+R3]
+STRH     R1,[R2,-R3]
+STRH     R1,[R2,R3]!
+STRH     R1,[R2],R3
+STRH     R1,[R2],-R3
+STRH     R1,[R2,#&AA]
+STRH     R1,[R2,#-&AA]
+STRH     R1,[R2,#&AA]!
+STRH     R1,[R2],#&AA
+STRH     R1,[R2],#-&AA
+
+STRHT    R1,[R2]           ; [R2]=R1 (store halfword, user mode access)
+STREQHT  R1,[R2]
+STRHT    R1,[R2],#&AA
+STRHT    R1,[R2],#-&AA
+STRHT    R1,[R2],R3
+STRHT    R1,[R2],+R3
+STRHT    R1,[R2],-R3
+
+STREXH   R1,R2,[R3]        ; [R2]=R1 (store halfword, exclusive)
+STREQEXH R1,R2,[R3]
+
+STR      R1,[R2]           ; [R2]=R1 (store word)
+STREQ    R1,[R2]
+STR      R1,[R2,R3]
+STR      R1,[R2,R3,LSL #1]
+STR      R1,[R2,+R3]
+STR      R1,[R2,-R3]
+STR      R1,[R2,R3]!
+STR      R1,[R2],R3
+STR      R1,[R2],+R3
+STR      R1,[R2],-R3
+STR      R1,[R2],R3,LSL #1
+STR      R1,[R2,#&123]
+STR      R1,[R2,#-&123]
+STR      R1,[R2,#&123]!
+STR      R1,[R2],#&123
+STR      R1,[R2],#-&123
+STR      R1,str_address
+
+STRT     R1,[R2]           ; [R2]=R1 (store word, user mode access)
+STREQT   R1,[R2]
+STRT     R1,[R2],#&123
+STRT     R1,[R2],#-&123
+STRT     R1,[R2],R3
+STRT     R1,[R2],+R3
+STRT     R1,[R2],-R3
+STRT     R1,[R2],R3,LSL #1
+
+STREX    R1,R2,[R3]        ; [R2]=R1 (store word, exclusive)
+STREQEX  R1,R2,[R3]
+
+STRD     R0,R1,[R3,R4]     ; [R3+R4]=R0, [R3+R4+4]=R1 (store doubleword)
+STRD     R0,R1,[R3,+R4]
+STREQD   R0,R1,[R3,-R4]
+STRD     R0,R1,[R3,R4]!
+STRD     R0,R1,[R3],R4
+STRD     R0,R1,[R3],+R4
+STRD     R0,R1,[R3],-R4
+STRD     R0,R1,[R3,#&AA]
+STRD     R0,R1,[R3,#-&AA]
+STRD     R0,R1,[R3,#&AA]!
+STRD     R0,R1,[R3],#&AA
+STRD     R0,R1,[R3],#-&AA
+
+STREXD   R1,R2,R3,[R4]     ; [R3]=R1, [R3,#4]=R2 (store doubleword, exclusive)
+STREQEXD R1,R2,R3,[R4]
+
+.str_address
+
+#end

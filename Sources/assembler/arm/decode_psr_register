@@ -1,0 +1,150 @@
+
+; >-------------------------------------------------------------<
+
+.Decode_PSR_Register                   ;_R8 = First char or Blank
+   STMFD    R13!,{R14}                 ;~R0 = Mask bits, ~R8 = Next char
+   BL       Skip_Blanks
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   ORREQ    R9,R9,#1 << 22
+   CMPNE    R8,#'A'
+   CMPNE    R8,#'C'
+   BNE      DPR_Error
+   MOV      R0,R8
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   CMP      R8,#'_'
+   LDMNEFD  R13!,{R15}
+   LDRB     R8,[R10],#1
+   CMP      R0,#'A'
+   BNE      DPR_CPSR_Or_SPSR
+   CMP      R8,#'G'                    ; xPSR_g?
+   CMPNE    R8,#'g'
+   MOVEQ    R0,#%0100
+   BEQ      DPR_End
+   CMP      R8,#'N'
+   CMPNE    R8,#'n'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'Z'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'V'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'Q'
+   BNE      DPR_Error
+   LDRB     R8,[R10]
+   BIC      R8,R8,#32
+   CMP      R8,#'G'                    ; xPSR_nzcvqg?
+   MOVEQ    R0,#%1100
+   ADDEQ    R10,R10,#1
+   MOVNE    R0,#%1000                  ; xPSR_nzcvq
+   B        DPR_End
+
+.DPR_CPSR_Or_SPSR
+   MOV      R0,#0
+;@@@JJA 16/10/12
+   TEQ      R8,#'A'
+   TEQNE    R8,#'a'
+   BEQ      DPR_CPSR_Or_SPSR_all
+;@@@JJA
+   CMP      R8,#'C'
+   CMPNE    R8,#'c'
+   ORREQ    R0,R0,#1
+   LDREQB   R8,[R10],#1
+   CMP      R8,#'X'
+   CMPNE    R8,#'x'
+   ORREQ    R0,R0,#1 << 1
+   LDREQB   R8,[R10],#1
+   CMP      R8,#'S'
+   CMPNE    R8,#'s'
+   ORREQ    R0,R0,#1 << 2
+   LDREQB   R8,[R10],#1
+   CMP      R8,#'F'
+   CMPNE    R8,#'f'
+   ORREQ    R0,R0,#1 << 3
+   LDREQB   R8,[R10],#1
+   LDMFD    R13!,{R15}
+
+;@@@JJA 16/10/12
+.DPR_CPSR_Or_SPSR_all
+   LDRB     R8,[R10],#1
+   TEQ      R8,#'l'
+   TEQNE    R8,#'L'
+   LDREQB   R8,[R10],#1
+   TEQ      R8,#'l'
+   TEQNE    R8,#'L'
+   MOVEQ    R0, #%1001
+   LDREQB   R8,[R10],#1
+   LDMFD    R13!,{R15}
+;@@@JJA
+
+.DPR_End
+   LDRB     R8,[R10],#1
+   LDMFD    R13!,{R15}
+
+.DPR_Error
+   MOV      R0,#&07                    ; Asm_Error #&07 = Illegal PSR register
+   B        Asm_Error
+
+; >-------------------------------------------------------------<
+
+.Decode_PSR_Flags_Register             ;_R8 = First char or Blank, ~R0 = Register, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   CMP      R8,#'_'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'Z'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      DPR_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'V'
+   BNE      DPR_Error
+   MOV      R0,#15
+   LDRB     R8,[R10],#1
+   LDMFD    R13!,{R15}

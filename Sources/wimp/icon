@@ -1,0 +1,131 @@
+
+; >-------------------------------------------------------------<
+
+.Create_Icon                           ;_R0 = Window, _R1 = Xstart, _R2= Ystart, _R3 = Xend,
+   ; R0 - Window                       ;_R4 = Yend, _R5-> Text, _R6-> Validation string
+   ; R1 - Xstart                       ;      (or -1), _R7 = Indlength, _R8 = Iconflags
+   ; R2 - Ystart                       ;~R0 = Icon handle
+   ; R3 - Xend
+   ; R4 - Yend
+   ; R5 - Text
+   ; R6 - Validation string (or -1)
+   ; R7 - Indlength
+   ; R8 - Iconflags
+   ;
+   STMFD    R13!,{R4-R9,R14}
+   ADD      R4,R13,#28
+   LDMIA    R4,{R4-R8}
+   ADR      R9,Block
+   STMIA    R9,{R0-R4,R8}
+   TST      R8,#&100                   ; (Iconflags AND &100)=0?
+   BNE      CI_Indirected
+   ; Data is not indirected
+   ;
+   MOV      R0,R5
+   ADD      R1,R9,#24
+   BL       StrCopy
+   B        CI_Create
+
+.CI_Indirected
+   ; Data is indirected
+   ;
+   LDR      R1,Ind_Pointer
+   STR      R1,[R9,#24]
+   MOV      R0,R5
+   BL       StrCopy
+   CMP      R7,#0                      ; indlength=0? (Set the length equal to the string)
+   BEQ      CI_Ind_Length_Zero
+   ADD      R0,R7,#1
+   STR      R0,[R9,#32]
+   BL       Inc_Ind_Pointer
+   B        CI_End_Ind_Length
+
+.CI_Ind_Length_Zero
+   MOV      R0,R5
+   BL       StrLen
+   ADD      R0,R0,#1
+   STR      R0,[R9,#32]
+   BL       Inc_Ind_Pointer
+
+.CI_End_Ind_Length
+   AND      R0,R8,#3
+   CMP      R0,#2                      ; (iconflags AND 3)=2?
+   ; Indirected sprite icon
+   ;
+   MOVEQ    R0,#1
+   STREQ    R0,[R9,#28]
+   STRNE    R6,[R9,#28]
+
+.CI_Create
+   MOV      R1,R9
+   SWI      Wimp_CreateIcon
+   LDMFD    R13!,{R4-R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Find_IconData                         ;_R0 = Window, _R1 = Icon
+   ADR      R2,StrBuffer               ;~R0-> Textstring, ~R1 = Size,
+   STMIA    R2,{R0,R1}                 ;~R2-> Validation string
+   MOV      R1,R2
+   SWI      Wimp_GetIconState
+   LDR      R0,[R1,#8+20]
+   LDR      R2,[R1,#8+24]
+   LDR      R1,[R1,#8+28]
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Copy_Icon_Text                        ;_R0 = Window, _R1 = Icon, R2-> Text
+   STMFD    R13!,{R4,R14}
+   MOV      R4,R2
+   BL       Find_IconData
+   MOV      R1,R0
+   MOV      R0,R4
+   BL       StrCopy
+   MOV      R0,#&0D
+   STRB     R0,[R1,#-1]
+   LDMFD    R13!,{R4,R15}
+
+; >-------------------------------------------------------------<
+
+.Select_Icon                           ;_R0 = Window, _R1 = Icon, _R2 = Select flag
+   MOV      R2,R2,LSL #21              ; (1 = Select, 0 = Unselect)
+   ADR      R3,SelectBlock
+   STMIA    R3,{R0-R2}
+   MOV      R1,R3
+   SWI      Wimp_SetIconState
+   MOV      R15,R14
+
+.SelectBlock
+   DCD      0
+   DCD      0
+   DCD      0
+   DCD      1 << 21
+
+; >-------------------------------------------------------------<
+
+.Shade_Icon                            ;_R0 = Window, _R1 = Icon, _R2 = Shade flag
+   MOV      R2,R2,LSL #22              ; (1 = Shade, 0 = Unshade)
+   ADR      R3,ShadeBlock
+   STMIA    R3,{R0-R2}
+   MOV      R1,R3
+   SWI      Wimp_SetIconState
+   MOV      R15,R14
+
+.ShadeBlock
+   DCD      0
+   DCD      0
+   DCD      0
+   DCD      1 << 22
+
+; >-------------------------------------------------------------<
+
+.Update_Icon                           ;_R0 = Window, _R1 = Icon
+   ADR      R2,UpdateBlock
+   STMIA    R2,{R0,R1}
+   MOV      R1,R2
+   SWI      Wimp_SetIconState
+   MOV      R15,R14
+
+.UpdateBlock
+   DBD      4

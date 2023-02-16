@@ -1,0 +1,33 @@
+
+#name <Tmp$Dir>.^.^.test_alu_instructions
+
+#area test,code
+
+MOV     R1,R2    ; R1=R2
+MVN     R1,R2    ; R1=NOT R2
+
+ADD     R1,R2,R3 ; R1=R2+R3
+SUB     R1,R2,R3 ; R1=R2-R3
+RSB     R1,R2,R3 ; R1=R3-R2
+ADC     R1,R2,R3 ; R1=R2+R3+C
+SBC     R1,R2,R3 ; R1=R2-R3+C
+RSC     R1,R2,R3 ; R1=R3-R2+C
+
+AND     R1,R2,R3 ; R1=R2 AND R3
+ORR     R1,R2,R3 ; R1=R2 OR R3
+EOR     R1,R2,R3 ; R1=R2 EOR R3
+BIC     R1,R2,R3 ; R1=R2 AND NOT R3
+
+CMP     R1,R2    ; PSR=R1-R2
+CMN     R1,R2    ; PSR=R1+R2
+TST     R1,R2    ; PSR=R1 AND R2
+TEQ     R1,R2    ; PSR=R1 EOR R2
+
+MOVS    R1,R2
+MOVEQ   R1,R2
+MOVEQS  R1,R2
+
+MOV     R1,#&AA
+MOV     R1,#&F000000F
+
+#end

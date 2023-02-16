@@ -1,0 +1,16 @@
+   ; Try making pie charts with this source.
+   ; It contains one instruction of each type.
+   ;
+   MOV      R1,#1
+   AND      R1,R2,R3
+   CMP      R1,R2
+   LDR      R1,[R2]
+   B        &1234
+   ADR      R1,&8000
+   SWI      OS_WriteC
+
+   MVFS     F1,#1
+   ADFS     F1,F2,F3
+   CMF      F1,F2
+   LDFS     F1,[R2]
+   FLTS     F1,R2

@@ -1,0 +1,256 @@
+
+; >-------------------------------------------------------------<
+
+.DT_DCB_DCD_DCF_DCW                    ;_R8 = "C"
+   LDRB     R8,[R10],#1                ; Should be "B", "D", "F" or "W"
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BEQ      DT_DCB
+   CMP      R8,#'D'
+   BEQ      DT_DCD
+   CMP      R8,#'F'
+   BEQ      DT_DCFx
+   CMP      R8,#'W'
+   BEQ      DT_DCW
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_DCB
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   SUB      R10,R10,#1
+   LDR      R4,Object_Size
+   MOV      R6,R11
+
+.DTDCB_Loop
+   MOV      R5,R11
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      DTDCB_String
+   BICS     R1,R0,#&FF
+   MOVNE    R0,#&38                    ; Asm_Error #&38 = Number too big, 8 bit only
+   BNE      Asm_Error
+   STRB     R0,[R11],#1
+   B        DTDCB_Next
+
+.DTDCB_String
+.DTDCB_Loop2
+   LDRB     R2,[R0],#1
+   STRB     R2,[R11],#1
+   CMP      R2,#&00
+   BNE      DTDCB_Loop2
+   SUB      R11,R11,#1
+
+.DTDCB_Next
+   SUB      R0,R11,R5
+   ADD      R4,R4,R0
+   STR      R4,Object_Size
+   BL       Check_WorkSpace
+   CMP      R8,#','                    ; If "," then do once more
+   BEQ      DTDCB_Loop
+   LDR      R0,Virtual_Flag
+   CMP      R0,#1
+   MOVEQ    R11,R6
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_DCD
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   SUB      R10,R10,#1
+   TST      R11,#3                     ; Testing for Word-alignment
+   BEQ      DTDCD_Word
+   MOV      R0,#&03                    ; Asm_Warning #&03 = Data not word-aligned
+   BL       Asm_Warning
+   BL       Align_PC
+
+.DTDCD_Word
+   LDR      R4,Object_Size
+   MOV      R5,R11
+
+.DTDCD_Loop
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr            ; Constant
+   STR      R0,[R11],#4
+   ADD      R4,R4,#4
+   STR      R4,Object_Size
+   BL       Check_WorkSpace
+   CMP      R8,#','                    ; If "," then do once more
+   BEQ      DTDCD_Loop
+   LDR      R0,Virtual_Flag
+   CMP      R0,#1
+   MOVEQ    R11,R5
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_DCFx                               ;_R8 = "F"
+   LDRB     R8,[R10],#1                ; Should be "D", "E", "P" or "S"
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   MOVEQ    R4,#0
+   BEQ      DT_DCF
+   CMP      R8,#'D'
+   MOVEQ    R4,#1
+   BEQ      DT_DCF
+   CMP      R8,#'P'
+   MOVEQ    R4,#3
+   BEQ      DT_DCF
+   CMP      R8,#'E'
+   BNE      DT_Unknown
+   MOVEQ    R4,#2
+   LDRB     R0,[R10]
+   BIC      R0,R0,#32
+   CMP      R0,#'P'
+   MOVEQ    R4,#4
+   LDREQB   R8,[R10],#1
+
+; >-------------------------------------------------------------<
+
+.DT_DCF                                ;_R4 = Floating point format (0=S,1=D,2=E,3=P,4=EP)
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   SUB      R10,R10,#1
+   TST      R11,#3                     ; Testing for Word-alignment
+   BEQ      DT_DCF_Word
+   MOV      R0,#&03                    ; Asm_Warning #&03 = Data not word-aligned
+   BL       Asm_Warning
+   BL       Align_PC
+
+.DT_DCF_Word
+   LDR      R5,Object_Size
+   MOV      R6,R11
+
+.DT_DCF_Loop
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   ADD      R15,R15,R4,LSL #2
+   MOV      R0,R0
+   B        DT_DCFS
+   B        DT_DCFD
+   B        DT_DCFE
+   B        DT_DCFP
+   B        DT_DCFEP
+
+; >-------------------------------------------------------------<
+
+.DT_DCFS
+   RFS      R0
+   BIC      R1,R0,#1 << 18             ; Clear Overflow trap bit
+   WFS      R1
+   STFS     F0,[R11],#4
+   RFS      R2
+   WFS      R0                         ; Restore trap bit
+   TST      R2,#1 << 2
+   MOVNE    R0,#&44                    ; Asm_Error #&44 = Floating Point number too big for chosen precision
+   BNE      Asm_Error
+   ADD      R5,R5,#4
+   B        DT_DCF_Continue
+
+; >-------------------------------------------------------------<
+
+.DT_DCFD
+   RFS      R0
+   BIC      R1,R0,#1 << 18             ; Clear Overflow trap bit
+   WFS      R1
+   STFD     F0,[R11],#8
+   LDR      R2,Option_FPA
+   CMP      R2,#1
+   BEQ      DT_DCFD_Use_FPA
+   LDR      R2,[R11,#-8]
+   LDR      R3,[R11,#-4]
+   STR      R2,[R11,#-4]
+   STR      R3,[R11,#-8]
+
+.DT_DCFD_Use_FPA
+   RFS      R2
+   WFS      R0                         ; Restore trap bit
+   TST      R2,#1 << 2
+   MOVNE    R0,#&44                    ; Asm_Error #&44 = Floating Point number too big for chosen precision
+   BNE      Asm_Error
+   ADD      R5,R5,#8
+   B        DT_DCF_Continue
+
+; >-------------------------------------------------------------<
+
+.DT_DCFE
+   STFE     F0,[R11],#12
+   ADD      R5,R5,#12
+   B        DT_DCF_Continue
+
+; >-------------------------------------------------------------<
+
+.DT_DCFP
+   ;------> Set NO-extended precision in FPA
+   RFS      R0
+   BIC      R1,R0,#1 << 11
+   WFS      R1
+   STFP     F0,[R11],#12
+   ADD      R5,R5,#12
+   WFS      R0                         ; Restore bits
+   B        DT_DCF_Continue
+
+; >-------------------------------------------------------------<
+
+.DT_DCFEP
+   ;------> Set extended precision in FPA
+   RFS      R0
+   ORR      R1,R0,#1 << 11
+   WFS      R1
+   STFP     F0,[R11],#16
+   ADD      R5,R5,#16
+   WFS      R0                         ; Restore bits
+
+; >-------------------------------------------------------------<
+
+.DT_DCF_Continue
+   STR      R5,Object_Size
+   BL       Check_WorkSpace
+   CMP      R8,#','                    ; If "," then do once more
+   BEQ      DT_DCF_Loop
+   LDR      R0,Virtual_Flag
+   CMP      R0,#1
+   MOVEQ    R11,R6
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_DCW
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   SUB      R10,R10,#1
+   TST      R11,#1                     ; Testing for HalfWord-alignment
+   BEQ      DTDCW_HalfWord
+   MOV      R0,#&04                    ; Asm_Warning #&04 = Data not halfword-aligned
+   BL       Asm_Warning
+   BL       Align_PC
+
+.DTDCW_HalfWord
+   LDR      R4,Object_Size
+   MOV      R5,R11
+
+.DTDCW_Loop
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr            ; Constant
+   BICS     R1,R0,#&FFFF
+   MOVNE    R0,#&39                    ; Asm_Error #&39 = Number too big, 16 bit only
+   BNE      Asm_Error
+   STRB     R0,[R11],#1
+   MOV      R0,R0,LSR #8
+   STRB     R0,[R11],#1
+   ADD      R4,R4,#2
+   STR      R4,Object_Size
+   BL       Check_WorkSpace
+   CMP      R8,#','                    ; If "," then do once more
+   BEQ      DTDCW_Loop
+   LDR      R0,Virtual_Flag
+   CMP      R0,#1
+   MOVEQ    R11,R5
+   B        DT_End

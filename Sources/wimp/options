@@ -1,0 +1,62 @@
+
+; >-------------------------------------------------------------<
+
+.Load_Options
+   STMFD    R13!,{R4,R5,R14}
+   ADR      R0,Option_FileName
+   ADR      R1,Block2
+   ADR      R2,extASM_Path
+   BL       Print_String
+   MOV      R0,#16
+   ADR      R1,Block2
+   ADR      R2,Option_File_Start
+   MOV      R3,#0
+   SWI      OS_File
+   LDMFD    R13!,{R4,R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Save_Options
+   STMFD    R13!,{R4,R5,R14}
+   ADR      R0,Option_FileName
+   ADR      R1,Block2
+   ADR      R2,extASM_Path
+   BL       Print_String
+   MOV      R0,#10
+   LDR      R1,PieRadius_Pointer
+   SWI      XOS_ReadUnsigned
+   MOVVS    R2,#Default_PieRadius
+   STR      R2,Option_PieRadius
+   LDR      R1,MinLines_Pointer
+   SWI      XOS_ReadUnsigned
+   MOVVS    R2,#Default_MinLines
+   STR      R2,Option_MinLines
+   MOV      R0,#10
+   ADR      R1,Block2
+   MOV      R2,#&FFD
+   ADR      R4,Option_File_Start
+   ADR      R5,Option_File_End
+   SWI      OS_File
+   LDMFD    R13!,{R4,R5,R15}
+
+.Option_FileName   DCB   "%s.Resources.Configure",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Set_Options
+   STMFD    R13!,{R4-R7,R14}
+   LDR      R4,Handle_OPTIONS
+   MOV      R5,#0                      ; First icon
+   LDR      R6,Options
+   MOV      R7,#1
+
+._Loop
+   MOV      R0,R4
+   MOV      R1,R5
+   AND      R2,R7,R6,LSR R5
+   BL       Select_Icon
+   ADD      R5,R5,#1
+   CMP      R5,#18
+   BLE      _Loop
+   LDMFD    R13!,{R4-R7,R15}

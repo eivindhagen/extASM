@@ -1,0 +1,921 @@
+
+; >-------------------------------------------------------------<
+
+.PreProcessor
+   STMFD    R13!,{R4-R6,R14}
+
+   BL       Wimp_Text_AddBlankLine
+
+   ADR      R0,Pre_WTLine_1
+   BL       Wimp_Text_AddLine
+
+   BL       Setup_Preprocessor
+
+   LDR      R0,Options
+   TST      R0,#Option_UseDefaultHeader
+   BLNE     Preprocess_Default_Header
+
+   MOV      R0,#Flex_Source
+   BL       Preprocess_Source
+
+   BL       Setup_Flex_Blocks
+
+   ADR      R0,Pre_WTLine_2
+   LDR      R2,Label_Num
+   BL       Wimp_Text_AddLine
+
+   ADR      R0,Pre_WTLine_3
+   LDR      R2,Source_Line_Num
+   BL       Wimp_Text_AddLine
+
+   BL       Wimp_Text_Window
+
+   LDMFD    R13!,{R4-R6,R15}
+
+.Pre_WTLine_1   DCB   "PreProcessing Source",0
+.Pre_WTLine_2   DCB   "Counting labels : %d",0
+.Pre_WTLine_3   DCB   "Counting lines : %d",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Setup_Preprocessor
+   MOV      R0,#0
+   STR      R0,Variable_MaxNum
+   STR      R0,Label_Num
+   STR      R0,Macro_Num
+   STR      R0,FPPOOL_Num
+   STR      R0,Source_Count_Offset
+   STR      R0,Source_Current_Offset
+   STR      R0,Source_Line_Num
+   STR      R0,Brace_Count
+   STR      R0,Enable_Brace_Return
+   STR      R0,Process_Macro_Level
+   STR      R0,First_Macro
+   STR      R0,Previous_Macro
+   STR      R0,Throwback_First_Sent
+   STR      R0,Errors
+   ;STR      R0,Warnings
+
+   LDR      R0,Options
+   TST      R0,#Option_Throwback
+   MOVEQ    R15,R14
+   SWI      DDEUtils_ReadTaskHandle
+   STR      R0,Throwback_Taskhandle
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Preprocess_Default_Header
+   STMFD    R13!,{R14}
+   ADR      R0,Pre_Header_End
+   ADR      R1,Header_Filename
+   LDR      R2,Header_Leafname
+   MOV      R3,#1
+   BL       Setup_Error_Context
+
+   MOV      R0,#Flex_Header
+   BL       Preprocess_Source
+
+.Pre_Header_End
+   MOV      R0,#0
+   BL       Restore_Error_Context
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+   ;------> Count number of variables, macros and lines in source
+.Preprocess_Source                     ;_R0 = Flex block for source
+   STMFD    R13!,{R14}
+   BL       Flex_Adr
+   MOV      R10,R0                     ; R10-> Source line 1
+
+.Pre_Line_Loop
+   LDRB     R8,[R10],#1                ; R8 = Source Char
+   LDR      R0,Options
+   TST      R0,#Option_NoPeriod
+   BLEQ     Skip_Blanks
+
+   CMP      R8,#&0A                    ; NewLine -> Quit scan
+   CMPNE    R8,#&00                    ; NULL -> Quit scan
+   BLNE     Process_Token
+
+   LDR      R0,Poll_Timer
+   SUBS     R0,R0,#1
+   LDRLE    R0,Poll_Lines
+   STR      R0,Poll_Timer
+   BLLE     Wimp_Text_Window
+
+   LDR      R0,Source_Line
+   ADD      R0,R0,#1
+   STR      R0,Source_Line
+
+   CMP      R8,#&00                    ; NULL -> End of source
+   BNE      Pre_Line_Loop
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Setup_Flex_Blocks
+   STMFD    R13!,{R14}
+   BL       Setup_Flex_Variable
+   BL       Setup_Flex_Macro
+   BL       Setup_Flex_Object
+   BL       Setup_Flex_Expand
+   BL       Setup_Flex_VarList
+   BL       Setup_Flex_Binaries
+   LDMFD    R13!,{R15}
+
+.VarList_Num
+   DCD      0
+
+; >-------------------------------------------------------------<
+
+.Setup_Flex_Variable
+   STMFD    R13!,{R14}
+   LDR      R0,Variable_MaxNum
+   ADD      R0,R0,#16                  ; Extra variables for macros
+   LDR      R1,Label_Num
+   LDR      R2,FPPOOL_Num
+   ADD      R0,R0,R1
+   ADD      R3,R0,R2
+   STR      R3,VarList_Num
+
+   MOVS     R0,R3,LSL #1
+   MOV      R1,#0
+
+._Loop
+   BEQ      SFB_End_Variable_Loop
+   MOVS     R0,R0,LSR #1
+   ADD      R1,R1,#1
+   B        _Loop
+
+.SFB_End_Variable_Loop
+   MOV      R2,#1
+   MOV      R0,R2,LSL R1               ; Variable_MaxNum is twice the previous number
+   STR      R0,Variable_MaxNum         ; rounded up to the nearest power of two
+   STR      R1,Variable_Power2
+   MOV      R1,R0,LSL #6               ; Space needed to hold variables
+   MOV      R0,#Flex_Variable
+   BL       Flex_Resize
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Setup_Flex_Macro
+   STMFD    R13!,{R14}
+   MOV      R1,#0
+   LDR      R0,Macro_Num
+   MOVS     R0,R0,LSL #1
+
+._Loop
+   BEQ      SFB_End_Macro_Loop
+   MOVS     R0,R0,LSR #1
+   ADD      R1,R1,#1
+   B        _Loop
+
+.SFB_End_Macro_Loop
+   MOV      R2,#1
+   MOV      R0,R2,LSL R1               ; Macro_MaxNum is twice the number of macros,
+   STR      R0,Macro_MaxNum            ; rounded up to the nearest power of two
+   STR      R1,Macro_Power2
+   MOV      R1,R0,LSL #6               ; Space needed to hold macros
+   MOV      R0,#Flex_Macro
+   BL       Flex_Resize
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Setup_Flex_Object
+   STMFD    R13!,{R14}
+   LDR      R0,Source_Line_Num
+   MOV      R1,R0,LSL #2               ; Space needed to hold object code (number of
+   CMP      R1,#Default_MinObject_Size ; lines*4, an educated guess)
+   MOVLT    R1,#Default_MinObject_Size
+   SUB      R2,R1,#WorkSpace_Buffer    ; WorkSpace contains WorkSpace_Buffer less than what
+   STR      R2,WorkSpace               ; is reserved (WorkSpace_Buffer bytes buffer)
+   MOV      R0,#Flex_Object
+   BL       Flex_Resize
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Setup_Flex_Expand
+   STMFD    R13!,{R14}
+   LDR      R0,Source_Line_Num
+   ADD      R1,R0,#&100                ; Extra space for lines in macros, or for colon
+   MOV      R1,R1,LSL #2               ; Space needed to hold line-expand info (1 word each)
+   MOV      R0,#Flex_Expand
+   BL       Flex_Resize
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Setup_Flex_VarList
+   STMFD    R13!,{R14}
+   MOV      R0,#Flex_Variable
+   BL       Flex_Size
+   ADD      R0,R0,R1
+   TST      R0,#&FF000000
+   MOVEQ    R2,#16
+   MOVEQ    R3,#4
+   MOVNE    R2,#32
+   MOVNE    R3,#5
+   STR      R2,VarList_Size
+   LDR      R0,VarList_Num
+   MOV      R1,R0,LSL R3
+   CMP      R1,#Default_MinVarList_Size
+   MOVLT    R1,#Default_MinVarList_Size
+   MOV      R0,#Flex_VarList
+   BL       Flex_Resize
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Setup_Flex_Binaries
+   STMFD    R13!,{R14}
+   MOV      R0,#Flex_Binaries
+   MOV      R1,#Default_Binaries_Size
+   BL       Flex_Resize
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Process_Token                         ;_R8 = First char of token, ~R8 = EOL
+   STMFD    R13!,{R14}
+
+.Process_Token_Direct                  ;_R0 = Options
+   ADRL     R1,PT_LineEnd
+   ADR      R14,Error_Context
+   STMIA    R14,{R1,R4-R13}            ; Store Asm_Error context
+
+   CMP      R8,#&01
+   BNE      PTD_Not_Source_Start
+   BL       Source_Start
+   B        PT_End
+
+.PTD_Not_Source_Start
+   CMP      R8,#&02
+   BNE      PTD_Not_Source_End
+   BL       Source_End
+   B        PT_End
+
+.PTD_Not_Source_End
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   MOVEQ    R0,#0
+   BLEQ     Skip_Blanks
+
+   CMP      R8,#'#'                    ; PreProcessor commands
+   BEQ      PT_Switch
+   CMP      R8,#'.'
+   BEQ      PT_Label
+   CMP      R8,#':'
+   BEQ      PT_Colon
+   CMP      R8,#';'
+   BNE      PTD_Not_Flush_Line
+   BL       Flush_Line
+   LDMFD    R13!,{R15}
+
+.PTD_Not_Flush_Line
+   CMP      R8,#'{'
+   CMPNE    R8,#'}'
+   BNE      PT_Not_Brace
+
+   LDR      R1,Brace_Count
+   CMP      R8,#'{'
+   ADDEQ    R1,R1,#1
+   CMP      R8,#'}'
+   SUBEQ    R1,R1,#1
+   LDR      R2,Enable_Brace_Return
+   CMP      R1,#0
+   RSBLTS   R3,R2,#0
+   MOVLT    R8,#&00
+   LDMLTFD  R13!,{R15}
+   STR      R1,Brace_Count
+
+.PT_Not_Brace
+   CMP      R8,#'M'
+   CMPNE    R8,#'m'
+   BEQ      PT_Macro
+
+   TST      R0,#Option_NoPeriod
+   BNE      PT_Label
+
+   B        PT_LineEnd
+
+; >-------------------------------------------------------------<
+
+.PT_Label                              ;_R8 = "."
+   LDR      R0,Label_Num
+   ADD      R0,R0,#1
+   STR      R0,Label_Num
+   B        PT_LineEnd
+
+; >-------------------------------------------------------------<
+
+.PT_Colon                              ;_R8 = ":"
+   LDRB     R8,[R10],#1                ; Get next char after colon
+   LDR      R0,Options
+   TST      R0,#Option_NoPeriod
+   BLEQ     Skip_Blanks
+   CMP      R8,#&0A
+   BNE      Process_Token_Direct
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.PT_Macro                              ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      PT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      PT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      PT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      PT_LineEnd
+   ADR      R0,Process_Token
+   MOV      R1,#1
+   BL       Process_Macro
+   LDR      R0,Process_Macro_Level
+   CMP      R0,#0
+   LDREQ    R0,Macro_Num
+   ADDEQ    R0,R0,#1
+   STREQ    R0,Macro_Num
+
+   CMP      R8,#&00
+   LDMEQFD  R13!,{R15}
+   B        PT_End
+
+; >-------------------------------------------------------------<
+
+.PT_Switch                             ;_R8 = "#"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'%'                    ; "#%" ?
+   BEQ      PT_LineEnd
+   BIC      R8,R8,#32                  ; Make upper case
+   CMP      R8,#'A'
+   RSBGES   R0,R8,#'Z'                 ; Char>="A" and Char<="Z"?
+   SUBGE    R8,R8,#'A'                 ; Start at zero
+   ADDGE    R15,R15,R8,LSL #2
+   B        PTS_Unknown
+   B        PTS_A                      ; A - "#area"
+   B        PTS_B                      ; B - "#base"
+   B        PTS_Unknown                ; C
+   B        PTS_Unknown                ; D
+   B        PTS_E                      ; E - "#else", "#end", "#endif", "#endr", "#entry"
+                                       ;     "#exec", "#export"
+   B        PTS_F                      ; F - "#format", "#fppool", "#fpset"
+   B        PTS_Unknown                ; G
+   B        PTS_Unknown                ; H
+   B        PTS_I                      ; I - "#if", "#import", "#include"
+   B        PTS_Unknown                ; J
+   B        PTS_Unknown                ; K
+   B        PTS_L                      ; L - "#load"
+   B        PTS_Unknown                ; M
+   B        PTS_N                      ; N - "#name"
+   B        PTS_Unknown                ; O
+   B        PTS_Unknown                ; P
+   B        PTS_Unknown                ; Q
+   B        PTS_R                      ; R - "#rept"
+   B        PTS_S                      ; S - "#set", "#smile", "#speed", "#strset"
+   B        PTS_T                      ; T - "#type"
+   B        PTS_Unknown                ; U
+   B        PTS_Unknown                ; V
+   B        PTS_Unknown                ; W
+   B        PTS_Unknown                ; X
+   B        PTS_Unknown                ; Y
+   B        PTS_Unknown                ; Z
+
+.PTS_A                                 ;_R8 = "A" -> "#area"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      PTS_Unknown
+   ; PTS_AREA                          ;_R8 = "R"
+   ;
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#area" in PreProcessor
+
+.PTS_B                                 ;_R8 = "B" -> "#base"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#base" in PreProcessor
+
+.PTS_E                                 ;_R8 = "E" -> "#else", "#end", "#endif", "#entry"
+   LDRB     R8,[R10],#1                ;             "#endr", "#exec", "#export"
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BEQ      PTS_ELSE
+   CMP      R8,#'N'
+   BEQ      PTS_END_ENDIF_ENDR_ENTRY
+   CMP      R8,#'X'
+   BEQ      PTS_EXEC_EXPORT
+   B        PTS_Unknown
+
+.PTS_ELSE                              ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#else" in PreProcessor
+
+.PTS_END_ENDIF_ENDR_ENTRY              ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BEQ      PTS_ENTRY
+   CMP      R8,#'D'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   CMPNE    R8,#':'
+   CMPNE    R8,#';'
+   CMPNE    R8,#&0A
+   BEQ      PT_LineEnd                 ; Ignore "#end" in PreProcessor
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BEQ      PT_LineEnd                 ; Ignore "#endr" in PreProcessor
+   CMP      R8,#'I'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#endif" in PreProcessor
+
+.PTS_ENTRY                             ;_R8 = "T"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'Y'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#entry" in PreProcessor
+
+.PTS_EXEC_EXPORT                       ;_R8 = "X"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BEQ      PTS_EXEC
+   CMP      R8,#'P'
+   BNE      PTS_Unknown
+   ; PTS_EXPORT                        ;_R8 = "P"
+   ;
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#export" in PreProcessor
+
+.PTS_EXEC                              ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#exec" in PreProcessor
+
+
+.PTS_F                                 ;_R8 = "F" -> "#format", "#fpa", "#fppool", "#fpset"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BEQ      PTS_FORMAT
+   CMP      R8,#'P'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      PT_LineEnd                 ; Ignore "#fpa" in PreProcessor
+   CMP      R8,#'P'
+   BEQ      PTS_FPPOOL
+   CMP      R8,#'S'
+   BNE      PTS_Unknown
+   ; PTS_FPSET                         ;_R8 = "S"
+   ;
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      PTS_Unknown
+   LDR      R0,Variable_MaxNum
+   ADD      R0,R0,#1
+   STR      R0,Variable_MaxNum
+   B        PT_LineEnd                 ; Ignore "#fpset" in PreProcessor
+
+.PTS_FORMAT                            ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#format" in PreProcessor
+
+.PTS_FPPOOL                            ;_R8 = "P"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      PTS_Unknown
+   LDR      R0,Variable_MaxNum
+   ADD      R0,R0,#1
+   STR      R0,Variable_MaxNum
+   LDR      R0,FPPOOL_Num
+   ADD      R0,R0,#1
+   STR      R0,FPPOOL_Num
+   B        PT_LineEnd                 ; Ignore "#fppool" in PreProcessor
+
+.PTS_I                                 ;_R8 = "I" -> "#if", "#import", "#include"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   BEQ      PT_LineEnd                 ; Ignore "#if" in PreProcessor
+   CMP      R8,#'M'
+   BEQ      PTS_IMPORT
+   CMP      R8,#'N'
+   BNE      PTS_Unknown
+   ; PTS_INCLUDE                       ;_R8 = "N"
+   ;
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'U'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   BL       Include_Source
+   B        PT_End
+
+.PTS_IMPORT                            ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#import" in PreProcessor
+
+.PTS_L                                 ;_R8 = "L" -> "#load"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#load" in PreProcessor
+
+.PTS_N                                 ;_R8 = "N" -> "#name"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   ; PTS_NAME
+   ;
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   SUB      R0,R10,#1
+   STR      R0,Object_Filename
+   B        PT_LineEnd
+
+.PTS_R                                 ;_R8 = "R" -> "#rept"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#rept" in PreProcessor
+
+.PTS_S                                 ;_R8 = "S" -> "#set", "#smile", "#speed", "#strset"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BEQ      PTS_SET
+   CMP      R8,#'M'
+   BEQ      PTS_SMILE
+   CMP      R8,#'P'
+   BEQ      PTS_SPEED
+   CMP      R8,#'T'
+   BNE      PTS_Unknown
+   ; PTS_STRSET                        ;_R8 = "T"
+   ;
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      PTS_Unknown
+   LDR      R0,Variable_MaxNum
+   ADD      R0,R0,#1
+   STR      R0,Variable_MaxNum
+   B        PT_LineEnd
+
+.PTS_SET                               ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      PTS_Unknown
+   LDR      R0,Variable_MaxNum
+   ADD      R0,R0,#1
+   STR      R0,Variable_MaxNum
+   B        PT_LineEnd
+
+.PTS_SMILE                             ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   MOV      R0,#1
+   STR      R0,Option_Face
+   LDRB     R8,[R10],#1
+   B        PT_End
+
+.PTS_SPEED                             ;_R8 = "P"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   CMP      R8,#' '
+   CMPNE    R8,&09
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BL       Decode_Constant            ; Lines/WimpPoll
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R0,R0,LSL #2
+   STR      R0,Poll_Lines              ; Store Speed*4, reduce before Assembler
+   B        PT_End
+
+.PTS_T                                 ;_R8 = "T" -> "#type"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'Y'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      PTS_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      PTS_Unknown
+   B        PT_LineEnd                 ; Ignore "#type" in PreProcessor
+
+.PTS_Unknown
+   MOV      R0,#&60                    ; Asm_Error #&60 = Unknown assembler switch
+   B        Asm_Error
+
+; >-------------------------------------------------------------<
+
+.PT_LineEnd
+   BL       Flush_Line
+   LDMFD    R13!,{R15}
+
+.PT_End
+   BL       Skip_Blanks
+   CMP      R8,#':'
+   BEQ      PT_Colon
+   CMP      R8,#';'
+   BNE      PTE_Not_Flush_Line
+   BL       Flush_Line
+   LDMFD    R13!,{R15}
+
+.PTE_Not_Flush_Line
+   CMP      R8,#&0A
+   LDMEQFD  R13!,{R15}
+   MOV      R0,#&24                    ; Asm_Error #&24 = Syntax overflow (too many operands)
+   B        Asm_Error
+
+; >-------------------------------------------------------------<
+
+   ; Format of the source
+   ;
+   ; [01]<Main source>[0A][02][0A][00] (no included files)
+   ;
+   ; [01]<Main source>[0A][01]<New source>[0A][02]<Rest of main source>[0A][02][0A][00]
+   ;
+.Include_Source                        ;_R8 = '"', _R10-> Filename in source
+   STMFD    R13!,{R4-R6,R14}
+   CMP      R8,#'"'
+   MOVNE    R0,#&28                    ; Asm_Error #&28 = Missing """
+   BNE      Asm_Error
+   MOV      R4,R10
+   LDRB     R8,[R10],#1
+   BL       Find_Quote
+   ADR      R6,Block
+   MOV      R0,R4
+   MOV      R1,R6
+   SUB      R2,R10,R4
+   SUB      R2,R2,#1
+   BL       StrCopyNum
+
+   ADR      R0,Include_WTLine_1
+   MOV      R1,#TextColour_Include
+   MOV      R2,R6
+   BL       Wimp_Text_AddColourLine
+
+   MOV      R0,#17
+   MOV      R1,R6
+   SWI      OS_File
+   CMP      R0,#1
+   MOVNE    R0,#&2B                    ; Asm_Error #&2B = File '%s' not found
+   MOVNE    R2,R6
+   BNE      Asm_Error
+
+   LDR      R0,Source_Size
+   ADD      R0,R0,R4
+   STR      R0,Source_Size
+   MOV      R0,#Flex_Source
+   ADD      R4,R4,#4
+   MOV      R1,R4
+   BL       Flex_Adjust
+   ; Move rest of source up
+   ;
+   LDR      R1,Source_Size_Data
+   ADD      R2,R1,R4
+   STR      R2,Source_Size_Data
+   ADD      R1,R1,R0
+   ADD      R2,R4,R10
+   MOV      R0,R10
+   BL       Move_Memory_Up_Byte
+   ; Load source file
+   ;
+   MOV      R9,R10
+   MOV      R0,#':'
+   STRB     R0,[R9],#1
+   MOV      R0,#&01
+   STRB     R0,[R9],#1
+   MOV      R0,#16
+   MOV      R1,R6
+   MOV      R2,R9
+   MOV      R3,#0
+   SWI      OS_File
+   MOV      R5,R9
+   ADD      R9,R9,R4
+   LDRB     R0,[R9,#-1]
+   CMP      R0,#&0A
+   MOVNE    R0,#&0A
+   MOVEQ    R0,#' '
+   STRB     R0,[R9],#1
+   MOV      R0,#&02
+   STRB     R0,[R9],#1
+
+   ADR      R0,Include_WTLine_2
+   MOV      R2,R4
+   BL       Wimp_Text_AddLine
+   MOV      R0,R6
+   BL       Add_Source_Name
+   LDRB     R8,[R10],#1
+
+   ;------> Check source, MUST NOT contain any NULL chars
+   MOV      R0,R5
+   SUB      R1,R9,#1
+   BL       Check_For_NULL
+   CMN      R14,#1
+   LDMNEFD  R13!,{R4-R6,R15}
+
+   ADR      R0,Include_WTLine_3
+   MOV      R1,#TextColour_Errors
+   BL       Wimp_Text_AddColourLine
+   ADR      R14,Internal_Context
+   LDMIA    R14,{R0,R13}
+   MOV      R15,R0
+
+.Include_WTLine_1   DCB   "Include - %s",0
+.Include_WTLine_2   DCB   "Include length : %d",0
+.Include_WTLine_3   DCB   "Include - ERROR : Source file contains NULL char!",0
+   ALIGN

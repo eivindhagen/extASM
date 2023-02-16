@@ -1,0 +1,4 @@
+| !Boot file for extASM
+
+Set File$Type_725 extASM
+IconSprites <Obey$Dir>.!Sprites

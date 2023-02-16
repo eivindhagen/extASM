@@ -1,0 +1,597 @@
+
+; >-------------------------------------------------------------<
+
+.Assembler
+   STMFD    R13!,{R14}
+   BL       Asm_Init
+
+.Asm_Pass_Loop
+   BL       Asm_Init_Pass
+
+   LDR      R0,Options
+   TST      R0,#Option_UseDefaultHeader
+   BLNE     Assemble_Default_Header
+
+   MOV      R0,#Flex_Source
+   BL       Flex_Adr
+   MOV      R10,R0                     ; R10-> Source line 1
+
+.Asm_Line_Loop
+   BL       Asm_Line
+   CMP      R8,#&00                    ; NULL -> End of source
+   BNE      Asm_Line_Loop
+
+   BL       Asm_Check_Nesting
+
+   ADR      R0,Asm_WTLine_2
+   LDR      R2,Source_Line_Num
+   LDR      R3,Object_Size
+   BL       Wimp_Text_AddLine
+
+   LDR      R0,Asm_Pass
+   ADD      R0,R0,#1
+   STR      R0,Asm_Pass
+
+   LDR      R0,Last_Pass_Valid
+   CMP      R0,#0
+   BNE      Asm_Pass_Loop              ; Keep on until same size twice and all variables are resolved!
+
+   BL       Asm_End
+   LDMFD    R13!,{R15}
+
+.Asm_WTLine_1   DCB   "====>   PASS #%2d  |<====",0
+.Asm_WTLine_2   DCB   "Source lines : %7d Object size : %d",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Asm_Init
+   STMFD    R13!,{R4,R14}
+   MOV      R0,#3
+   STR      R0,extASM_Doing
+   MOV      R0,#1
+   STR      R0,Asm_Pass                ; Multiple passes, starting from 1
+   LDR      R0,Poll_Lines
+   MOV      R0,R0,LSR #2
+   STR      R0,Poll_Lines
+   STR      R0,Poll_Timer
+   MOV      R0,#0
+   STR      R0,Stat_Data_Ready
+
+   ADR      R0,Expand_Counters         ; Clear auto-expansion warning counters
+   ADD      R1,R0,#&100
+   MOV      R4,#0
+
+.AE_Counter_Loop
+   STR      R4,[R0],#4
+   CMP      R0,R1
+   BNE      AE_Counter_Loop
+
+   MOV      R0,#15                     ; Variables and misc.
+   STR      R0,RELATIVE_Register_Set
+   STR      R4,Prev_Variable_Offset
+   STR      R4,String_Chunk
+   STR      R4,Max_String_Chunk
+   STR      R4,Virtual_Flag
+   LDMFD    R13!,{R4,R15}
+
+; >-------------------------------------------------------------<
+
+.Asm_Init_Pass
+   STMFD    R13!,{R4,R14}
+
+   BL       Wimp_Text_AddBlankLine
+
+   ADR      R0,Asm_WTLine_1
+   LDR      R2,Asm_Pass
+   BL       Wimp_Text_AddLine
+
+   BL       Setup_TempRegs
+   BL       Setup_Nesting
+   BL       Setup_AutoExpansion
+   BL       Setup_Source_Code
+   BL       Setup_Object_Code
+
+   LDR      R4,Options
+   TST      R4,#Option_CodeStat
+   BLNE     Clear_Code_Counters
+
+   TST      R4,#Option_VariableWarning
+   TSTEQ    R4,#Option_VarList
+   BLNE     Clear_Reference_Counters
+
+   MOV      R0,#0
+   STR      R0,Last_Pass_Valid                ; NULL afterwards means we're finished
+   STR      R0,Prev_Variable_Offset           ; Variable linked list
+   STR      R0,Prev_Real_Variable_Offset      ; Local variable reference, start at top
+
+   LDMFD    R13!,{R4,R15}
+
+.FPPOOL_Str DCB   "#FPPOOL_0",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Setup_TempRegs
+   MOV      R0,#0
+   STR      R0,TEMP_Status
+   STR      R0,TEMP_Stacked
+   STR      R0,TEMP_Used
+   STR      R0,TEMP_Needed_Macro
+   STR      R0,TEMP_Needed
+   STR      R0,FPTEMP_Status
+   STR      R0,FPTEMP_Stacked
+   STR      R0,FPTEMP_Used
+   STR      R0,FPTEMP_NumRegs
+   STR      R0,FPTEMP_Needed_Macro
+   STR      R0,FPTEMP_Needed
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Setup_Nesting
+   MOV      R0,#0
+   STR      R0,IF_Level
+   STR      R0,REPT_Level
+   STR      R0,STRUCT_Level
+   STR      R0,Macro_Level
+   STR      R0,IncBin_Num
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Setup_AutoExpansion
+   STMFD    R13!,{R14}
+   MOV      R0,#0
+   STR      R0,Expand_Info_Offset
+   STR      R0,Prev_Token_Object_Size
+   STR      R0,Num_Fast_NOPs
+   STR      R0,Num_Fallback_NOPs
+   STR      R0,FPPOOL_Count
+   STR      R0,FPPOOL_Size
+
+   LDR      R0,FPPOOL_Num
+   CMP      R0,#0
+   BEQ      AI_No_FPPOOL
+   ADR      R0,FPPOOL_Str
+   MOV      R1,#0
+   BL       Find_Variable
+   STR      R0,FPPOOL
+
+.AI_No_FPPOOL
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Setup_Source_Code
+   MOV      R0,#0
+   STR      R0,Brace_Count
+   STR      R0,Enable_Brace_Return
+   STR      R0,Process_Macro_Level
+   STR      R0,Source_Count_Offset
+   STR      R0,Source_Current_Offset
+   STR      R0,Source_Line_Num
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Setup_Object_Code
+   STMFD    R13!,{R14}
+   MOV      R0,#Flex_Object
+   BL       Flex_Adr
+   MOV      R11,R0                     ; R11-> Object
+   MOV      R0,#0
+   STR      R0,Object_Size             ; Reset object size for each pass
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Clear_Code_Counters
+   MOV      R2,#0
+   ADR      R0,Code_Counters           ; Clear code counters
+   ADD      R1,R0,#74*4
+
+.Code_Counters_Loop
+   STR      R2,[R0],#4
+   CMP      R0,R1
+   BNE      Code_Counters_Loop
+
+   ADR      R0,CC_Counters             ; Clear condition code counters
+   ADD      R1,R0,#64
+
+.CC_Counters_Loop
+   STR      R2,[R0],#4
+   CMP      R0,R1
+   BNE      CC_Counters_Loop
+
+   ADR      R0,Shift_Counters          ; Clear shift counters loop
+   ADD      R1,R0,#40
+
+.Shift_Counters_Loop
+   STR      R2,[R0],#4
+   CMP      R0,R1
+   BNE      Shift_Counters_Loop
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Clear_Reference_Counters
+   STMFD    R13!,{R14}
+   MOV      R0,#Flex_VarList
+   BL       Flex_Adr
+   LDR      R3,VarList_Size
+   SUB      R1,R3,#1
+   BIC      R0,R0,R1                   ; Data must lie on the size of each element boundary
+   ADD      R1,R0,R3                   ; for the sort to work
+   LDR      R2,Prev_Variable_Offset
+   CMP      R2,#0
+   BEQ      AI_End
+   ADD      R2,R2,R1
+   MOV      R14,#0
+
+.AI_Var_Loop
+   LDR      R0,[R1],R3
+   CMP      R3,#16
+   BICEQ    R0,R0,#&FF000000
+   STR      R14,[R0,#12]
+   CMP      R1,R2
+   BLT      AI_Var_Loop
+
+   LDR      R1,First_Macro
+   CMP      R1,#0
+   BEQ      AI_End
+
+.AI_Macro_Loop
+   STR      R14,[R1,#12]
+   LDR      R1,[R1,#16]
+   CMP      R1,#0
+   BNE      AI_Macro_Loop
+
+.AI_End
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Assemble_Default_Header
+   STMFD    R13!,{R14}
+   ADR      R0,Asm_Header_End
+   ADR      R1,Header_Filename
+   LDR      R2,Header_Leafname
+   MOV      R3,#1
+   BL       Setup_Error_Context
+
+   MOV      R0,#Flex_Header
+   BL       Flex_Adr
+   MOV      R10,R0                     ; R10-> Source line 1
+
+.DH_Asm_Loop
+   BL       Asm_Line
+   CMP      R8,#&00                    ; NULL -> End of source
+   BNE      DH_Asm_Loop
+
+.Asm_Header_End
+   MOV      R0,#0
+   BL       Restore_Error_Context
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Asm_End
+   STMFD    R13!,{R4,R5,R14}
+   BL       Setup_Error_Context_Info
+
+   LDR      R0,IncBin_Num
+   CMP      R0,#0
+   BLNE     Asm_Include
+
+   LDR      R4,Options
+   TST      R4,#Option_VariableWarning
+   BLNE     Asm_Check_Unused
+
+   TST      R4,#Option_VarList
+   BLNE     Asm_List_Variables
+
+   TST      R4,#Option_AutoExpand
+   BLNE     Asm_AutoExpand_Summary
+
+   TST      R4,#Option_CodeStat
+   BLNE     Asm_Statistics
+
+   BL       Stat_Windows
+
+   ;ADR      R0,Asm_WTLine_4
+   ;LDR      R2,Errors
+   ;LDR      R3,Warnings
+   ;BL       Wimp_Text_AddLine
+
+   ADR      R0,Asm_WTLine_3
+   BL       Wimp_Text_AddLine
+
+   BL       Wimp_Text_Window
+
+   LDR      R0,Throwback_First_Sent
+   CMP      R0,#1
+   LDMNEFD  R13!,{R4,R5,R15}
+
+   ADR      R3,Block                   ; Send DDEUtils_ThrowbackEnd
+   MOV      R0,#20
+   STR      R0,[R3]
+   MOV      R0,#0
+   STR      R0,[R3,#12]
+   MOV      R0,#&42584
+   STR      R0,[R3,#16]
+   MOV      R0,#17
+   MOV      R1,R3
+   LDR      R2,Throwback_Taskhandle
+   SWI      Wimp_SendMessage
+   LDMFD    R13!,{R4,R5,R15}
+
+.Asm_WTLine_3   DCB   "Assembly done!",0
+;.Asm_WTLine_4   DCB   "Errors : %d  Warnings : %d",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Stat_Windows
+   STMFD    R13!,{R4,R5,R14}
+   ADR      R5,Block
+   MOV      R1,R5
+   LDR      R0,Handle_STAT_ARM
+   STR      R0,[R1]
+   SWI      Wimp_GetWindowInfo
+   LDR      R0,[R1,#32]
+   TST      R0,#1 << 16
+   BEQ      SW_ARM_Window_Closed
+   LDR      R0,Stat_Data_Ready
+   CMP      R0,#1
+   BEQ      SW_Not_CloseWindow
+   SWI      Wimp_CloseWindow
+   B        SW_ARM_Window_Closed
+
+.SW_Not_CloseWindow
+   MOV      R0,R1
+   BL       Open_Stat_Window
+   MOV      R1,R5
+   LDR      R0,[R1],#44
+   LDMIA    R1,{R1-R4}
+   SWI      Wimp_ForceRedraw
+
+.SW_ARM_Window_Closed
+   MOV      R1,R5
+   LDR      R0,Handle_STAT_FPA
+   STR      R0,[R1]
+   SWI      Wimp_GetWindowInfo
+   LDR      R0,[R1,#32]
+   TST      R0,#1 << 16
+   BEQ      SW_FPA_Window_Closed
+   LDR      R0,Stat_Data_Ready
+   CMP      R0,#1
+   BEQ      SW_Not_CloseWindow2
+   SWI      Wimp_CloseWindow
+   B        SW_FPA_Window_Closed
+
+.SW_Not_CloseWindow2
+   MOV      R0,R1
+   BL       Open_Stat_Window
+   MOV      R1,R5
+   LDR      R0,[R1],#44
+   LDMIA    R1,{R1-R4}
+   SWI      Wimp_ForceRedraw
+
+.SW_FPA_Window_Closed
+   LDMFD    R13!,{R4,R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Asm_Fallback
+   STMFD    R13!,{R4-R8,R14}
+   MOV      R0,#Flex_Expand
+   BL       Flex_Size
+   LDR      R4,Expand_Info_Offset
+   CMP      R4,R1
+   MOVGE    R0,#Flex_Expand
+   MOVGE    R1,#Expand_Step
+   BLGE     Flex_Adjust
+   ADD      R1,R4,#4
+   STR      R1,Expand_Info_Offset
+   ADD      R4,R4,R0                   ; R4-> Expand info record
+   LDR      R5,[R4]                    ; Object size of line from previous pass
+   AND      R7,R5,#3 << 30             ; Save any error flag
+   BIC      R5,R5,#3 << 30             ; Mask it off
+   LDR      R6,Prev_Token_Object_Size  ; Object size of previous token
+   LDR      R0,Object_Size             ; Current token object size
+   SUBS     R6,R0,R6                   ; Object size of line from current pass
+   BLT      No_Fallback
+   CMP      R6,R5
+   STRGT    R15,Last_Pass_Valid        ; Line increased in size, this pass is not valid
+   BGE      No_Fallback
+   LDR      R8,Num_Fallback_NOPs
+   LDR      R0,Options
+   TST      R0,#Option_AutoShrink
+   BEQ      Fallback_Loop
+   LDR      R0,Asm_Pass                ; If it is more than Max_Passes passes, temporarily
+   CMP      R0,#Max_Passes             ; disable AutoShrink
+   STRLE    R15,Last_Pass_Valid        ; Line decreased in size, this pass is not valid
+   BLE      No_Fallback
+   MOV      R0,#&06                    ; Asm_Warning #&06 = AutoShrink temporarily turned off
+   BL       Asm_Warning
+
+.Fallback_Loop
+   MOV      R9,#&E1A00000              ; NOP instruction (MOV R0,R0)
+   BL       Write_Instruction
+   ADD      R6,R6,#4
+   ADD      R8,R8,#1
+   CMP      R6,R5
+   BLT      Fallback_Loop
+   STR      R8,Num_Fallback_NOPs
+
+.No_Fallback
+   ORR      R6,R6,R7                   ; Insert error flag again
+   STR      R6,[R4]
+   LDR      R0,Object_Size
+   STR      R0,Prev_Token_Object_Size
+   LDMFD    R13!,{R4-R8,R15}
+
+; >-------------------------------------------------------------<
+
+.Asm_Check_Nesting
+   STMFD    R13!,{R4-R6,R14}
+   LDR      R0,IF_Level
+   SUBS     R0,R0,#1
+   BLT      ACN_No_Missing_ENDIF
+   ADR      R1,IF_Array
+   ADD      R0,R0,R0,LSL #1
+   ADD      R0,R1,R0,LSL #2
+   LDR      R4,[R0,#4]
+   LDR      R6,[R0,#8]
+   MOV      R0,R4
+   BL       Find_LeafName
+   MOV      R5,R0
+   MOV      R0,#&67                    ; Asm_Error #&67 = Missing #endif
+   MOV      R1,#0
+   STMFD    R13!,{R4-R6}
+   BL       Asm_Error_Return
+   ADD      R13,R13,#12
+
+.ACN_No_Missing_ENDIF
+   LDR      R0,REPT_Level
+   SUBS     R0,R0,#1
+   LDMLTFD  R13!,{R4-R6,R15}
+   ADR      R1,REPT_Array
+   ADD      R0,R1,R0,LSL #4
+   LDR      R4,[R0,#4]
+   LDR      R6,[R0,#8]
+   MOV      R0,R4
+   BL       Find_LeafName
+   MOV      R5,R0
+   MOV      R0,#&68                    ; Asm_Error #&68 = Missing #endr
+   MOV      R1,#0
+   STMFD    R13!,{R4-R6}
+   BL       Asm_Error_Return
+   ADD      R13,R13,#12
+   LDMFD    R13!,{R4-R6,R15}
+
+; >-------------------------------------------------------------<
+
+.Asm_Include                           ;_R0 = Number of files to include
+   STMFD    R13!,{R4-R10,R14}
+   ; Inc-file records
+   ; ----------------
+   ; +0 = Filename pointer (in source)
+   ; +4 = Address to put file
+   ;
+   MOV      R6,R0
+   MOV      R0,#Flex_Binaries
+   BL       Flex_Adr
+   MOV      R9,R0                      ; R9-> Files to include
+
+.Inc_Loop
+   LDR      R10,[R9],#4
+   MOV      R4,R10
+   LDRB     R8,[R10],#1
+   BL       Find_Quote
+   SUB      R7,R10,#1
+   MOV      R0,#0
+   STRB     R0,[R7]
+   MOV      R0,#16
+   MOV      R1,R4
+   LDR      R2,[R9],#4
+   MOV      R3,#0
+   SWI      XOS_File
+   MOV      R0,#'"'
+   STRB     R0,[R7]
+   SUBS     R6,R6,#1
+   BNE      Inc_Loop
+   LDMFD    R13!,{R4-R10,R15}
+
+; >-------------------------------------------------------------<
+
+.Asm_Line                              ;_R10-> Start of line, ~R8 = EOL
+   STMFD    R13!,{R14}
+
+   LDRB     R8,[R10],#1
+   LDR      R0,Options
+   TST      R0,#Option_NoPeriod
+   BLEQ     Skip_Blanks
+
+   CMP      R8,#&0A
+   CMPNE    R8,#&00
+   BLNE     Decode_Token
+
+   LDR      R0,Poll_Timer
+   SUBS     R0,R0,#1
+   LDRLE    R0,Poll_Lines
+   STR      R0,Poll_Timer
+   BLLE     Wimp_Text_Window
+
+   LDR      R0,Source_Line
+   ADD      R0,R0,#1
+   STR      R0,Source_Line
+
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Write_Instruction
+   STMFD    R13!,{R14}
+   TST      R11,#3                     ; Testing for Word-alignment
+   BEQ      WI_Word
+   MOV      R0,#&02                    ; Asm_Warning #&02 = Code not word-aligned
+   BL       Asm_Warning
+   BL       Align_PC
+
+.WI_Word
+   LDR      R0,Virtual_Flag
+   CMP      R0,#0
+   STREQ    R9,[R11],#4
+   LDR      R0,Object_Size
+   ADD      R0,R0,#4
+   STR      R0,Object_Size
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Align_PC
+   TST      R11,#3
+   MOVEQ    R15,R14
+   BIC      R11,R11,#3
+   ADD      R11,R11,#4
+   LDR      R0,Object_Size
+   BIC      R0,R0,#3
+   ADD      R0,R0,#4
+   STR      R0,Object_Size
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Check_WorkSpace
+   STMFD    R13!,{R14}
+   LDR      R0,Object_Size
+   LDR      R1,WorkSpace
+   LDR      R2,Virtual_Flag
+   CMP      R0,R1
+   RSBGES   R3,R2,#0
+   LDMLTFD  R13!,{R15}
+
+.CW_CMP
+   ADD      R1,R1,#Object_Step
+   CMP      R0,R1
+   BGT      CW_CMP
+   STR      R1,WorkSpace
+
+   MOV      R0,#Flex_Object
+   ADD      R1,R1,#WorkSpace_Buffer
+   BL       Flex_Resize
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Unimplemented_Instruction
+   MOV      R0,#&2F                    ; Asm_Error #&2F = Unimplemented instruction (missing documentation)
+   B        Asm_Error
+
+; >-------------------------------------------------------------<
+
+.DT_Write_Instruction
+   BL       Write_Instruction
+   B        DT_End

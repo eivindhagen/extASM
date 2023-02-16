@@ -1,0 +1,1301 @@
+
+; >-------------------------------------------------------------<
+
+.Decode_Value                          ;_R8 = First char or Blank
+   STMFD    R13!,{R4-R7,R14}           ;~R0 = Value or string address (if integer or string)
+   BL       Skip_Blanks                ;~F0 = Value (if FP-value)
+                                       ;~R1 = Type of value (Int_Value, FP_Value, String_Value)
+   ;------> Unary +                    ;~R8 = Next char
+   CMP      R8,#'+'                    ;~R14 = Signal error
+   BNE      DV_Not_Unary_Plus
+   LDRB     R8,[R10],#1
+   BL       Decode_Value               ;       -2 = Warning, variable not found, but it is
+   LDMFD    R13!,{R4-R7,R15}           ;       first pass, or variable had warning flag set.
+                                       ;       If variable is not found, return value is
+.DV_Not_Unary_Plus                     ;       integer zero.
+   ;------> Unary -                    ;       -3 = End of expression
+   CMP      R8,#'-'
+   BNE      DV_Check_SubExpression
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   MNFEQE   F0,F0
+   RSBLT    R0,R0,#0
+   BGT      Mismatch_Num
+   LDMFD    R13!,{R4-R7,R15}
+
+.DV_Check_SubExpression
+   ;------> Sub-expressions
+   CMP      R8,#'('                    ; LeftPar has highest priority
+   BNE      DV_Mode
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr                ; Sub-expression, returns after matching ")"
+   CMP      R8,#')'
+   MOVNE    R0,#&47                    ; Asm_Error #&47 = Missing ")"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   CMN      R14,#3
+   MOVEQ    R14,#0
+   B        DV_End
+
+.DV_Mode
+   CMP      R8,#'''
+   BEQ      DV_Quote
+
+   CMP      R8,#'"'
+   BEQ      DV_Quote_String
+
+   CMP      R8,#'&'                    ; Check for numeric value
+   CMPNE    R8,#'$'
+   CMPNE    R8,#'%'
+   CMPNE    R8,#'@'
+   BEQ      DV_Numeric
+   CMP      R8,#'0'                    ; Check for integer value
+   RSBGES   R1,R8,#'9'
+   BGE      DV_Numeric
+
+   SUB      R7,R10,#1                  ; Pointer to start of expression
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   RSBGES   R1,R8,#'Z'
+   SUBGE    R8,R8,#'A'
+   ADDGE    R15,R15,R8,LSL #2
+   B        DV_Variable
+   B        DV_ABS_ACS_ALIGN_ASC_ASN_ATN ; A - "ABS()", "ACS()", "ALIGN()", "ASC()",
+                                       ;       "ASN()", "ATN()"
+   B        DV_Variable                ; B
+   B        DV_CHR_COS                 ; C - "CHR$()", "COS()"
+   B        DV_DEG                     ; D - "DEG()"
+   B        DV_EVAL_EXP                ; E - "EVAL()", "EXP()"
+   B        DV_Variable                ; F
+   B        DV_Variable                ; G
+   B        DV_Variable                ; H
+   B        DV_INSTR_INT               ; I - "INSTR()", "INT()"
+   B        DV_Variable                ; J
+   B        DV_Variable                ; K
+   B        DV_LEFT_LEN_LN_LOG         ; L - "LEFT$()", "LEN()", "LN()", "LOG()"
+   B        DV_MID                     ; M - "MID$()"
+   B        DV_NOT                     ; N - "NOT"
+   B        DV_Variable                ; O
+   B        DV_Variable                ; P
+   B        DV_Variable                ; Q
+   B        DV_RAD_RIGHT_RND           ; R - "RAD()", "RIGHT$()", "RND()"
+   B        DV_SGN_SIN_SQR_STR_STRING  ; S - "SGN()", "SIN()", "SQR()", "STR$()",
+                                       ;     "STRING$()"
+   B        DV_TAN_TIME                ; T - "TAN()", "TIME$()"
+   B        DV_Variable                ; U
+   B        DV_VAL                     ; V - "VAL()"
+   B        DV_Variable                ; W
+   B        DV_Variable                ; X
+   B        DV_Variable                ; Y
+   B        DV_Variable                ; Z
+
+.DV_ABS_ACS_ALIGN_ASC_ASN_ATN
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BEQ      DV_ABS
+   CMP      R8,#'C'
+   BEQ      DV_ACS
+   CMP      R8,#'L'
+   BEQ      DV_ALIGN
+   CMP      R8,#'S'
+   BEQ      DV_ASC_ASN
+   CMP      R8,#'T'
+   BEQ      DV_ATN
+   B        DV_Variable
+
+.DV_ABS
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   BLT      DVABS_Integer
+   BGT      Mismatch_Num
+   ABSE     F0,F0                      ; Floating Point
+   B        DV_End
+
+.DVABS_Integer                         ; Integer
+   CMP      R0,#0
+   RSBLT    R0,R0,#0
+   B        DV_End
+
+.DV_ACS
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   ABSE     F1,F0
+   CMFE     F1,#1
+   MOVGT    R0,#&43                    ; Asm_Error #&43 = Too big number for arc Sine or arc Cosine
+   BGT      Asm_Error
+   ACSE     F0,F0
+   B        DV_End
+
+.DV_ALIGN
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'G'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R4,R0
+   BL       Ensure_Comma
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Str
+   CMP      R0,#0
+   MOVEQ    R0,#&36                    ; Asm_Error #&36 = Bad constant
+   BEQ      Asm_Error
+   MOV      R1,R4
+   mdiv     R2,R1,R0
+   CMP      R1,#0
+   SUBNE    R4,R4,R1
+   ADDNE    R4,R4,R0
+   MOV      R0,R4
+   MOV      R1,#0
+   B        DV_End
+
+.DV_ASC_ASN
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BEQ      DV_ASC
+   CMP      R8,#'N'
+   BEQ      DV_ASN
+   B        DV_Variable
+
+.DV_ASC
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   LDRB     R0,[R0]
+   MOV      R1,#0
+   B        DV_End
+
+.DV_ASN
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   ABSE     F1,F0
+   CMFE     F1,#1
+   MOVGT    R0,#&43                    ; Asm_Error #&43 = Too big number for arc Sine or arc Cosine
+   BGT      Asm_Error
+   ASNE     F0,F0
+   B        DV_End
+
+.DV_ATN
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   ATNE     F0,F0
+   B        DV_End
+
+.DV_CHR_COS
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BEQ      DV_CHR
+   CMP      R8,#'O'
+   BEQ      DV_COS
+   B        DV_Variable
+
+.DV_CHR
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'$'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMP      R0,#&FF
+   MOVHI    R0,#&36                    ; Asm_Error #&36 = Bad constant
+   BHI      Asm_Error
+   ADR      R1,StrBuffer
+   STRB     R0,[R1]
+   MOV      R0,#0
+   STRB     R0,[R1,#1]
+   MOV      R0,R1
+   MOV      R1,#2
+   B        DV_End
+
+.DV_COS
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   COSE     F0,F0
+   B        DV_End
+
+.DV_DEG
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'G'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   LDFE     F1,DVDEG_Factor
+   MUFE     F0,F0,F1
+   B        DV_End
+
+.DVDEG_Factor DCFE   90/asn(1)
+
+.DV_EVAL_EXP
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'V'
+   BEQ      DV_EVAL
+   CMP      R8,#'X'
+   BEQ      DV_EXP
+   B        DV_Variable
+
+.DV_EVAL
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   MOV      R4,R10
+   MOV      R5,R8
+   MOV      R10,R0
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#0
+   MOVEQ    R0,#0
+   MOVEQ    R1,#0
+   BLNE     Decode_Expr
+   MOV      R10,R4
+   MOV      R8,R5
+   B        DV_End
+
+.DV_EXP
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   EXPE     F0,F0
+   B        DV_End
+
+.DV_INSTR_INT
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BEQ      DV_INT
+   CMP      R8,#'S'
+   BEQ      DV_INSTR
+   B        DV_Variable
+
+.DV_INSTR
+   ; R4 - String
+   ; R5 - Search string
+   ; R6 - Position to search from
+   ;
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   ADR      R4,Block2
+   MOV      R1,R4
+   BL       StrCopy
+   BL       Ensure_Comma
+   BL       Decode_Expr
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   MOV      R5,R0
+   BL       Skip_Blanks
+   CMP      R8,#','
+   MOVNE    R0,#1
+   BNE      DV_INSTR_End
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+
+.DV_INSTR_End
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   MOV      R6,R0
+   MOV      R0,R4
+   BL       StrLen
+   CMP      R6,#1
+   CMPGE    R0,R6
+   MOVLT    R0,#0
+   MOVLT    R1,#0
+   BLT      DV_End
+   ADD      R0,R4,R6
+   SUB      R0,R0,#1
+   MOV      R1,R5
+   BL       StrStr
+   CMP      R0,#0
+   SUBGT    R0,R0,R4
+   ADDGT    R0,R0,#1
+   MOV      R1,#0
+   B        DV_End
+
+.DV_INT
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FIXEQM   R0,F0
+   BGT      Mismatch_Num
+   MOVEQ    R1,#0
+   B        DV_End
+
+.DV_LEFT_LEN_LN_LOG
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BEQ      DV_LOG
+   CMP      R8,#'N'
+   BEQ      DV_LN
+   CMP      R8,#'E'
+   BEQ      DV_LEFT_LEN
+   B        DV_Variable
+
+.DV_LEFT_LEN
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   BEQ      DV_LEFT
+   CMP      R8,#'N'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   BL       StrLen
+   MOV      R1,#0
+   B        DV_End
+
+.DV_LEFT
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'$'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   MOV      R4,R0
+   BL       Ensure_Comma
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R2,R0
+   MOV      R0,R4
+   MOV      R1,R4
+   BL       StrCopyNum
+   MOV      R0,R4
+   MOV      R1,#2
+   B        DV_End
+
+.DV_LN
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   CMFE     F0,#0
+   MOVLE    R0,#&42                    ; Asm_Error #&42 = Logarithm range
+   BLE      Asm_Error
+   LGNE     F0,F0
+   B        DV_End
+
+.DV_LOG
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'G'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   CMFE     F0,#0
+   MOVLE    R0,#&42                    ; Asm_Error #&42 = Logarithm range
+   BLE      Asm_Error
+   LOGE     F0,F0
+   B        DV_End
+
+.DV_MID
+   ; R4 -> String
+   ; R5 -  Start
+   ; R6 -  Length
+   ;
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'$'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   MOV      R4,R0
+   BL       Ensure_Comma
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R5,R0
+   CMP      R8,#','
+   MOVNE    R0,#&FF
+   BNE      DVMID_Not_Length
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+
+.DVMID_Not_Length
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   MOV      R6,R0
+   MOV      R0,R4
+   BL       StrLen
+   CMP      R5,#1
+   CMPGE    R0,R5
+   MOVLT    R6,#0
+   ADDGE    R4,R4,R5
+   SUBGE    R4,R4,#1
+   MOV      R0,R4
+   MOV      R1,R4
+   MOV      R2,R6
+   BL       StrCopyNum
+   MOV      R0,R4
+   MOV      R1,#2
+   B        DV_End
+
+.DV_NOT
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DV_Variable
+   ; Check if "NOT" is a part of a variable name
+   ;
+   LDRB     R8,[R10]
+   CMP      R8,#'A'
+   RSBGES   R0,R8,#'Z'                 ; A-Z
+   BGE      DV_Variable
+   CMP      R8,#'a'
+   RSBGES   R0,R8,#'z'                 ; a-z
+   BGE      DV_Variable
+   CMP      R8,#'0'
+   RSBGES   R0,R8,#'9'                 ; 0-9
+   CMPLT    R8,#128                    ; 128-255
+   BGE      DV_Variable
+   CMP      R8,#'_'                    ; _
+   CMPNE    R8,#'.'                    ; .
+   BEQ      DV_Variable
+
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   MOVEQ    R1,#0
+   BGT      Mismatch_Num
+   MVN      R0,R0
+   B        DV_End
+
+.DV_RAD_RIGHT_RND
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DV_RAD
+   CMP      R8,#'I'
+   BEQ      DV_RIGHT
+   CMP      R8,#'N'
+   BEQ      DV_RND
+   B        DV_Variable
+
+.DV_RAD
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   LDFE     F1,DVRAD_Factor
+   MUFE     F0,F0,F1
+   B        DV_End
+
+.DVRAD_Factor DCFE   asn(1)/90
+
+.DV_RIGHT
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'G'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'$'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   MOV      R4,R0
+   BL       Ensure_Comma
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R5,R0
+   MOV      R0,R4
+   BL       StrLen
+   CMP      R5,#1
+   MOVLT    R5,#0
+   CMP      R5,R0
+   MOVGT    R5,R0
+   ADD      R0,R4,R0
+   SUB      R0,R0,R5
+   MOV      R1,R4
+   BL       StrCopy
+   MOV      R0,R4
+   MOV      R1,#2
+   B        DV_End
+
+.DV_RND
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   MOVEQ    R1,#0
+   BGT      Mismatch_Num
+   CMP      R0,#0
+   LDREQ    R0,DVRND_Prev_Num
+   RSBLT    R2,R0,#0
+   STRLT    R2,DVRND_Seed
+   BLE      DV_End
+   MOV      R5,R0
+   LDR      R0,DVRND_Seed
+   LDR      R1,DVRND_Constant
+   MOV      R2,#0
+   MOV      R3,#31
+   MOV      R4,#1
+
+.DVRND_Loop
+   MOVS     R0,R0,LSL #1
+   EORCS    R0,R0,R1
+   ORRCS    R2,R2,R4,LSL R3
+   SUBS     R3,R3,#1
+   BGE      DVRND_Loop
+   STR      R0,DVRND_Seed
+   BIC      R2,R2,#1 << 31
+   mdiv     R3,R2,R5
+   STR      R2,DVRND_Prev_Num
+   MOV      R0,R2
+   MOV      R1,#0
+   B        DV_End
+
+.DVRND_Seed     DCD   &12345678
+.DVRND_Constant DCD   &1D872B41
+.DVRND_Prev_Num DCD   0
+
+.DV_SGN_SIN_SQR_STR_STRING
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'G'
+   BEQ      DV_SGN
+   CMP      R8,#'I'
+   BEQ      DV_SIN
+   CMP      R8,#'Q'
+   BEQ      DV_SQR
+   CMP      R8,#'T'
+   BEQ      DV_STR_STRING
+   B        DV_Variable
+
+.DV_SGN
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   BLT      DVSGN_Integer
+   BGT      Mismatch_Num
+   ; Floating Point
+   ;
+   CMFE     F0,#0
+   MOVGT    R0,#1
+   MVNLT    R0,#0
+   MOVEQ    R0,#0
+   MOV      R1,#0
+   B        DV_End
+
+   ; Integer
+   ;
+.DVSGN_Integer
+   CMP      R0,#0
+   MOVGT    R0,#1
+   MVNLT    R0,#0
+   B        DV_End
+
+.DV_SIN
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   SINE     F0,F0
+   B        DV_End
+
+.DV_SQR
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   CMFE     F0,#0
+   MOVLT    R0,#&41                    ; Asm_Error #&41 = Negative square root
+   BLT      Asm_Error
+   SQTE     F0,F0
+   B        DV_End
+
+.DV_STR_STRING
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'$'
+   BNE      DV_STRING
+   LDRB     R8,[R10],#1
+   CMP      R8,#'~'
+   MOVEQ    R4,#1
+   MOVNE    R4,#0
+   LDREQB   R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   MOV      R2,R0
+   CMP      R4,#1
+   ADREQ    R0,DVSTR_Hex_Str
+   CMPEQ    R1,#FP_Value
+   FIXEQZ   R2,F0
+   MOVEQ    R1,#0
+   SFMFD    F0,1,[R13]!
+   CMP      R1,#1
+   MOVEQ    R2,R13
+   ADREQ    R0,DVSTR_FP_Str
+   CMPLT    R4,#1
+   ADRLT    R0,DVSTR_Integer_Str
+   BGT      Mismatch_Num
+   ADR      R4,StrBuffer
+   MOV      R1,R4
+   BL       Print_String
+   ADD      R13,R13,#12
+   MOV      R0,R4
+   MOV      R1,#2
+   B        DV_End
+
+.DVSTR_Integer_Str DCB   "%d",0
+.DVSTR_Hex_Str     DCB   "%x",0
+.DVSTR_FP_Str      DCB   "%f",0
+   ALIGN
+
+.DV_STRING
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'G'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'$'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R4,R0
+   BL       Ensure_Comma
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   CMP      R4,#0
+   MOVLE    R2,#0
+   STRLEB   R2,[R0]
+   BLE      DV_End
+   MOV      R5,R0
+   ADR      R6,Block2
+   MOV      R1,R6
+   ADD      R7,R6,#Max_String_Size
+
+.DVSTR_Loop
+   MOV      R0,R5
+   BL       StrCopy
+   SUB      R1,R1,#1
+   CMP      R1,R7
+   MOVGT    R0,#&3D                    ; Asm_Error #&3D = String too long
+   BGT      Asm_Error
+   SUBS     R4,R4,#1
+   BNE      DVSTR_Loop
+   MOV      R0,R6
+   MOV      R1,R5
+   BL       StrCopy
+   MOV      R0,R5
+   MOV      R1,#2
+   B        DV_End
+
+.DV_TAN_TIME
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DV_TAN
+   CMP      R8,#'I'
+   BEQ      DV_TIME
+   B        DV_Variable
+
+.DV_TAN
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+   TANE     F0,F0
+   B        DV_End
+
+.DV_TIME
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'$'
+   BNE      DV_Variable
+   MOV      R0,#14
+   ADR      R1,StrBuffer
+   MOV      R2,#0
+   STRB     R2,[R1]
+   SWI      OS_Word
+   MOV      R0,#0
+   STRB     R0,[R1,#24]
+   LDRB     R8,[R10],#1
+   MOV      R0,R1
+   MOV      R1,#2
+   B        DV_End
+
+.DV_VAL
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   CMP      R8,#'('
+   BNE      DV_Variable
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R8,#')'
+   BNE      Missing_Parenthesis
+   LDRB     R8,[R10],#1
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   MOV      R4,R10
+   MOV      R5,R8
+   MOV      R10,R0
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#0
+   MOVEQ    R0,#0
+   MOVEQ    R1,#0
+   BLNE     Decode_Constant
+   MOV      R10,R4
+   MOV      R8,R5
+   B        DV_End
+
+.DV_Numeric
+   BL       Decode_Constant
+   B        DV_End
+
+.DV_Quote
+   LDRB     R0,[R10],#1                ; R0 = Constant
+   LDRB     R8,[R10],#1
+   CMP      R8,#'''
+   MOVNE    R0,#&3B                    ; Asm_Error #&3B = Quotes missing in character ('.')
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   MOV      R1,#0
+   B        DV_End
+
+.DV_Quote_String
+   ADR      R3,StrBuffer
+   MOV      R4,R3
+   ADD      R5,R3,#Max_String_Size+1
+
+.DV_StringLoop
+   LDRB     R8,[R10],#1
+   CMP      R8,#'|'
+   LDREQB   R8,[R10],#1
+   BEQ      DVS_Not_Control
+   CMP      R8,#'<'
+   BNE      DVS_Not_ASCII
+   SUB      R6,R10,#1
+
+.DV_StringLoop2
+   LDRB     R8,[R10],#1
+   CMP      R8,#'>'
+   CMPNE    R8,#&0A
+   BNE      DV_StringLoop2
+   CMP      R8,#'>'
+   MOVNE    R0,#&3E                    ; Asm_Error #&3E = Missing ending ">" for ASCII value in string
+   BNE      Asm_Error
+   MOV      R0,#0
+   LDRB     R7,[R10]
+   MOV      R0,#0
+   STRB     R0,[R10]
+   MOV      R0,R6
+   MOV      R1,R3
+   MOV      R2,#&FF
+   SWI      OS_GSTrans
+   ADD      R3,R3,R2
+   STRB     R7,[R10]
+   B        DV_StringLoop
+
+.DVS_Not_ASCII
+   CMP      R8,#'"'
+   BNE      DVS_Not_Quote
+   LDRB     R0,[R10]
+   CMP      R0,#'"'
+   BNE      DVS_End
+   LDRB     R8,[R10],#1
+
+.DVS_Not_Quote
+   CMP      R8,#&0A
+   BEQ      DVS_End
+
+.DVS_Not_Control
+   CMP      R8,#&0A
+   CMPNE    R3,R5
+   BEQ      DVS_End
+   STRB     R8,[R3],#1
+   B        DV_StringLoop
+
+.DVS_End
+   CMP      R3,R5
+   MOVEQ    R0,#&3D                    ; Asm_Error #&3D = String too long
+   BEQ      Asm_Error
+   CMP      R8,#'"'
+   MOVNE    R0,#&3C                    ; Asm_Error #&3C = Quotes missing in string ("...")
+   BNE      Asm_Error
+   MOV      R0,#0
+   STRB     R0,[R3]
+   LDRB     R8,[R10],#1
+   MOV      R0,R4
+   MOV      R1,#2
+   B        DV_End
+
+.DV_Variable
+   MOV      R10,R7
+   ADR      R5,Block2
+   MOV      R0,R5
+   BL       StrCopySource
+   SUB      R1,R0,R5
+   CMP      R1,#1
+   MOVEQ    R0,#&34                    ; Asm_Error #&34 = Missing variable
+   BEQ      Asm_Error
+   MOV      R0,R5
+   MOV      R1,#0
+   BL       Find_Variable
+   CMN      R1,#1
+   BNE      DV_No_Warning
+   LDR      R2,Asm_Pass
+   CMP      R2,#1
+   MOVGT    R0,#&30                    ; Asm_Error #&30 = Unknown variable, '<Name>'
+   MOVGT    R2,R5
+   BGT      Asm_Error
+   STR      R15,Last_Pass_Valid
+   MOV      R0,#0
+   MOV      R1,#0
+   MVN      R14,#1
+   STR      R14,DV_Warning
+   B        DV_End
+
+.DV_No_Warning
+   MOV      R4,R0
+   LDRB     R0,[R4,#63]
+   MOV      R1,R0,LSR #4
+   LDR      R2,RELATIVE_Register_Read
+   CMP      R2,#15
+   STREQ    R1,RELATIVE_Register_Read
+   AND      R0,R0,#3
+   CMP      R0,#1
+   LDFEQE   F0,[R4]
+   MOVEQ    R1,#1
+   BEQ      DV_Var_End
+   LDRLT    R0,[R4]
+   MOVLT    R1,#0
+   BLT      DV_Var_End
+   ; String variable
+   ;
+   MOV      R0,#Flex_String
+   BL       Flex_Adr
+   MOV      R6,R0
+   LDR      R5,[R4]
+   ADR      R7,StrBuffer
+   MOV      R1,R7
+
+.DV_Next_Chunk
+   SUB      R5,R5,#1
+   ADD      R2,R6,R5,LSL #6
+   ADD      R2,R2,#4
+   ADD      R3,R2,#60
+
+.DV_String_Read_Loop
+   LDRB     R0,[R2],#1
+   STRB     R0,[R1],#1
+   CMP      R0,#0
+   CMPNE    R2,R3
+   BNE      DV_String_Read_Loop
+   CMP      R0,#&00
+   LDRNE    R5,[R6,R5,LSL #6]
+   BNE      DV_Next_Chunk
+   MOV      R0,R7
+   MOV      R1,#2
+
+.DV_Var_End
+   LDR      R2,[R4,#12]
+   ADD      R2,R2,#1
+   STR      R2,[R4,#12]
+   LDRB     R2,[R4,#63]
+   TST      R2,#1 << 2
+   MVNNE    R14,#1
+   STRNE    R14,DV_Warning
+   STRNE    R15,Last_Pass_Valid
+
+.DV_End                                ;_R0/F0 = Value, _R1 = Type of value
+   CMN      R14,#3
+   MOVEQ    R14,#0
+   MOV      R4,R14
+   BL       Skip_Blanks
+   MOV      R14,R4
+   CMP      R8,#&0A
+   CMPNE    R8,#&00
+   CMPNE    R8,#','
+   CMPNE    R8,#':'
+   CMPNE    R8,#';'
+   CMPNE    R8,#']'
+   CMPNE    R8,#'}'
+   MVNEQ    R14,#2
+   LDMEQFD  R13!,{R4-R7,R15}
+
+   CMP      R8,#'!'
+   LDMNEFD  R13!,{R4-R7,R15}
+   LDRB     R2,[R10]
+   CMP      R2,#'='
+   MVNNE    R14,#2
+   LDMFD    R13!,{R4-R7,R15}

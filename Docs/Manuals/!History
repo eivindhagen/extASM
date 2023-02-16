@@ -1,0 +1,53 @@
+Changes since version 1.00
+--------------------------
+TODO: Add information for version 1.00 to 2.00.
+
+Version   Comment
+-----------------
+1.00
+----
+Released program.
+
+1.01
+----
+- Fixed Throwback bug, it didn't detect the correct option in the
+  Options-window, so you had to select "MakeAOF" to use Throwback.
+
+  There is still a problem with using extASM with Throwback at the same time as
+  using a C compiler with Throwback. If you use both programs at the same time,
+  don't use Throwback on extASM, and comment out the loading of the "DDEUtilsEm"
+  in extASM's !Run file.
+
+  *** Important: It seems also that the "DDEUtilsEm" module can give some
+  strange error messages when using file operations in the Desktop. If that
+  happends, then one solution is also then to remove it from memory (and the
+  !Run file). I will try to find out where the problem is.
+
+- The extASM-module is split, so that the Throwback part and "*Drag"-statement
+  are implemented in the modules "DDEUtilsEm" and "DragMod" respectively. Then,
+  the "DragMod" module can be used freely other places, as it just contains the
+  "*Drag" statement.
+
+- The #name directive is changed. Now the whole path of the object file is
+  specified, so that the object file can be placed anywhere, not just relative
+  to the source file on the same filing system. To save the object file relative
+  to the source file, use the "Tmp$Dir" variable, like this:
+  '#name <Tmp$Dir>.ObjectFile'.
+
+- A new option is added, "Trap doubleclicks", in the Options window (it is put
+  instead of the not yet implemented "AOF" option in the Options window). When
+  this is on, if a file with extASM filetype (&725) is double-clicked, it is
+  assembled by extASM. This is handy if you use a text editor with a run-after-
+  save option, as you then can save and assemble the source from the text
+  editor.
+
+  If you use the StrongED text editor, you can instead use the extASM
+  "mode file" supplied with extASM, to save and assemble from the editor.
+
+1.02
+----
+- A small change. Now the unary operator "NOT" must be followed by a
+  not-an-identifier-character, for example space/TAB, parenthesis etc. This
+  enables one to use variables and labels starting with "NOT" (upper or lower
+  case), for example "B   Not_Test". Previously this would be interpreted as
+  "NOT _Test", and would therefore give an error. This works fine now.

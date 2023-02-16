@@ -1,0 +1,38 @@
+
+#name <Tmp$Dir>.^.^.test_structures
+
+#area test,code
+
+struct Test
+{
+.X DCD 0
+.Y DCD 0
+.Size
+}
+
+DCD &1234
+.Block
+DBB Test.Size,0
+DCD &1234
+
+struct OffsetTest,#&1000
+{
+.X DCD 0
+.Y DCD 0
+.Size
+}
+
+DCD OffsetTest.X
+DCD OffsetTest.Y
+
+struct StepTest,#&1000,4
+{
+.X
+.Y
+.Size
+}
+
+DCD StepTest.X
+DCD StepTest.Y
+
+#end

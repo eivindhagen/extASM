@@ -1,0 +1,806 @@
+
+; >-------------------------------------------------------------<
+
+.DT_Switch                             ;_R8 = "#"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'%'                    ; "#%" ?
+   BEQ      DT_LineEnd
+   BIC      R8,R8,#32                  ; Make upper case
+   CMP      R8,#'A'
+   RSBGES   R0,R8,#'Z'                 ; Char>="A" and Char<="Z"?
+   SUBGE    R8,R8,#'A'                 ; Start at zero
+   ADDGE    R15,R15,R8,LSL #2
+   B        DT_LineEnd
+   B        DTS_A                      ; A - "#area"
+   B        DTS_B                      ; B - "#base"
+   B        DT_LineEnd                 ; C
+   B        DT_LineEnd                 ; D
+   B        DTS_E                      ; E - "#else", "#end", "#endif", "#endr", "#exec", "#export"
+   B        DTS_F                      ; F - "#format", "#fpa", "#fppool", "#fpset"
+   B        DT_LineEnd                 ; G
+   B        DT_LineEnd                 ; H
+   B        DTS_I                      ; I - "#if", "#import"
+   B        DT_LineEnd                 ; J
+   B        DT_LineEnd                 ; K
+   B        DTS_L                      ; L - "#load"
+   B        DT_LineEnd                 ; M
+   B        DT_LineEnd                 ; N
+   B        DT_LineEnd                 ; O
+   B        DT_LineEnd                 ; P
+   B        DT_LineEnd                 ; Q
+   B        DTS_R                      ; R - "#rept"
+   B        DTS_S                      ; S - "#set", "#strset"
+   B        DTS_T                      ; T - "#type"
+   B        DT_LineEnd                 ; U
+   B        DT_LineEnd                 ; V
+   B        DT_LineEnd                 ; W
+   B        DT_LineEnd                 ; X
+   B        DT_LineEnd                 ; Y
+   B        DT_LineEnd                 ; Z
+
+; >-------------------------------------------------------------<
+
+.DTS_A                                 ;_R8 = "A" -> "#area"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DT_LineEnd
+   B        DT_LineEnd
+
+; >-------------------------------------------------------------<
+
+.DTS_B                                 ;_R8 = "B" -> "#base"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ; DTS_BASE
+   ;
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr            ; Base address
+   STR      R0,Object_Base
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DTS_E                                 ;_R8 = "E" -> "#else", "#end", "#endif", "#endr"
+   LDRB     R8,[R10],#1                ;             "#export"
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BEQ      DTS_ELSE
+   CMP      R8,#'N'
+   BEQ      DTS_END_ENDIF_ENDR
+   CMP      R8,#'X'
+   BEQ      DTS_EXEC_EXPORT
+
+; >-------------------------------------------------------------<
+
+.DTS_ELSE                              ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ;------> Found #else
+   ADR      R0,IF_Array
+   LDR      R1,IF_Level
+   SUBS     R1,R1,#1
+   MOVLT    R0,#&61                    ; Asm_Error #&61 = #else without #if
+   BLT      Asm_Error
+   ADD      R1,R1,R1,LSL #1
+   LDR      R2,[R0,R1,LSL #2]!         ; Read flags
+   TST      R2,#2
+   MOVNE    R0,#&61                    ; Asm_Error #&61 = #else without #if
+   BNE      Asm_Error
+   MOV      R2,#3
+   STR      R2,[R0]                    ; Set #else flag and #if state
+   SUB      R10,R10,#1
+   B        DTSI_IF_ELSE_ENDIF_Loop
+
+; >-------------------------------------------------------------<
+
+.DTS_END_ENDIF_ENDR                    ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   CMPNE    R8,#':'
+   CMPNE    R8,#';'
+   CMPNE    R8,#&0A
+   BEQ      DT_End
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BEQ      DTS_ENDIF
+   CMP      R8,#'R'
+   BEQ      DTS_ENDR
+   B        DT_LineEnd
+
+; >-------------------------------------------------------------<
+
+.DTS_ENDIF                             ;_R8 = "I"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ; Found #endif
+   ;
+   ADR      R0,IF_Array
+   LDR      R1,IF_Level
+   SUBS     R1,R1,#1                   ; Decrement #if counter
+   MOVLT    R0,#&62                    ; Asm_Error #&62 = #endif without #if
+   BLT      Asm_Error
+   STR      R1,IF_Level
+   BEQ      DT_End
+   SUB      R1,R1,#1
+   ADD      R1,R1,R1,LSL #1
+   LDR      R2,[R0,R1,LSL #2]          ; Read state of previous #if
+   TST      R2,#1
+   BNE      DT_End                     ; If TRUE, continue
+   SUB      R10,R10,#1
+   B        DTSI_IF_ELSE_ENDIF_Loop
+
+; >-------------------------------------------------------------<
+
+.DTS_ENDR                              ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ADR      R0,REPT_Array
+   LDR      R1,REPT_Level
+   CMP      R1,#0
+   MOVEQ    R0,#&64                    ; Asm_Error #&64 = #endr without #rept
+   BEQ      Asm_Error
+
+   SUB      R1,R1,#1
+   LDR      R2,[R0,R1,LSL #4]!
+   SUBS     R2,R2,#1
+   STREQ    R1,REPT_Level
+   BEQ      DT_End
+
+   STR      R2,[R0]
+   LDR      R1,[R0,#4]
+   STR      R1,Source_Filename
+   LDR      R1,[R0,#8]
+   STR      R1,Source_Line
+   LDR      R10,[R0,#12]
+   LDRB     R8,[R10],#1
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DTS_EXEC_EXPORT                       ;_R8 = "X"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BEQ      DTS_EXEC
+   CMP      R8,#'P'
+   BNE      DT_LineEnd
+   ; DTS_EXPORT                        ;_R8 = "P"
+   ;
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_LineEnd
+   B        DT_LineEnd
+
+; >-------------------------------------------------------------<
+
+.DTS_EXEC                              ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr            ; Exec address
+   STR      R0,Object_Exec
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DTS_F                                 ;_R8 = "F" -> "#format", "#fpa", "#fppool", "#fpset"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BEQ      DTS_FORMAT
+   CMP      R8,#'P'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DTS_FPA
+   CMP      R8,#'P'
+   BEQ      DTS_FPPOOL
+   CMP      R8,#'S'
+   BNE      DT_LineEnd
+
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ; DTS_FPSET
+   ;
+   BL       Skip_Blanks
+   ADR      R7,Block
+   MOV      R0,R7
+   SUB      R10,R10,#1
+   BL       StrCopySource
+   BL       Skip_Blanks
+   CMP      R8,#'='
+   MOVNE    R0,#&32                    ; Asm_Error #&32 = Unknown variable operation
+   BNE      Asm_Error
+
+   ADR      R0,DTS_Variable_Error
+   MVN      R1,#0
+   BL       Setup_Error_Context
+
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   MOVLT    R1,#1
+   BGT      Mismatch_Num
+
+   CMN      R14,#2
+   ORREQ    R1,R1,#1 << 2
+   MOV      R2,R7
+   BL       Set_Variable
+
+   MVN      R0,#0
+   BL       Restore_Error_Context
+   B        DT_End
+
+.DTS_Variable_Error
+   MVN      R0,#0
+   BL       Restore_Error_Context
+
+   MOV      R1,#1 << 9
+   MOV      R2,R7
+   BL       Set_Variable
+   B        DT_LineEnd
+
+; >-------------------------------------------------------------<
+
+.DTS_FORMAT                            ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   STR      R0,Number_Format
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DTS_FPA                               ;_R8 = "A"
+   MOV      R0,#1
+   STR      R0,Option_FPA
+   LDRB     R8,[R10],#1
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DTS_FPPOOL                            ;_R8 = "P"
+   ; Format of #fppool variables
+   ; ---------------------------
+   ; 00-03  = #fppool object code address
+   ; 04-07  = Leafname
+   ; 08-11  = Line
+   ; 12-15  = Reference counter
+   ; 16-31  = Name
+   ; 32-35  = Size of data
+   ; 36-39  = Stored size of data
+   ; 40-43  = Stored reference counter
+   ; 44-47  = Register offset
+   ;
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+
+   LDR      R0,STRUCT_Level
+   LDR      R1,RELATIVE_Register_Set
+   CMP      R0,#0
+   CMPEQ    R1,#15
+   BEQ      DTS_FPPOOL_Not_Area
+   MOV      R0,#0
+   STR      R0,FPPOOL_Num
+   MOV      R0,#&6A                    ; Asm_Error #&6A = #fppool not allowed in struct or relative area
+   B        Asm_Error
+
+.DTS_FPPOOL_Not_Area
+   MOV      R4,#15
+   MOV      R5,#0
+   BL       Skip_Blanks
+   CMP      R8,#':'
+   CMPNE    R8,#';'
+   CMPNE    R8,#&0A
+   BEQ      DTSPOOL_End_Header
+   BL       Decode_Register
+   MOV      R4,R0
+
+   BL       Skip_Blanks
+   CMP      R8,#','
+   BNE      DTSPOOL_End_Header
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   MOV      R5,R0
+
+.DTSPOOL_End_Header
+   LDR      R6,FPPOOL_Count
+   ADD      R0,R6,#1
+   STR      R0,FPPOOL_Count
+   ADR      R7,Block
+   ADR      R0,FPPOOL_Var
+   MOV      R1,R7
+   MOV      R2,R6
+   BL       Print_String
+   MOV      R0,R11
+   MOV      R1,R4,LSL #4
+   ORR      R1,R1,#1 << 10
+   MOV      R2,R7
+   BL       Set_Variable
+
+   LDR      R1,Source_LeafName
+   STR      R1,[R0,#4]
+   LDR      R1,Source_Line
+   STR      R1,[R0,#8]
+
+   MOV      R3,#0
+   LDR      R4,Asm_Pass
+   CMP      R4,#1
+   LDREQ    R1,FPPOOL_Size
+   STREQ    R3,FPPOOL_Size
+   LDRNE    R1,[R0,#32]
+   STRNE    R3,[R0,#32]
+   LDR      R2,Object_Size
+   ADD      R2,R2,R1
+   STR      R2,Object_Size
+   ADD      R11,R11,R1
+   STR      R1,[R0,#36]
+   LDR      R1,[R0,#12]
+   STR      R1,[R0,#40]
+   STR      R5,[R0,#44]
+   BL       Check_WorkSpace
+   CMP      R4,#1
+   BEQ      DT_End
+
+   LDR      R0,FPPOOL_Num
+   ADD      R2,R6,#1
+   CMP      R2,R0
+   BEQ      DT_End
+   ADR      R0,FPPOOL_Var
+   MOV      R1,R7
+   BL       Print_String
+   MOV      R0,R7
+   MOV      R1,#0
+   BL       Find_Variable
+   STR      R0,FPPOOL
+   B        DT_End
+
+.FPPOOL_Var DCB   "#FPPOOL_%d",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.DTS_I                                 ;_R8 = "I" -> "#if", "#import"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   BEQ      DTS_IF
+   CMP      R8,#'M'
+   BNE      DT_LineEnd
+   B        DT_LineEnd
+
+; >-------------------------------------------------------------<
+
+.DTS_IF                                ;_R8 = "F"
+   ; IF Array
+   ; --------
+   ; +0  = Flags    - Bit 0 - #if state,  1 = True, 0 = False
+   ;                  bit 1 - #else flag, 1 = Found, 0 = Not found
+   ; +4  = Filename
+   ; +8  = Line
+   ; +12 = Flags 2
+   ; etc.
+   ;
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   ADR      R1,IF_Array
+   LDR      R2,IF_Level
+   ADD      R3,R2,#1                   ; Increment #if counter
+   CMP      R3,#16
+   MOVGT    R0,#&65                    ; Asm_Error #&65 = Too many nested #if's, maximum 16
+   BGT      Asm_Error
+   STR      R3,IF_Level
+   ADD      R2,R2,R2,LSL #1
+   ADD      R1,R1,R2,LSL #2
+   CMP      R0,#0
+   MOVNE    R0,#1
+   LDR      R4,Source_Filename
+   LDR      R5,Source_Line
+   STMIA    R1,{R0,R4,R5}              ; Store #if state, and clear #else flag
+   BNE      DT_End                     ; TRUE - Go right ahead
+   ;------> FALSE - skip to "#if", "#else" or "#endif"
+   SUB      R10,R10,#1
+
+.DTSI_IF_ELSE_ENDIF_Loop
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+
+   CMP      R8,#&0A                    ; NewLine -> Quit scan
+   CMPNE    R8,#&00
+   BEQ      DTSI_End_Line
+
+   CMP      R8,#'#'
+   BEQ      DTSI_Check_For_IF_ELSE_ENDIF
+
+.DTSI_Next_Token
+   MOV      R0,#0
+   BL       Next_Token
+   CMP      R8,#':'
+   BEQ      DTSI_IF_ELSE_ENDIF_Loop
+
+.DTSI_End_Line
+   LDR      R0,Source_Line
+   ADD      R0,R0,#1
+   STR      R0,Source_Line
+
+   CMP      R8,#&00
+   BNE      DTSI_IF_ELSE_ENDIF_Loop
+
+   ADR      R0,IF_Array
+   LDR      R1,IF_Level
+   SUB      R1,R1,#1
+   ADD      R1,R1,R1,LSL #1
+   ADD      R0,R0,R1,LSL #2
+   LDR      R4,[R0,#4]
+   LDR      R6,[R0,#8]
+   MOV      R0,R4
+   BL       Find_LeafName
+   MOV      R5,R0
+   MOV      R0,#&67                    ; Asm_Error #&67 = Missing #endif
+   MOV      R1,#0
+   STMFD    R13!,{R4-R6}
+   BL       Asm_Error_Return
+   ADD      R13,R13,#12
+   LDMFD    R13!,{R4-R7,R15}
+
+.DTSI_Check_For_IF_ELSE_ENDIF
+   ;------> #if, #else or #endif
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BEQ      DTSI_ELSE_ENDIF
+   CMP      R8,#'I'
+   BNE      DTSI_Next_Token
+   LDRB     R8,[R10],#1                ;_R8 = "I"
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   BEQ      DTS_IF
+   B        DTSI_Next_Token
+
+; >-------------------------------------------------------------<
+
+.DTSI_ELSE_ENDIF                       ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BEQ      DTSI_ELSE
+   CMP      R8,#'N'
+   BNE      DTSI_Next_Token
+   LDRB     R8,[R10],#1                ;_R8 = "N"
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DTSI_Next_Token
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      DTSI_Next_Token
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   BNE      DTSI_Next_Token
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ;------> Found #endif
+   ADR      R0,IF_Array
+   LDR      R1,IF_Level
+   SUBS     R1,R1,#1                   ; Decrement #if counter
+   STR      R1,IF_Level
+   BEQ      DT_End
+   SUB      R1,R1,#1
+   ADD      R1,R1,R1,LSL #1
+   LDR      R2,[R0,R1,LSL #2]          ; Read state of previous #if
+   TST      R2,#1
+   BNE      DT_End                     ; If TRUE, continue
+   SUB      R10,R10,#1
+   B        DTSI_IF_ELSE_ENDIF_Loop    ; Otherwise, scan for #if, #else and #endif again
+
+; >-------------------------------------------------------------<
+
+.DTSI_ELSE                             ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DTSI_Next_Token
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DTSI_Next_Token
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ;------> Found #else
+   ADR      R0,IF_Array
+   LDR      R1,IF_Level
+   SUB      R1,R1,#1
+   ADD      R1,R1,R1,LSL #1
+   LDR      R2,[R0,R1,LSL #2]!         ; Read flags
+   TST      R2,#2
+   MOVNE    R0,#&61                    ; Asm_Error #&61 = #else without #if
+   BNE      Asm_Error
+   MOV      R2,#3
+   STR      R2,[R0]                    ; Set #else flag and #if state
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DTS_L                                 ;_R8 = "L" -> "#load"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ; DTS_LOAD
+   ;
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr            ; Load address
+   STR      R0,Object_Load
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DTS_R                                 ;_R8 = "R" -> "#rept"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ;
+   ; REPT array
+   ; ----------
+   ; +0  = Repetition counter
+   ; +4  = Filename
+   ; +8  = Line number
+   ; +12 = Source pointer
+   ; +16 = Repetition counter 2
+   ; etc.
+   ;
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr            ; Repetitions
+   CMP      R0,#0
+   MOVLE    R0,#&69                    ; Asm_Error #&69 = Number of #rept repetitions must be non-zero
+   BLE      Asm_Error
+   ADR      R1,REPT_Array
+   LDR      R2,REPT_Level
+   ADD      R3,R2,#1
+   CMP      R3,#16
+   MOVGT    R0,#&66                    ; Asm_Error #&66 = Too many nested '#rept's, maximum 16
+   BGT      Asm_Error
+   STR      R3,REPT_Level
+   STR      R0,[R1,R2,LSL #4]!
+   LDR      R0,Source_Filename
+   STR      R0,[R1,#4]
+   LDR      R0,Source_Line
+   STR      R0,[R1,#8]
+   SUB      R0,R10,#1
+   STR      R0,[R1,#12]
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DTS_S                                 ;_R8 = "S" -> "#set", "#strset"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BEQ      DTS_SET
+   CMP      R8,#'T'
+   BNE      DT_LineEnd
+
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ; DTS_STRSET
+   ;
+   BL       Skip_Blanks
+   ADR      R7,Block
+   MOV      R0,R7
+   SUB      R10,R10,#1
+   BL       StrCopySource
+   BL       Skip_Blanks
+   CMP      R8,#'='
+   MOVNE    R0,#&32                    ; Asm_Error #&32 = Unknown variable operation
+   BNE      Asm_Error
+
+   ADRL     R0,DTS_Variable_Error
+   MVN      R1,#0
+   BL       Setup_Error_Context
+
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   MOVEQ    R1,#2
+   CMP      R1,#2
+   BNE      Mismatch_Str
+
+   CMN      R14,#2
+   ORREQ    R1,R1,#1 << 2
+   MOV      R2,R7
+   BL       Set_Variable
+
+   MVN      R0,#0
+   BL       Restore_Error_Context
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DTS_SET                               ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   BL       Skip_Blanks
+   ADR      R7,Block
+   MOV      R0,R7
+   SUB      R10,R10,#1
+   BL       StrCopySource
+   BL       Skip_Blanks
+   CMP      R8,#'='
+   MOVNE    R0,#&32                    ; Asm_Error #&32 = Unknown variable operation
+   BNE      Asm_Error
+
+   ADRL     R0,DTS_Variable_Error
+   MVN      R1,#0
+   BL       Setup_Error_Context
+
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   MOV      R1,#0
+
+   CMN      R14,#2
+   ORREQ    R1,R1,#1 << 2
+   MOV      R2,R7
+   BL       Set_Variable
+
+   MVN      R0,#0
+   BL       Restore_Error_Context
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DTS_T                                 ;_R8 = "T" -> "#type"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'Y'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DT_LineEnd
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ; DTS_TYPE
+   ;
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr            ; File type
+   STR      R0,Object_Filetype
+   B        DT_End

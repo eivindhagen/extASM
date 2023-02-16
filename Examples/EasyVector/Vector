@@ -1,0 +1,495 @@
+; ----------------------------------------
+; Simple Vector Pyramid
+; © Eivind Hagen
+; © Zynx/ArcEmpire
+; Based on RGBW Pyramid, The Gathering '93
+; Programmed : 10 August 1993 - Evening
+;
+; Modified by Terje Slettebø to take
+; advantage of new extASM features, such
+; as the 'relative' statement, April 1995.
+; ----------------------------------------
+
+#set vdu = 256
+
+#set Stack_Size=2048
+#set Screen_Mode=13
+
+#set Screen_Width=320
+#set Screen_Height=256
+#set Screen_BPP=8
+
+#set Screen_Size=(Screen_Width*Screen_BPP/8)*Screen_Height
+#set Screen_Buffers=2
+
+.Code_Start
+
+;  >============================================================<
+;  >                             START                          <
+;  >============================================================<
+
+.Start
+   ADRL     R12,General_Data
+   STR      R13,Old_Stack
+   ADR      R13,New_Stack+Stack_Size
+   STMFD    R13!,{R0-R12,R14}
+
+; >-----------------------------------------------------------<
+
+   BL       Initialize
+
+; >-------------------------------------------------------------<
+
+.Main_Loop
+   MOV      R0,#19
+   SWI      OS_Byte
+
+   BL       Swap_Screens
+   BL       Clear_Screen
+   BL       GorTri
+
+._Loop
+   SWI      OS_Mouse
+   TST      R2,#%001
+   BNE      _Loop                      ; Right button = Pause
+   TST      R2,#%100
+   BEQ      Main_Loop
+
+; >-------------------------------------------------------------<
+
+.The_End
+   B        Quit
+
+; >=============================================================<
+
+;  --------------------------------------------------------------
+;  |      ####  #####  #   #  #####  ####    ###   #            |
+;  |     #      #      ##  #  #      #   #  #   #  #            |
+;  |     #  ##  ###    # # #  ###    ####   #####  #            |
+;  |     #   #  #      #  ##  #      #  #   #   #  #            |
+;  |      ###   #####  #   #  #####  #   #  #   #  #####        |
+;  --------------------------------------------------------------
+
+;  >============================================================<
+;  >                      GENERAL ROUTINES                      <
+;  >============================================================<
+
+.Initialize
+   STMFD    R13!,{R14}
+
+   MOV      R0,#135
+   SWI      OS_Byte 
+   STR      R2,Original_Mode
+
+   SWI      vdu+22                     ; VDU 22 - SET SCREEN MODE
+   SWI      vdu+0                      ; MODE 0 - USED TO FREE LOT'S OF MEMORY
+
+   MOV      R0,#2
+   SWI      OS_ReadDynamicArea
+
+   MOV      R0,#2
+   MOV      R2,#Screen_Buffers*Screen_Size
+   RSB      R1,R1,R2
+   SWI      OS_ChangeDynamicArea
+
+   MOV      R0,#2
+   SWI      OS_ReadDynamicArea
+   MOV      R2,#Screen_Buffers*Screen_Size
+   CMP      R1,R2
+   MOVLT    PC,#0
+
+   ADR      R0,Buffer 
+   MOV      R1,R0
+   MOV      R2,#149
+   STR      R2,[R0,#0]
+   MVN      R2,#0
+   STR      R2,[R0,#4]
+   SWI      OS_ReadVduVariables 
+   LDR      R2,[R1,#0]
+   STR      R2,Screen_Top 
+   SWI      vdu+22                     ; VDU 22 - SET SCREEN MODE
+   SWI      vdu+Screen_Mode            ; Set proper screen mode
+   SWI      OS_RemoveCursors 
+
+   MOV      R0,#Screen_Buffers         ; Clear screen memory
+   LDR      R1,Screen_Top 
+.Clear_Screen_Memory
+   STR      R1,Screen_Adr 
+   STMFD    R13!,{R0,R1}
+   BL       Clear_Screen
+   LDMFD    R13!,{R0,R1}
+   MOV      R2,#Screen_Size
+   ADD      R1,R1,R2
+   SUBS     R0,R0,#1
+   BGT      Clear_Screen_Memory
+   LDMFD    R13!,{PC}^
+
+; >-------------------------------------------------------------<
+
+.Quit
+   SWI      OS_RestoreCursors 
+   MVN      R0,#0                      ; -1, close commandwindow
+   SWI      Wimp_CommandWindow 
+   LDR      R0,Original_Mode
+   SWI      Wimp_SetMode 
+   LDMFD    R13!,{R0-R12,R14}
+   LDR      R13,Old_Stack
+   MOVS     PC,R14
+
+; >-------------------------------------------------------------<
+
+.Swap_Screens
+   STMFD    R13!,{R14}
+
+   MOV      R0,#113                    ; OS_Byte 113 - SET HARDWARE SCREEN BANK
+   LDR      R1,Screen_Bank             ;
+   ADD      R1,R1,#1                   ;
+   SWI      OS_Byte                    ;
+
+   LDR      R0,Screen_Top 
+   LDR      R3,Screen_Bank 
+   ADD      R1,R3,#1
+   CMP      R1,#Screen_Buffers
+   MOVGE    R1,#0
+   STR      R1,Screen_Bank 
+   MOV      R2,#Screen_Size                  ; R2 = Screen size
+   MLA      R1,R2,R1,R0
+   STR      R1,Screen_Adr 
+   ADD      R1,R1,R2,ASR #1
+   MOV      R2,#Screen_Width*Screen_BPP/8    ; R2 = Line size
+   ADD      R1,R1,R2,ASR #1
+   STR      R1,Screen_Origo 
+   MLA      R3,R2,R3,R0
+   STR      R3,Screen_Old 
+
+   LDMFD    R13!,{PC}^
+
+; >-------------------------------------------------------------<
+
+.Clear_Screen
+   LDR      R0,Screen_Adr 
+   MOV      R1,#Screen_Size/4/10/4
+   MOV      R2,#0
+   MOV      R3,#0
+   MOV      R4,#0
+   MOV      R5,#0
+   MOV      R6,#0
+   MOV      R7,#0
+   MOV      R8,#0
+   MOV      R9,#0
+   MOV      R10,#0
+   MOV      R11,#0
+.Clear_Screen_Loop
+   #rept 4
+   STMIA    R0!,{R2-R11}
+   #endr
+   SUBS     R1,R1,#1
+   BGT      Clear_Screen_Loop
+   MOV      PC,R14
+
+; >-------------------------------------------------------------<
+
+
+.Tri_Model                             ; 3d coordinates for Tetraeder
+   DCD     0 : DCD    60-60 : DCD   -40+40
+   DCD   -60 : DCD   -40-60 : DCD   -40+40
+   DCD    60 : DCD   -40-60 : DCD   -40+40
+   DCD     0 : DCD     0-60 : DCD    60+40
+
+.Tri_Temp
+   DCD     0 : DCD     0 : DCD     0
+   DCD     0 : DCD     0 : DCD     0
+   DCD     0 : DCD     0 : DCD     0
+   DCD     0 : DCD     0 : DCD     0
+
+.Tri_Coord                             ; Coordinates
+   DCD   200, 150
+   DCD   250, 250
+   DCD   400, 170
+   DCD   100, 130
+
+.Triangles_Num
+   DCD     4
+
+.Triangles                             ; Coord-ptrs & colour [4 colour bytes]
+   DCD     0,1,2 , &40404040
+   DCD     0,2,3 , &80808080
+   DCD     0,3,1 , &a0a0a0a0
+   DCD     3,2,1 , &f0f0f0f0
+
+.Rot_X     DCD   0
+.Rot_Y     DCD   0
+.Rot_Z     DCD   0
+
+.GorTri
+   STMFD    R13!,{R0-R12,R14}
+
+   ;------> Rotate model
+   ;        X Rotate
+
+   ADR      R0,Tri_Model               ; R0-> Model coords  [X,Y,Z]
+   ADR      R1,Tri_Temp                ; R1-> Temp coords   [X,Y,Z]
+   ADR      R2,Sin_Tab 
+   ADR      R3,Cos_Tab 
+
+   LDR      R4,Rot_X
+   ADD      R4,R4,#3
+   BIC      R4,R4,#512
+   STR      R4,Rot_X
+
+   LDR      R2,[R2,R4,ASL #2]          ; R2 = SinX
+   LDR      R3,[R3,R4,ASL #2]          ; R3 = CosX
+   MOV      R4,#4                      ; R4 = Points
+._Loop
+   LDMIA    R0!,{R5,R6,R7}             ; R5 = X * R6=Y, R7=Z            [0 Bit]
+   MUL      R8,R3,R6                   ; R8 = Y * CosX                  [12 Bit]
+   MUL      R9,R3,R7                   ; R9 = Z * CosX                  [12 Bit]
+   MUL      R10,R2,R6                  ; R10= Y * SinX                  [12 Bit]
+   MUL      R11,R2,R7                  ; R11= Z * SinX                  [12 Bit]
+   SUB      R6,R8,R11                  ;                                [12 Bit]
+   ADD      R7,R9,R10                  ;                                [12 Bit]
+   MOV      R6,R6,ASR #12              ;                                [0 Bit]
+   MOV      R7,R7,ASR #12              ;                                [0 Bit]
+   STMIA    R1!,{R5,R6,R7}             ; Store Rotated coords
+
+   SUBS     R4,R4,#1
+   BGT      _Loop
+
+   ;        Z Rotate
+
+   ADR      R0,Tri_Temp                ; R0-> Model coords  [X,Y,Z]
+   ADR      R1,Tri_Temp                ; R1-> Temp coords   [X,Y,Z]
+   ADR      R2,Sin_Tab 
+   ADR      R3,Cos_Tab 
+
+   LDR      R4,Rot_Z
+   ADD      R4,R4,#2
+   BIC      R4,R4,#512
+   STR      R4,Rot_Z
+
+   LDR      R2,[R2,R4,ASL #2]          ; R2 = SinX
+   LDR      R3,[R3,R4,ASL #2]          ; R3 = CosX
+   MOV      R4,#4                      ; R4 = Points
+._Loop2
+   LDMIA    R0!,{R5,R6,R7}             ; R5 = X * R6=Y, R7=Z            [0 Bit]
+   MUL      R8,R3,R5                   ; R8 = Y * CosX                  [12 Bit]
+   MUL      R9,R3,R6                   ; R9 = Z * CosX                  [12 Bit]
+   MUL      R10,R2,R5                  ; R10= Y * SinX                  [12 Bit]
+   MUL      R11,R2,R6                  ; R11= Z * SinX                  [12 Bit]
+   SUB      R5,R8,R11                  ;                                [12 Bit]
+   ADD      R6,R9,R10                  ;                                [12 Bit]
+   MOV      R5,R5,ASR #12              ;                                [0 Bit]
+   MOV      R6,R6,ASR #12              ;                                [0 Bit]
+   STMIA    R1!,{R5,R6,R7}             ; Store Rotated coords
+
+   SUBS     R4,R4,#1
+   BGT      _Loop2
+
+   ;------> Project 3D -> 2D
+
+   ADR      R0,Tri_Temp                ; R0-> Temp coords   [X,Y,Z]
+   ADR      R1,Tri_Coord               ; R1-> Screen coords [X,Y]
+   ADR      R14,Per_Tab
+   MOV      R2,#4                      ; R2 = Number of Points
+._Loop3
+   LDMIA    R0!,{R3,R4,R5}             ; R3=X, R4=Y, R5=Z
+   ADD      R5,R5,#480
+   LDR      R5,[R14,R5,ASL #2]
+   MUL      R3,R5,R3
+   MUL      R4,R5,R4
+   MOV      R3,R3,ASR #12+2
+   MOV      R4,R4,ASR #12+2
+   ADD      R3,R3,#Screen_Width/2
+   RSB      R4,R4,#Screen_Height/2
+   STMIA    R1!,{R3,R4}                ; Next coord
+
+   SUBS     R2,R2,#1
+   BGT      _Loop3
+
+   ;------> Plot triangles
+
+   MOV      R4,#0
+.Polygons_Loop
+   ADR      R3,Triangles               ; R3-> Triangle vertices
+   ADD      R3,R3,R4,ASL #4
+
+   ;------> Check face
+
+   ADR      R2,Tri_Coord 
+   LDMIA    R3,{R6,R8,R10}
+   ADD      R6,R2,R6,ASL #3
+   ADD      R8,R2,R8,ASL #3
+   ADD      R10,R2,R10,ASL #3
+   LDMIA    R6,{R6,R7}
+   LDMIA    R8,{R8,R9}
+   LDMIA    R10,{R10,R11}
+   SUB      R8,R8,R6
+   SUB      R9,R9,R7
+   SUB      R6,R10,R6
+   SUB      R7,R11,R7
+
+   MUL      R10,R6,R9
+   MUL      R11,R7,R8
+   CMP      R10,R11
+   BLT      Next_Polygon
+
+   ;------> Clear Scan buffers
+
+   STMFD    R13!,{R0-R4}
+
+   ADR      R0,Tri_Buff_Left 
+   ADR      R1,Tri_Buff_Right 
+   MOV      R2,#Screen_Height
+   MOV      R3,#-1
+._Loop
+   STMIA    R0!,{R3}
+   STMIA    R1!,{R3}
+   SUBS     R2,R2,#1
+   BGT      _Loop
+
+   LDMFD    R13!,{R0-R4}
+
+   ;------> Scan all vertices
+
+   STMFD    R13!,{R3,R4}
+
+   ADR      R0,Tri_Buff_Left 
+   ADR      R1,Tri_Buff_Right 
+   ADR      R2,Tri_Coord 
+
+   LDR      R5,[R3,#0]
+   LDR      R7,[R3,#4]
+   BL       Scan_Vertice               ; p0 - p1
+   LDR      R5,[R3,#4]
+   LDR      R7,[R3,#8]
+   BL       Scan_Vertice               ; p1 - p2
+   LDR      R5,[R3,#8]
+   LDR      R7,[R3,#0]
+   BL       Scan_Vertice               ; p2 - p0
+
+   ;------> Plot Scan buffers
+
+   LDR      R10,[R3,#12]
+   ADR      R0,Tri_Buff_Left
+   ADR      R1,Tri_Buff_Right
+   LDR      R14,Screen_Adr
+   MOV      R3,#Screen_Height
+.Line_Loop
+   LDMIA    R0!,{R6}                   ; R6=x0
+   LDMIA    R1!,{R8}                   ; R8=x1
+
+   CMP      R6,R8
+   EXGGT    R6,R8                      ; R6 < R8, fill line from R6 to R8 with colour in R10
+   CMP      R8,#-1                     ; if R8 = -1, then this line is not important
+   BEQ      Line_Filled
+   CMP      R6,#-1                     ; check if line start is missing ? (sort of a bug)
+   MOVEQ    R6,R8
+
+   ADD      R6,R14,R6
+   ADD      R8,R14,R8
+
+.Line_Fill_Start
+   ;------> Fill until word boundary
+._Loop
+   STRB     R10,[R6],#1
+   CMP      R6,R8
+   BGT      Line_Filled
+   TST      R6,#%11                    ; test byte-bits
+   BNE      _Loop                      ; fill until word boundary
+
+.Line_Fill_Fast
+   ;------> Fill as many words as possible
+   SUB      R8,R8,#4                   ; reduce R8 to detect end quicker
+._Loop
+   CMP      R6,R8
+   BGT      Line_Fill_End
+   STR      R10,[R6],#4
+   BLE      _Loop                      ; fill more words
+
+.Line_Fill_End
+   ADD      R8,R8,#4                   ; fix R8 after manipulation
+   ;------> Fill until end
+._Loop
+   STRB     R10,[R6],#1
+   CMP      R6,R8
+   BLE      _Loop                      ; fill until word boundary
+
+.Line_Filled
+   ADD      R14,R14,#Screen_Width      ; Add 1 line
+   SUBS     R3,R3,#1
+   BGT      Line_Loop
+
+   LDMFD    R13!,{R3,R4}
+
+; >- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -<
+
+.Next_Polygon
+   ADD      R4,R4,#1
+   LDR      R5,Triangles_Num 
+   CMP      R4,R5
+   BLT      Polygons_Loop
+
+   LDMFD    R13!,{R0-R12,PC}^
+
+; >-------------------------------------------------------------<
+
+.Scan_Vertice
+   STMFD    R13!,{R0-R12,R14}
+
+   ADD      R5,R2,R5,ASL #3            ; *8
+   ADD      R7,R2,R7,ASL #3            ; *8
+   LDMIA    R5,{R5,R6,R10}             ; R5=x0, R6=y0, R10=RRGGBB
+   LDMIA    R7,{R7,R8,R11}             ; R7=x1, R8=y1, R11=RRGGBB
+   CMP      R6,R8
+   MOVLE    R9,R0
+   MOVGT    R9,R1                      ; R9-> Scan buffer, X update
+   EXGGT    R5,R7
+   EXGGT    R6,R8                      ; y0 < y1
+   EXGGT    R10,R11
+
+   MOV      R5,R5,ASL #16              ; R5=x0             [16 Bit]
+   MOV      R7,R7,ASL #16              ; R7=x1             [16 Bit]
+   SUB      R10,R7,R5                  ; R10=dx            [16 Bit]
+   SUB      R11,R8,R6                  ; R11=dy
+   ADD      R11,R11,#1                 ; NO DIVISION BY ZERO !!!!!!!!!!!!!!
+   TEMP     R0
+   DIV      R14,R10,R11                ; R14=dx/dy         [16 Bit]
+   LOCK     R0
+._Loop
+   MOV      R10,R5,ASR #16
+   STR      R10,[R9,R6,ASL #2]
+   ADD      R5,R5,R14
+   ADD      R6,R6,#1
+   CMP      R6,R8
+   BLE      _Loop
+
+   LDMFD    R13!,{R0-R12,PC}^
+
+;  >============================================================<
+;  >                         GENERAL DATA                       <
+;  >============================================================<
+
+.General_Data
+relative R12
+{
+.Original_Mode          DCD   0
+.Screen_Top             DCD   0
+.Screen_Adr             DCD   0
+.Screen_Old             DCD   0
+.Screen_Origo           DCD   0
+.Screen_Bank            DCD   0
+.Old_Stack              DCD   0
+   ALIGN 256
+.New_Stack              DBB   Stack_Size,0
+.Buffer                 DBB   1024,0
+.Tri_Buff_Left          DBD   Screen_Height,0
+.Tri_Buff_Right         DBD   Screen_Height,0
+
+.Sin_Tab    incbin   "<Tmp$Dir>.Tables.S_512_12"
+.Cos_Tab    incbin   "<Tmp$Dir>.Tables.C_512_12"
+.Per_Tab    incbin   "<Tmp$Dir>.Tables.P_1024_12"
+}
+
+; >-------------------------------------------------------------<
+
+.Code_End

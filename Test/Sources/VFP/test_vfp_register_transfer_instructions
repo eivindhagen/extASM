@@ -1,0 +1,48 @@
+
+#name <Tmp$Dir>.^.^.test_vfp_register_transfer_instructions
+
+#area test,code
+
+; Floating point <-> Floating point conversions
+
+FCVTDS    D1,S1            ; D1 = S1
+FCVTDSEQ  D1,S1
+
+FCVTSD    S1,D1            ; S1 = D1
+FCVTSDEQ  S1,D1
+
+; Floating point <-> Integer conversions
+
+FSITOS    S1,S2            ; S1 = S2 (signed integer)
+FSITOSEQ  S1,S1
+
+FSITOD    D1,S1            ; D1 = S1 (signed integer)
+FSITODEQ  D1,S1
+
+FUITOS    S1,S2            ; S1 = S2 (unsigned integer)
+FUITOSEQ  S1,S2
+
+FUITOD    D1,S1            ; D1 = S1 (unsigned integer)
+FUITODEQ  D1,S1
+
+FTOSIS    S1,S2            ; S1 (signed integer) = S2
+FTOSIZS   S1,S2
+FTOSISEQ  S1,S2
+FTOSIZSEQ S1,S2
+
+FTOSID    S1,D1            ; S1 (signed integer) = D1
+FTOSIZD   S1,D1
+FTOSIDEQ  S1,D1
+FTOSIZDEQ S1,D1
+
+FTOUIS    S1,S2            ; S1 (unsigned integer) = S2
+FTOUIZS   S1,S2
+FTOUISEQ  S1,S2
+FTOUIZSEQ S1,S2
+
+FTOUID    S1,D1            ; S1 (unsigned integer) = D1
+FTOUIZD   S1,D1
+FTOUIDEQ  S1,D1
+FTOUIZDEQ S1,D1
+
+#end

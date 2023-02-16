@@ -1,0 +1,27 @@
+
+#name <Tmp$Dir>.^.^.test_shifts
+
+#area test,code
+
+MOV    R1,#1 << 16
+
+MOV    R1,R2,LSL #1
+MOV    R1,R2,LSR #1
+MOV    R1,R2,ASR #1
+MOV    R1,R2,ROR #1
+MOV    R1,R2,RRX
+
+MOV    R1,R2,LSL R3
+MOV    R1,R2,LSR R3
+MOV    R1,R2,ASR R3
+MOV    R1,R2,ROR R3
+
+MOV    R1,R2,LSL #0
+MOV    R1,R2,LSR #0
+MOV    R1,R2,ASR #0
+MOV    R1,R2,ROR #0
+
+MOV    R1,R2,LSR #32
+MOV    R1,R2,ASR #32
+
+#end

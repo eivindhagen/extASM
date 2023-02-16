@@ -1,0 +1,261 @@
+
+.General_Data
+
+relative R12,#-Relative_Position
+{
+   ; Wimp
+   ;
+   .Relative_Start
+   .Task_Name                 DCB   "extASM",0
+   .extASM_DirVar             DCB   "extASM$Dir",0
+   .TmpDir_Var                DCB   "Tmp$Dir",0
+   .Default_Object_Filename   DCB   "|<Tmp$Dir>.Object",0
+   .Empty_Str                 DCB   0
+   ; Menu
+   ;
+   .CM_Dotted_Str             DCB   "$D",0
+   .CM_MenuWarning_Str        DCB   "$M",0
+   .CM_Writable_Str           DCB   "$W",0
+   .CM_Foreground_Str         DCB   "$F",0
+   .CM_Background_Str         DCB   "$B",0
+                              ALIGN
+   .Task_String               DCB   "TASK"
+   .Message_List              DCD   1,2,3,4,5,6,7,&A,&502,&400C0,&400C1,0
+   ; File transfer
+   ;
+   .DataSave_Ref              DCD   -1
+   .DataSaveAck_Ref           DCD   -1
+   .DataLoad_Ref              DCD   -1
+   .RAMFetch_Ref              DCD   -1
+   .RAMTransmit_Ref           DCD   -1
+   .Relative_End
+}
+
+relative R12,#-Relative_Position+Relative_End-Relative_Start,virtual
+{
+   .RO3_Flag                  DCD   0
+   .Task_Handle               DCD   0
+   .extASM_Doing              DCD   0     ; 1 = PreProcessor, 2 = MacroScanner, 3 = Assembler
+                                          ; 0 = Ready
+   .extASM_Pause              DCD   0     ; 0 = Not pause, 1 = Pause
+   ; Windows
+   ;
+   .Handle_BARICON            DCD   0
+   .Handle_INFO               DCD   0
+   .Handle_SAVE               DCD   0
+   .Handle_OPTIONS            DCD   0
+   .Handle_PROCESS            DCD   0
+   .Handle_STATUS             DCD   0
+   .Handle_STAT_ARM           DCD   0
+   .Handle_STAT_FPA           DCD   0
+   ; Menus
+   ;
+   .Menu_Array                DBD   Max_Menu_Entries
+   .Menu_Count                DCD   0
+   .Max_Menu_Pointer          DCD   0
+   .Menu_Item_Ticked          DCD   0
+   .Main_Menu                 DCD   0
+   ; Status Info window
+   ;
+   .Wimp_Text_Space           DCD   0
+   .Wimp_Text_Size            DCD   0
+   .Wimp_Text_Lines           DCD   0
+   .Previous_Wimp_Text_Lines  DCD   0
+   .MinLines_Pointer          DCD   0
+   ; Statistics windows
+   ;
+   .Previous_ARM_PieRadius    DCD   0
+   .Previous_FPA_PieRadius    DCD   0
+   .PieRadius_Pointer         DCD   0
+   ; File transfer
+   ;
+   .RAMFetch_Window           DCD   0
+   .RAMFetch_Icon             DCD   0
+   .RAMFetch_Receiver         DCD   0
+   .RF_DataPointer            DCD   0
+   .File_Data
+   .File_FlexBlock            DCD   0
+   .File_Address              DCD   0
+   .File_Size                 DCD   0
+   .File_Type                 DCD   0
+   .File_Leafname             DCD   0     ; Ctrl-terminated
+   ; Memory management and misc.
+   ;
+   .Ind_Pointer               DCD   0
+   .Max_ScreenX               DCD   0
+   .Max_ScreenY               DCD   0
+   .Ctrl_Block                DBB   16
+   .Flex_Blocks               DCD   0
+   .MemTop                    DCD   0
+   ;
+   ; Options
+   ;
+   .Option_File_Start
+   .Options                   DCD   0
+   .Option_Colours            DCD   0
+   .Option_PieRadius          DCD   0
+   .Option_MinLines           DCD   0
+   .Option_File_End
+   ; Switches
+   ;
+   .Option_Face               DCD   0
+   .Poll_Lines                DCD   0
+   .Poll_Timer                DCD   0
+   .IncBin_Num                DCD   0
+   .Option_FPA                DCD   0
+   ; Relative
+   ;
+   .RELATIVE_Register_Set     DCD   0
+   .RELATIVE_Register_Read    DCD   0
+   ; Source
+   ;
+   .Source_Size               DCD   0
+   .Source_Filetype           DCD   0
+   .Source_Size_Data          DCD   0
+   .Source_Num_Offset         DCD   0
+   .Source_Count_Offset       DCD   0
+   .Source_Current_Offset     DCD   0
+   .Source_Line_Num           DCD   0
+   .Header_Leafname           DCD   0
+   ; Object
+   ;
+   .Object_Filename           DCD   0
+   .Object_Size               DCD   0
+   .Object_Filetype           DCD   0
+   .Object_Base               DCD   0
+   .Object_Load               DCD   0
+   .Object_Exec               DCD   0
+   ; Assembler
+   ;
+   .Asm_Pass                  DCD   0
+   .Last_Pass_Valid           DCD   0
+   .WorkSpace                 DCD   0
+   .Expand_Info_Offset        DCD   0
+   .Prev_Token_Object_Size    DCD   0
+   .Num_Fast_NOPs             DCD   0
+   .Num_Fallback_NOPs         DCD   0
+   .Brace_Count               DCD   0
+   .Enable_Brace_Return       DCD   0
+   .Process_Macro_Level       DCD   0
+   .Virtual_Flag              DCD   0
+   .Errors                    DCD   0
+   ;.Warnings                  DCD   0
+
+   .AutoExpand_Number         DCD   0
+   .AutoExpand_Pointer        DCD   0
+   .AutoExpand_Make_MOV       DCD   0
+   .AutoExpand_Rn             DCD   0
+   .FP_AutoExpand_Number      DCD   0
+   ; Statistics
+   ;
+   .Stat_Data_Ready           DCD   0
+   ; Variables
+   ;
+   .Variable_MaxNum           DCD   0
+   .Variable_Power2           DCD   0
+   .Prev_Variable_Offset      DCD   0
+   .Prev_Real_Variable_Offset DCD   0
+   .Max_String_Chunk          DCD   0
+   .String_Chunk              DCD   0
+   .Number_Format             DCD   0
+   .CSFP_Format               DCD   0
+   .Label_Num                 DCD   0
+   .FPPOOL_Num                DCD   0
+   .FPPOOL_Count              DCD   0
+   .FPPOOL                    DCD   0
+   .FPPOOL_Size               DCD   0
+   .VarList_Size              DCD   0
+   .DV_Warning                DCD   0
+
+   ; Macros
+   ;
+   .Source_Context            DBD   3
+   .Macro_Num                 DCD   0
+   .Macro_MaxNum              DCD   0
+   .Macro_Power2              DCD   0
+   .TEMP_Status               DCD   0     ; Bitmask, 0=LOCKed, 1=TEMPed
+   .TEMP_Needed               DCD   0     ; Bitmask, 0=Not needed in current instr., 1=Needed
+   .FPTEMP_Status             DCD   0     ; Bitmask, 0=LOCKed, 1=TEMPed
+   .FPTEMP_Needed             DCD   0     ; Bitmask, 0=Not needed in current instr., 1=Needed
+   .First_Macro               DCD   0
+   .Previous_Macro            DCD   0
+   .Macro_Level               DCD   0     ; This must not be moved
+   ; Stack frame top
+   ;
+   .Stack_Frame
+   .TEMP_Needed_Macro         DCD   0     ; Bitmask, 0=Not needed in current macro, 1=Needed
+   .TEMP_Stacked              DCD   0     ; Bitmask, 0=Not stacked, 1=Stacked
+   .TEMP_Used                 DCD   0     ; Bitmask, 0=TEMP register not used, 1=Used
+   .Source_Filename           DCD   0     ; The following three must be in this order
+   .Source_LeafName           DCD   0
+   .Source_Line               DCD   0
+   .Macro_Parameter_Start     DCD   0
+   .Macro_Parameter_End       DCD   0
+
+   .FPTEMP_Needed_Macro       DCD   0     ; Bitmask, 0=Not needed in current macro, 1=Needed
+   .FPTEMP_Stacked            DCD   0     ; Bitmask, 0=Not stacked, 1=Stacked
+   .FPTEMP_Used               DCD   0     ; Bitmask, 0=TEMP register not used, 1=Used
+   .FPTEMP_FirstReg           DCD   0     ; First register to be stacked
+   .FPTEMP_NumRegs            DCD   0     ; Number of registers to be stacked
+   ; Stack frame bottom
+   ;
+   ; Messages, warnings and errors
+   ;
+   .Throwback_Taskhandle      DCD   0
+   .Throwback_First_Sent      DCD   0
+   .Internal_Context          DBD   2
+   .Error_Context             DBD   11
+   ; #if, #rept, #struct
+   ;
+   .IF_Level                  DCD   0
+   .REPT_Level                DCD   0
+   .STRUCT_Level              DCD   0
+   ; Statistics
+   ;
+   .ARM_Statistics            DBD   8
+   .FPA_Statistics            DBD   6
+   .CC_Counters               DBD   16
+   .Shift_Counters            DBD   10
+   .Code_Counters             DBD   74
+   .Flex_Array                DBD   Num_Flex_Blocks+1
+   ; Nesting
+   ;
+   .STRUCT_Array              DBB   Max_STRUCT_Nesting
+      ALIGN 128
+   .IF_Array                  DBB   align(Max_IF_Nesting*12,128)
+   .REPT_Array                DBB   align(Max_REPT_Nesting*16,128)
+   ; Space for data and strings
+   ;
+   .STRUCT_Name               DBB   128
+      ALIGN 256
+   .Exception                 DBB   256
+   .Block                     DBB   Block_Size
+   .Block2                    DBB   Block2_Size
+   .Ind_Block                 DBB   Ind_Size
+   .Menu_Block                DBB   Menu_Size
+   .Message_Block             DBB   Message_Size
+   .extASM_Path               DBB   256
+   .Header_Filename           DBB   256
+   .Expand_Counters           DBB   256
+   .StrBuffer                 DBB   256
+   .StrBuffer2                DBB   256
+   .Stack_Base                DBB   Stack_Size
+   .Stack
+   .Flex_Heap
+}
+
+struct OperandType,#0,4
+{
+   .Size
+   .Type
+   .Signed
+   .End
+}
+
+struct VFPRegister,#0,4
+{
+   .Register
+   .Vx_Bits
+   .DNM_Bit
+   .Size
+}

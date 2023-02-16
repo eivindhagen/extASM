@@ -1,0 +1,47 @@
+
+; >-------------------------------------------------------------<
+
+.Decode_FP_Register                    ;_R8 = First char or Blank
+   STMFD    R13!,{R14}                 ;~R0 = FPRegister number, ~R14 = Signal error
+   BL       Skip_Blanks                ;       -2 = Warning, variable not found, but it is
+   MOV      R1,R10                     ;       first pass, or variable had warning flag set
+                                       ;~R8 = Next char
+   ;------> Check for "Fxx" OR "fxx"
+   CMP      R8,#'F'
+   CMPNE    R8,#'f'
+   BNE      DFPR_Check_SoftCode
+   LDRB     R8,[R10],#1
+   CMP      R8,#'0'
+   RSBGES   R0,R8,#'7'
+   BLT      DFPR_Check_SoftCode
+   SUB      R0,R8,#'0'
+   LDRB     R8,[R10],#1
+   MOV      R14,#0
+
+.DFPR_Check_Macro
+   LDR      R1,Macro_Level
+   ADR      R2,FPTEMP_Needed_Macro
+   LDMIA    R2,{R2,R3,R14}
+   CMP      R1,#0
+   CMPNE    R3,#0                      ; Macro_Level=0 or FPTEMP_Stacked=0?
+   LDMEQFD  R13!,{R15}
+   MOV      R1,#1
+   TST      R2,R1,LSL R0
+   TSTEQ    R3,R1,LSL R0               ; Is register in FPTEMP_Needed_Macro, FPTEMP_Stacked
+   TSTEQ    R14,R1,LSL R0              ; or FPTEMP_Used?
+   LDMNEFD  R13!,{R15}
+   MOV      R0,#&57                    ; Asm_Error #&57 = When using stacked temp-registers in macros, only registers in macro header can be used
+   B        Asm_Error
+
+.DFPR_Check_SoftCode
+   SUB      R10,R1,#1                  ; First char of soft register
+   LDRB     R8,[R10],#1
+   BL       Decode_Value               ;_R0 = Reg
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+
+   CMP      R0,#7
+   MOVHI    R0,#&09                    ; Asm_Error #&09 = Illegal register
+   BHI      Asm_Error
+   B        DFPR_Check_Macro

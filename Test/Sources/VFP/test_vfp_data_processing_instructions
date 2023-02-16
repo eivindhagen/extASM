@@ -1,0 +1,71 @@
+
+#name <Tmp$Dir>.^.^.test_vfp_data_processing_instructions
+
+#area test,code
+
+FCPYS    S1,S2             ; S1 = S2
+FCPYSEQ  S1,S2
+FCPYD    D1,D2
+FCPYDEQ  D1,D2
+
+FNEGS    S1,S2             ; S1 = -S2
+FNEGSEQ  S1,S2
+FNEGD    D1,D2
+FNEGDEQ  D1,D2
+
+FADDS    S1,S2,S3          ; S1 = S2 + S3
+FADDSEQ  S1,S2,S3
+FADDD    D1,D2,D3
+FADDDEQ  D1,D2,D3
+
+FSUBS    S1,S2,S3          ; S1 = S2 - S3
+FSUBSEQ  S1,S2,S3
+FSUBD    D1,D2,D3
+FSUBDEQ  D1,D2,D3
+
+FMULS    S1,S2,S3          ; S1 = S2 * S3
+FMULSEQ  S1,S2,S3
+FMULD    D1,D2,D3
+FMULDEQ  D1,D2,D3
+
+FNMULS   S1,S2,S3          ; S1 = -S2 * S3
+FNMULSEQ S1,S2,S3
+FNMULD   D1,D2,D3
+FNMULDEQ D1,D2,D3
+
+FDIVS    S1,S2,S3          ; S1 = S2 / S3
+FDIVSEQ  S1,S2,S3
+FDIVD    D1,D2,D3
+FDIVDEQ  D1,D2,D3
+
+FMACS    S1,S2,S3          ; S1 = S1 + S2 / S3
+FMACSEQ  S1,S2,S3
+FMACD    D1,D2,D3
+FMACDEQ  D1,D2,D3
+
+FNMACS   S1,S2,S3          ; S1 = S1 - S2 / S3
+FNMACSEQ S1,S2,S3
+FNMACD   D1,D2,D3
+FNMACDEQ D1,D2,D3
+
+FMSCS    S1,S2,S3          ; S1 = -S1 + S2 / S3
+FMSCSEQ  S1,S2,S3
+FMSCD    D1,D2,D3
+FMSCDEQ  D1,D2,D3
+
+FNMSCS   S1,S2,S3          ; S1 = -S1 - S2 / S3
+FNMSCSEQ S1,S2,S3
+FNMSCD   D1,D2,D3
+FNMSCDEQ D1,D2,D3
+
+FABSS    S1,S2             ; S1 = ABS S2
+FABSSEQ  S1,S2
+FABSD    D1,D2
+FABSDEQ  D1,D2
+
+FSQRTS   S1,S2             ; S1 = SQR S2
+FSQRTSEQ S1,S2
+FSQRTD   D1,D2
+FSQRTDEQ D1,D2
+
+#end

@@ -1,0 +1,201 @@
+
+; >-------------------------------------------------------------<
+
+.DT_VAND                               ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   ; VAND Qd, Qn, Qm
+   ; VAND Dd, Dn, Dm
+   ;
+   ;------> VAND          D  [Vn][Vd]    NQM [Vm]
+   MOV      R0,#%11110010000000000000000100010000
+   ; VAND.I<16|32> Qd, #<constant>
+   ; VAND.I<16|32> Dd, #<constant>
+   ;
+   ;------> VAND        a D   bcd[Vd]mode Q  efgh
+   MOV      R1,#%11110010100000000000000100110000
+   MOV      R2,#1
+   B        DT_SIMD_Xd_Xn_Xm_Or_I_16_32_Xd_Imm
+
+; >-------------------------------------------------------------<
+
+.DT_VBIC_VBIF_VBIT_VBSL                ;_R8 = "B"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BEQ      DT_VBIC_VBIF_VBIT
+   CMP      R8,#'S'
+   BEQ      DT_VBSL
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VBIC_VBIF_VBIT                     ;_R8 = "I"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BEQ      DT_VBIC
+   CMP      R8,#'F'
+   ; VBIF Qd, Qn, Qm
+   ; VBIF Dd, Dn, Dm
+   ;
+   ;------> VBIF          D  [Vn][Vd]    NQM [Vm]
+   MOVEQ    R9,#%11110011001100000000000100010000
+   LDREQB   R8,[R10],#1
+   BEQ      DT_SIMD_Xd_Xn_Xm
+   CMP      R8,#'T'
+   ; VBIT Qd, Qn, Qm
+   ; VBIT Dd, Dn, Dm
+   ;
+   ;------> VBIT          D  [Vn][Vd]    NQM [Vm]
+   MOVEQ    R9,#%11110011001000000000000100010000
+   LDREQB   R8,[R10],#1
+   BEQ      DT_SIMD_Xd_Xn_Xm
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VBIC                               ;_R8 = "C"
+   ; VBIC Qd, Qn, Qm
+   ; VBIC Dd, Dn, Dm
+   ;
+   ;------> VBIC          D  [Vn][Vd]    NQM [Vm]
+   MOV      R0,#%11110010000100000000000100010000
+   ; VBIC.I<16|32> Qd, #<constant>
+   ; VBIC.I<16|32> Dd, #<constant>
+   ;
+   ;------> VBIC        a D   bcd[Vd]mode Q  efgh
+   MOV      R1,#%11110010100000000000000100110000
+   MOV      R2,#0
+   B        DT_SIMD_Xd_Xn_Xm_Or_I_16_32_Xd_Imm
+
+; >-------------------------------------------------------------<
+
+.DT_VBSL                               ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   ; VBSL Qd, Qn, Qm
+   ; VBSL Dd, Dn, Dm
+   ;
+   ;------> VBSL          D  [Vn][Vd]    NQM [Vm]
+   MOVEQ    R9,#%11110011000100000000000100010000
+   LDREQB   R8,[R10],#1
+   BEQ      DT_SIMD_Xd_Xn_Xm
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VEOR                               ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   ; VEOR Qd, Qn, Qm
+   ; VEOR Dd, Dn, Dm
+   ;
+   ;------> VEOR          D  [Vn][Vd]    NQM [Vm]
+   MOVEQ    R9,#%11110011000000000000000100010000
+   LDREQB   R8,[R10],#1
+   BEQ      DT_SIMD_Xd_Xn_Xm
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VORN_VORR                          ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BEQ      DT_VORN
+   CMP      R8,#'R'
+   BEQ      DT_VORR
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VORN                               ;_R8 = "N"
+   ; VORN Qd, Qn, Qm
+   ; VORN Dd, Dn, Dm
+   ;
+   ;------> VORN          D  [Vn][Vd]    NQM [Vm]
+   MOV      R0,#%11110010001100000000000100010000
+   ; VORN.I<16|32> Qd, #<constant>
+   ; VORN.I<16|32> Dd, #<constant>
+   ;
+   ;------> VORN        a D   bcd[Vd]mode Q  efgh
+   MOV      R1,#%11110010100000000000000100010000
+   MOV      R2,#1
+   B        DT_SIMD_Xd_Xn_Xm_Or_I_16_32_Xd_Imm
+
+; >-------------------------------------------------------------<
+
+.DT_VORR                               ;_R8 = "R"
+   ; VORR Qd, Qn, Qm
+   ; VORR Dd, Dn, Dm
+   ;
+   ;------> VORR          D  [Vn][Vd]    NQM [Vm]
+   MOV      R0,#%11110010001000000000000100010000
+   ; VORR.I<16|32> Qd, #<constant>
+   ; VORR.I<16|32> Dd, #<constant>
+   ;
+   ;------> VORR        a D   bcd[Vd]mode Q  efgh
+   MOV      R1,#%11110010100000000000000100010000
+   MOV      R2,#0
+   B        DT_SIMD_Xd_Xn_Xm_Or_I_16_32_Xd_Imm
+
+; >-------------------------------------------------------------<
+
+.DT_VMVN                               ;_R8 = "V"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DT_Unknown
+   ; VMVN.I<16|32> Qd, #<immediate> (SIMD)
+   ; VMVN.I<16|32> Dd, #<immediate> (SIMD)
+   ; VMVN          Qd, Qm           (SIMD)
+   ; VMVN          Dd, Dm           (SIMD)
+   ;
+   LDRB     R8,[R10],#1
+   CMP      R8,#'.'
+   BEQ      DT_VMVN_Imm
+   ; VMVN          Qd, Qm
+   ; VMVN          Dd, Dm
+   ;
+   ;------> VMVN          D  sz  [Vd]     QM [Vm]
+   MOV      R9,#%11110011101100000000010110000000
+   BL       Ensure_Blank
+   BL       Decode_VFP_Destination_Register
+   MOV      R6,R1
+   BL       Decode_VFP_Operand_Two
+   BL       Ensure_Equal_SIMD_Register_Types_DM
+   CMP      R1,#'Q'
+   ORREQ    R9,R9,#SIMD_Q_Bit
+   B        DT_Write_Instruction
+
+.DT_VMVN_Imm
+   ; VMVN.I<16|32> Qd, #<immediate> (SIMD)
+   ; VMVN.I<16|32> Dd, #<immediate> (SIMD)
+   ;
+   ;------> VMVN        i D   imm[Vd]mode Q  imm4
+   MOV      R9,#%11110010100000000000000000110000
+   BL       Decode_VFP_Operand_Type
+   CMP      R0,#VFP_Operand_16
+   CMPNE    R0,#VFP_Operand_32
+   CMPEQ    R1,#VFP_Operand_Int
+   BNE      DT_Illegal_Operand_Type
+   MOV      R4,R0
+   BL       Decode_VFP_Destination_Register
+   BL       Ensure_Valid_SIMD_Register
+   CMP      R1,#'Q'
+   ORREQ    R9,R9,#SIMD_Q_Bit
+   BL       Ensure_Comma
+   BL       Ensure_Pound
+   MOV      R0,R4
+   MOV      R1,#0
+   BL       Decode_SIMD_Immediate
+   B        DT_Write_Instruction

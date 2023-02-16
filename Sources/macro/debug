@@ -1,0 +1,321 @@
+
+macro DebugPrintNL Str:s
+{
+#if Debug==1
+   STMFD    R13!,{R0-R3,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   SWI      OS_NewLine
+   MOV      R0,#15
+   MOV      R1,#1
+   SWI      OS_Byte
+   LDMFD    R13!,{R0-R3,R14}
+#endif
+}
+
+macro Print1 Str:s,Reg:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   MOV      R0,Reg
+   BL       Print_Number
+   LDMFD    R13!,{R0,R14}
+}
+
+macro Print2 Str:s,Reg1:r,Reg2:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   MOV      R0,Reg1
+   BL       Print_Number
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg2
+   BL       Print_Number
+   LDMFD    R13!,{R0,R14}
+}
+
+macro Print3 Str:s,Reg1:r,Reg2:r,Reg3:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   MOV      R0,Reg1
+   BL       Print_Number
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg2
+   BL       Print_Number
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg3
+   BL       Print_Number
+   LDMFD    R13!,{R0,R14}
+}
+
+macro Print4 Str:s,Reg1:r,Reg2:r,Reg3:r,Reg4:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   MOV      R0,Reg1
+   BL       Print_Number
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg2
+   BL       Print_Number
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg3
+   BL       Print_Number
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg4
+   BL       Print_Number
+   LDMFD    R13!,{R0,R14}
+}
+
+macro Print Str:s
+{
+   STMFD    R13!,{R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   LDMFD    R13!,{R14}
+}
+
+macro PrintCC$cc Str:s
+{
+   #set ncc=cc EOR 1
+   B$ncc    _Not_CC
+   STMFD    R13!,{R14}
+   MOV      R14,R15
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   TEQP     R14,#0
+   LDMFD    R13!,{R14}
+   ._Not_CC
+}
+
+macro PrintNL Str:s
+{
+   STMFD    R13!,{R0-R3,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   SWI      OS_NewLine
+   MOV      R0,#15
+   MOV      R1,#1
+   SWI      OS_Byte
+   LDMFD    R13!,{R0-R3,R14}
+}
+
+macro PrintStr Str:s,Reg:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   MOV      R0,Reg
+   SWI      OS_Write0
+   LDMFD    R13!,{R0,R14}
+}
+
+macro PrintStrCtrl Str:s,Reg:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   MOV      R0,Reg
+   BL       PrintStrCtrl
+   LDMFD    R13!,{R0,R14}
+}
+
+macro PrintStrFilter Str:s,Reg:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   MOV      R0,Reg
+   BL       PrintStrFilter
+   LDMFD    R13!,{R0,R14}
+}
+
+macro PrintChar Str:s,Reg:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   MOV      R0,Reg
+   CMP      R0,#' '
+   MOVLT    R0,#'.'
+   SWI      OS_WriteC
+   SWI      OS_WriteI+' '
+   SWI      OS_WriteI+'('
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg
+   BL       Print_Number
+   SWI      OS_WriteI+')'
+   LDMFD    R13!,{R0,R14}
+}
+
+macro PrintBin Str:s,Reg:r
+{
+   STMFD    R13!,{R0-R2,R14}
+   SWI      OS_WriteS
+   DCB      Str,10,13," 10987654321098765432109876543210",10,13,0
+   ALIGN
+   SWI      OS_WriteI+'%'
+   MOV      R1,Reg
+   MOV      R2,#32
+._Loop
+   MOVS     R1,R1,LSL #1
+   SWICS    OS_WriteI+'1'
+   SWICC    OS_WriteI+'0'
+   SUBS     R2,R2,#1
+   BNE      _Loop
+   LDMFD    R13!,{R0-R2,R14}
+}
+
+macro PrintHex Str:s,Reg:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   MOV      R0,Reg
+   BL       Print_HexNumber
+   LDMFD    R13!,{R0,R14}
+}
+
+macro PrintHex2 Str:s,Reg1:r,Reg2:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   MOV      R0,Reg1
+   BL       Print_HexNumber
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg2
+   BL       Print_HexNumber
+   LDMFD    R13!,{R0,R14}
+}
+
+macro PrintHex3 Str:s,Reg1:r,Reg2:r,Reg3:r
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg1
+   BL       Print_HexNumber
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg2
+   BL       Print_HexNumber
+   LDMFD    R13,{R0,R14}
+   MOV      R0,Reg3
+   BL       Print_HexNumber
+   LDMFD    R13!,{R0,R14}
+}
+
+macro PrintFP Str:s,FPReg:f
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   SFMFD    F0,1,[R13]!
+   MVFE     F0,FPReg
+   BL       Print_FP_Number
+   LFMFD    F0,1,[R13]!
+   LDMFD    R13!,{R0,R14}
+}
+
+macro PrintFP2 Str:s,FPReg1:f,FPReg2:f
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   SFMFD    F0,1,[R13]!
+   MVFE     F0,FPReg1
+   BL       Print_FP_Number
+   LFMFD    F0,1,[R13]
+   MVFE     F0,FPReg2
+   BL       Print_FP_Number
+   LFMFD    F0,1,[R13]!
+   LDMFD    R13!,{R0,R14}
+}
+
+macro PrintFP3 Str:s,FPReg1:f,FPReg2:f,FPReg3:f
+{
+   STMFD    R13!,{R0,R14}
+   SWI      OS_WriteS
+   DCB      Str,0
+   ALIGN
+   SFMFD    F0,1,[R13]!
+   MVFE     F0,FPReg1
+   BL       Print_FP_Number
+   LFMFD    F0,1,[R13]
+   MVFE     F0,FPReg2
+   BL       Print_FP_Number
+   LFMFD    F0,1,[R13]
+   MVFE     F0,FPReg3
+   BL       Print_FP_Number
+   LFMFD    F0,1,[R13]!
+   LDMFD    R13!,{R0,R14}
+}
+
+macro Home
+{
+   SWI      OS_WriteS
+   DCB      4,30,10,0
+}
+
+macro NL
+{
+   STMFD    R13!,{R0-R3}
+   SWI      OS_NewLine
+   MOV      R0,#15
+   MOV      R1,#1
+   SWI      OS_Byte
+   LDMFD    R13!,{R0-R3}
+}
+
+macro Get
+{
+   STMFD    R13!,{R0-R3}
+   MOV      R0,#15
+   MOV      R1,#1
+   SWI      OS_Byte
+   SWI      OS_ReadC
+   LDMFD    R13!,{R0-R3}
+}
+
+macro PrintInstruction Reg:r
+{
+   STMFD    R13!,{R0-R3,R14}
+   MOV      R0,Reg
+   BL       Print_HexNumber
+   SWI      OS_WriteI+','
+   SWI      OS_WriteI+' '
+   LDMFD    R13,{R0-R3,R14}
+   MOV      R0,Reg
+   LDR      R1,Object_Base
+   LDR      R2,Object_Size
+   ADD      R1,R1,R2
+   SUB      R1,R1,#4
+   SWI      Debugger_Disassemble
+   MOV      R0,R1
+   SWI      OS_Write0
+   SWI      OS_WriteI+' '
+   SWI      OS_NewLine
+   LDMFD    R13!,{R0-R3,R14}
+}

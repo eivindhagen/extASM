@@ -1,0 +1,174 @@
+
+#name <Tmp$Dir>.^.^.test_simd_instructions
+
+#area test,code
+
+; ----------------------------
+; Signed
+; ----------------------------
+
+SADD8       R1,R2,R3       ; (8+8 => 8) * 4
+SADD8EQ     R1,R2,R3
+
+SADD16      R1,R2,R3       ; (16+16 => 16) * 2
+SADD16EQ    R1,R2,R3
+
+SSUB8       R1,R2,R3       ; (8-8 => 8) * 4
+SSUB8EQ     R1,R2,R3
+
+SSUB16      R1,R2,R3       ; (16-16 => 16) * 2
+SSUB16EQ    R1,R2,R3
+
+SADDSUBX    R1,R2,R3       ; R2[31:16] + R3[15:0] - (R2[15:0] + R3[31:16])
+SADDSUBXEQ  R1,R2,R3
+
+SSUBADDX    R1,R2,R3       ; R2[15:0] + R3[31:16] - (R2[31:16] + R3[15:0])
+SSUBADDXEQ  R1,R2,R3
+
+SASX        R1,R2,R3       ; Alias for SADDSUBX
+SASXEQ      R1,R2,R3
+
+SSAX        R1,R2,R3       ; Alias for SSUBADDX
+SSAXEQ      R1,R2,R3
+
+; ----------------------------
+; Unsigned
+; ----------------------------
+
+UADD8       R1,R2,R3       ; (8+8 => 8) * 4
+UADD8EQ     R1,R2,R3
+
+UADD16      R1,R2,R3       ; (16+16 => 16) * 2
+UADD16EQ    R1,R2,R3
+
+USUB8       R1,R2,R3       ; (8-8 => 8) * 4
+USUB8EQ     R1,R2,R3
+
+USUB16      R1,R2,R3       ; (16-16 => 16) * 2
+USUB16EQ    R1,R2,R3
+
+UADDSUBX    R1,R2,R3       ; R2[31:16] + R3[15:0] - (R2[15:0] + R3[31:16])
+UADDSUBXEQ  R1,R2,R3
+
+USUBADDX    R1,R2,R3       ; R2[15:0] + R3[31:16] - (R2[31:16] + R3[15:0])
+USUBADDXEQ  R1,R2,R3
+
+UASX        R1,R2,R3       ; Alias for UADDSUBX
+UASXEQ      R1,R2,R3
+
+USAX        R1,R2,R3       ; Alias for USUBADDX
+USAXEQ      R1,R2,R3
+
+; ----------------------------
+; Signed, halving the results
+; ----------------------------
+
+SHADD8      R1,R2,R3       ; (8+8 => 8) * 4
+SHADD8EQ    R1,R2,R3
+
+SHADD16     R1,R2,R3       ; (16+16 => 16) * 2
+SHADD16EQ   R1,R2,R3
+
+SHSUB8      R1,R2,R3       ; (8-8 => 8) * 4
+SHSUB8EQ    R1,R2,R3
+
+SHSUB16     R1,R2,R3       ; (16-16 => 16) * 2
+SHSUB16EQ   R1,R2,R3
+
+SHADDSUBX   R1,R2,R3       ; R2[31:16] + R3[15:0] - (R2[15:0] + R3[31:16])
+SHADDSUBXEQ R1,R2,R3
+
+SHSUBADDX   R1,R2,R3       ; R2[15:0] + R3[31:16] - (R2[31:16] + R3[15:0])
+SHSUBADDXEQ R1,R2,R3
+
+SHASX        R1,R2,R3      ; Alias for SHADDSUBX
+SHASXEQ      R1,R2,R3
+
+SHSAX        R1,R2,R3      ; Alias for SHSUBADDX
+SHSAXEQ      R1,R2,R3
+
+; ----------------------------
+; Unsigned, halving the results
+; ----------------------------
+
+UHADD8      R1,R2,R3       ; (8+8 => 8) * 4
+UHADD8EQ    R1,R2,R3
+
+UHADD16     R1,R2,R3       ; (16+16 => 16) * 2
+UHADD16EQ   R1,R2,R3
+
+UHSUB8      R1,R2,R3       ; (8-8 => 8) * 4
+UHSUB8EQ    R1,R2,R3
+
+UHSUB16     R1,R2,R3       ; (16-16 => 16) * 2
+UHSUB16EQ   R1,R2,R3
+
+UHADDSUBX   R1,R2,R3       ; R2[31:16] + R3[15:0] - (R2[15:0] + R3[31:16])
+UHADDSUBXEQ R1,R2,R3
+
+UHSUBADDX   R1,R2,R3       ; R2[15:0] + R3[31:16] - (R2[31:16] + R3[15:0])
+UHSUBADDXEQ R1,R2,R3
+
+UHASX        R1,R2,R3      ; Alias for UHADDSUBX
+UHASXEQ      R1,R2,R3
+
+UHSAX        R1,R2,R3      ; Alias for UHSUBADDX
+UHSAXEQ      R1,R2,R3
+
+; ----------------------------
+; Signed saturated
+; ----------------------------
+
+QADD8       R1,R2,R3       ; (8+8 => 8) * 4
+QADD8EQ     R1,R2,R3
+
+QADD16      R1,R2,R3       ; (16+16 => 16) * 2
+QADD16EQ    R1,R2,R3
+
+QSUB8       R1,R2,R3       ; (8-8 => 8) * 4
+QSUB8EQ     R1,R2,R3
+
+QSUB16      R1,R2,R3       ; (16-16 => 16) * 2
+QSUB16EQ    R1,R2,R3
+
+QADDSUBX    R1,R2,R3       ; R2[31:16] + R3[15:0] - (R2[15:0] + R3[31:16])
+QADDSUBXEQ  R1,R2,R3
+
+QSUBADDX    R1,R2,R3       ; R2[15:0] + R3[31:16] - (R2[31:16] + R3[15:0])
+QSUBADDXEQ  R1,R2,R3
+
+QASX        R1,R2,R3       ; Alias for QADDSUBX
+QASXEQ      R1,R2,R3
+
+QSAX        R1,R2,R3       ; Alias for QSUBADDX
+QSAXEQ      R1,R2,R3
+
+; ----------------------------
+; Unsigned saturated
+; ----------------------------
+
+UQADD8      R1,R2,R3       ; (8+8 => 8) * 4
+UQADD8EQ    R1,R2,R3
+
+UQADD16     R1,R2,R3       ; (16+16 => 16) * 2
+UQADD16EQ   R1,R2,R3
+
+UQSUB8      R1,R2,R3       ; (8-8 => 8) * 4
+UQSUB8EQ    R1,R2,R3
+
+UQSUB16     R1,R2,R3       ; (16-16 => 16) * 2
+UQSUB16EQ   R1,R2,R3
+
+UQADDSUBX   R1,R2,R3       ; R2[31:16] + R3[15:0] - (R2[15:0] + R3[31:16])
+UQADDSUBXEQ R1,R2,R3
+
+UQSUBADDX   R1,R2,R3       ; R2[15:0] + R3[31:16] - (R2[31:16] + R3[15:0])
+UQSUBADDXEQ R1,R2,R3
+
+UQASX        R1,R2,R3      ; Alias for UQADDSUBX
+UQASXEQ      R1,R2,R3
+
+UQSAX        R1,R2,R3      ; Alias for UQSUBADDX
+UQSAXEQ      R1,R2,R3
+
+#end

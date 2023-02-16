@@ -1,0 +1,263 @@
+
+; >-------------------------------------------------------------<
+
+   ; R0 - Text xpos
+   ; R1 - Text ypos
+   ; R3 - Old angle
+   ; R4 - x1, xcenter
+   ; R5 - y1, ycenter
+   ; R6 - x2
+   ; R7 - y2
+   ; R8 - x3, oldx2
+   ; R9 - y3, oldy2
+   ; R10 - Data pointer
+   ; R11 - Coordinates pointer
+   ;
+   ; Coordinates and angles are stored as fixed point integers.
+   ;
+   ; Format of coordinates block
+   ; ---------------------------
+   ; +0  - x1
+   ; +4  - y1
+   ; +8  - x2
+   ; +12 - y2
+   ; +16 - x3
+   ; +20 - y3
+   ; +24 - Text xpos
+   ; +28 - Text ypos
+   ; +32 - Percent
+   ;
+.Pie_Chart                             ;_R0-> Data (-1 terminated), _R1-> Names
+   STMFD    R13!,{R4-R11,R14}          ; (zero-terminated), _R2 = Xcenter, _R3 = Ycenter
+   ADD      R4,R13,#36                 ;_R4 = Radius
+   LDMIA    R4,{R4}
+   STR      R4,PC_Pie_Radius
+   MOV      R8,R2
+   MOV      R9,R3
+   MOV      R10,R0
+   ADR      R11,StrBuffer
+   ADR      R4,PC_Colour_Array
+   STR      R4,PC_Colour_Pointer
+   ; Find total
+   ;
+   MOV      R4,#0
+
+.PC_Total_Loop
+   LDR      R5,[R0],#4
+   CMN      R5,#1
+   ADDNE    R4,R4,R5
+   BNE      PC_Total_Loop
+   STR      R4,PC_Total
+   ; Draw rectangles and print text
+   ;
+   SWI      OS_WriteI+5
+   SUB      R0,R0,#4
+   STR      R0,PC_End_Data_Pointer
+   SUB      R4,R0,R10
+   MOV      R0,R1
+   MOV      R1,R4,LSR #2
+   BL       PC_Rectangles
+   ; Draw sectors
+   ;
+   MOV      R3,#0                      ; OldAngle=0
+   MOV      R4,R8,LSL #Pie_Shift       ; X1=Xcenter
+   MOV      R5,R9,LSL #Pie_Shift       ; Y1=Ycenter
+   MOV      R8,R4                      ; X3=Xcenter (OldX2)
+   LDR      R0,PC_Pie_Radius
+   ADD      R9,R5,R0,LSL #Pie_Shift    ; Y3=Ycenter+Radius (OldY2)
+
+.PC_Sector_Loop
+   LDR      R0,[R10],#4                ; Read value
+   LDR      R1,PC_Total
+   CMP      R1,#0
+   LDMEQFD  R13!,{R4-R11,R15}
+   MOV      R2,#100
+   MUL      R2,R0,R2
+   ADD      R2,R2,R1,LSR #1
+   mdiv     R6,R2,R1                   ; Percentage=INT(Amount*100/Total+0.5) <=>
+   STR      R6,[R11,#32]               ;            INT((Amount*100+Total/2)/Total)
+   MOV      R2,#360 << Pie_Shift
+   MUL      R2,R0,R2
+   mdiv     R0,R2,R1
+   SUB      R2,R3,R0                   ; Angle=OldAngle-Amount*360/Total
+   ADDS     R0,R2,#90 << Pie_Shift
+   ADDMI    R0,R0,#360 << Pie_Shift
+   ADD      R0,R0,#1 << Pie_Shift-1
+   MOV      R0,R0,ASR #Pie_Shift
+   ; Calculate x2,y2
+   ;
+   LDR      R14,PC_Pie_Radius
+   FLTS     F2,R0
+   FLTS     F3,R14
+   LDFS     F0,PC_Factor
+   MUFS     F2,F2,F0
+   COSS     F0,F2
+   MUFS     F0,F0,F3
+   SINS     F1,F2
+   MUFS     F1,F1,F3
+   FIX      R6,F0
+   FIX      R7,F1
+   ADD      R6,R4,R6,LSL #Pie_Shift    ; x2=Xcenter+cos(Angle+90)*Radius
+   ADD      R7,R5,R7,LSL #Pie_Shift    ; y2=Ycenter+sin(Angle+90)*Radius
+   ; Calculate TextXpos,TextYpos
+   ;
+   ADD      R0,R2,R3                   ; NewAngle=Angle+OldAngle
+   MOV      R3,R2                      ; OldAngle=Angle
+   MOV      R0,R0,ASR #1
+   ADDS     R0,R0,#90 << Pie_Shift
+   ADDMI    R0,R0,#360 << Pie_Shift
+   ADD      R0,R0,#1 << Pie_Shift-1
+   MOV      R0,R0,ASR #Pie_Shift
+   ADD      R1,R14,#34
+   FLTS     F2,R0
+   FLTS     F3,R1
+   LDFS     F0,PC_Factor
+   MUFS     F2,F2,F0
+   COSS     F0,F2
+   MUFS     F0,F0,F3
+   SINS     F1,F2
+   MUFS     F1,F1,F3
+   FIX      R0,F0
+   FIX      R1,F1
+   ADD      R0,R4,R0,LSL #Pie_Shift    ; TextX=Xcenter+cos((Angle+OldAngle)/2+90)*Radius*1.2
+   ADD      R1,R5,R1,LSL #Pie_Shift    ; TextY=Ycenter+sin((Angle+OldAngle)/2+90)*Radius*1.2
+   STMIA    R11!,{R4-R9}               ; Store x1,y1, x2,y2, x3,y3
+   STMIA    R11!,{R0,R1}               ; Store TextXpos,TextYpos
+   LDR      R1,PC_Colour_Pointer
+   LDR      R0,[R1],#4                 ; Read colour
+   STR      R1,PC_Colour_Pointer
+   SWI      Wimp_SetColour
+   gmove    R4,R5
+   LDR      R0,[R11],#4
+   CMP      R0,#100
+   MOVNE    R14,#Plot_Sector
+   MOVEQ    R14,#Plot_CircleFill
+   BEQ      PC_CircleFill
+   gmove    R6,R7
+
+.PC_CircleFill
+   plot     R14,R8,R9
+   MOV      R8,R6                      ; x3=x2
+   MOV      R9,R7                      ; y3=y2
+   LDR      R0,PC_End_Data_Pointer
+   CMP      R10,R0                     ; DataPointer=EndDataPointer?
+   BNE      PC_Sector_Loop
+   STR      R11,PC_End_Coord_Pointer
+   ; Draw sector outline and print percentage text
+   ;
+   MOV      R0,#7
+   SWI      Wimp_SetColour
+   ADR      R10,StrBuffer2
+   ADR      R11,StrBuffer
+
+.PC_Outline_Loop
+   ; Draw sector outline
+   ;
+   LDMIA    R11!,{R4-R9}               ; Read x1,y1, x2,y2, x3,y3
+   line     R4,R5,R6,R7
+   line     R4,R5,R8,R9
+   gmove    R4,R5
+   LDR      R0,[R11,#8]
+   CMP      R0,#100
+   MOVNE    R14,#Plot_CircleArc
+   MOVEQ    R14,#Plot_Circle
+   BEQ      PC_Circle
+   gmove    R6,R7
+
+.PC_Circle
+   plot     R14,R8,R9
+   ; Print percentage
+   ;
+   LDMIA    R11!,{R1,R2,R4}            ; Read TextXpos,TextYpos, Percentage
+   MOV      R1,R1,ASR #Pie_Shift
+   MOV      R2,R2,ASR #Pie_Shift
+   MOV      R0,#Plot_Move
+   CMP      R4,#10
+   SUBLT    R1,R1,#8
+   SUBGE    R1,R1,#24
+   ADD      R2,R2,#12
+   SWI      OS_Plot                    ; MOVE TextXpos-Offset,TextYpos+16
+   MOV      R0,R4
+   MOV      R1,R10
+   MOV      R2,#&100
+   SWI      OS_ConvertInteger1
+   MOV      R0,R10
+   SWI      OS_Write0                  ; Print percentage
+   SWI      OS_WriteI+'%'
+   LDR      R0,PC_End_Coord_Pointer
+   CMP      R11,R0                     ; CoordPointer=EndCoordPointer?
+   BNE      PC_Outline_Loop
+   SWI      OS_WriteI+4
+   LDMFD    R13!,{R4-R11,R15}
+
+.PC_Factor            DCFS  asn(1)/90
+.PC_Pie_Radius        DCD   0
+.PC_End_Data_Pointer  DCD   0
+.PC_End_Coord_Pointer DCD   0
+.PC_Total             DCD   0
+.PC_Colour_Pointer    DCD   0
+.PC_Colour_Array      DCD   10,11,9,8,15,14,12,13
+
+; >-------------------------------------------------------------<
+
+.PC_Rectangles                         ;_R0-> Names, _R1 = Number of data, _R2= X, _R3 = Y
+   ; R4 - XPos
+   ; R5 - YPos
+   ; R6 - XSize
+   ; R7 - YSize
+   ; R8 - Names pointer
+   ; R9 - Number of data
+   ; R10 - Colour array
+   ; R11 - Count factor
+   ;
+   ; Draw background rectangle
+   ;
+   STMFD    R13!,{R4-R11,R14}
+   MOV      R8,R0
+   MOV      R9,R1
+   LDR      R4,PC_Pie_Radius
+   MOV      R7,R4
+   MOV      R5,#7
+   mdiv     R0,R4,R5
+   BIC      R14,R0,#1                  ; RectSize=Radius/7 AND NOT 1
+   ADD      R2,R2,R7
+   ADD      R4,R2,#Rect_Offset         ; Xstart=Xcenter+Radius+RectOffset
+   SUB      R1,R7,R14,LSL #1
+   ADD      R5,R3,R1                   ; Ystart=Ycenter+Radius-RectSize*2
+   SUB      R10,R4,R14                 ; Xpos=Xstart-RectSize
+   ADD      R11,R5,R14
+   MUL      R1,R9,R14
+   SUB      R11,R11,R1,LSL #1          ; Ypos=Ystart-Num*RectSize*2+RectSize
+   ADD      R6,R14,R14,LSL #1          ; Xsize=RectSize*3
+   ADD      R7,R14,R1,LSL #1           ; Ysize=Num*RectSize*2+RectSize
+   MOV      R0,#2
+   SWI      Wimp_SetColour
+   rectangle_fill R10,R11,R6,R7
+   MOV      R0,#7
+   SWI      Wimp_SetColour
+   rectangle R10,R11,R6,R7
+   ; Draw rectangles
+   ;
+   MOV      R6,R14                     ; Xsize=RectSize
+   ADR      R10,PC_Colour_Array
+   MOV      R11,#0                     ; CountFactor=0
+
+.PCR_Loop
+   LDR      R0,[R10],#4                ; Read colour
+   SWI      Wimp_SetColour
+   rectangle_fill R4,R5,R6,R6
+   MOV      R0,#7
+   SWI      Wimp_SetColour
+   rectangle R4,R5,R6,R6
+   MOV      R0,#Plot_Move
+   ADD      R3,R6,R6,LSL #1
+   ADD      R1,R4,R3
+   ADD      R2,R5,R6
+   SWI      OS_Plot                    ; MOVE Xpos+RectSize*3,Ypos+RectSize
+   MOV      R0,R8
+   SWI      OS_Write0                  ; Print names
+   MOV      R8,R0
+   SUB      R5,R5,R6,LSL #1            ; CountFactor=CountFactor+RectSize*2
+   SUBS     R9,R9,#1                   ; Num=Num-1
+   BNE      PCR_Loop
+   LDMFD    R13!,{R4-R11,R15}

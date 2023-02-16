@@ -1,0 +1,65 @@
+
+; >-------------------------------------------------------------<
+
+.DT_LSL_LSR                            ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   ;------> LSL  Cond       S    [Rd]shift   [Rm]
+   MOVEQ    R9,#%00000001101000000000000000000000
+   BEQ      DT_Shift_Instruction
+   CMP      R8,#'R'
+   ;------> LSR  Cond       S    [Rd]shift   [Rm]
+   MOVEQ    R9,#%00000001101000000000000000100000
+   BEQ      DT_Shift_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ROR                                ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   ;------> ROR  Cond       S    [Rd]shift   [Rm]
+   MOVEQ    R9,#%00000001101000000000000001100000
+   BEQ      DT_Shift_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_RRX                                ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'X'
+   ;------> RRX  Cond       S    [Rd]        [Rm]
+   MOVEQ    R9,#%00000001101000000000000001100000
+   BEQ      DT_ALU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_Shift_Instruction
+   LDRB     R8,[R10],#1                ; R8 = "S" or CC or Blank
+   BL       Decode_ConditionCode
+   CMP      R8,#'S'
+   CMPNE    R8,#'s'
+   ORREQ    R9,R9,#Update_PSR_Bit
+   LDREQB   R8,[R10],#1
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Two_Register
+   BL       Ensure_Comma
+   BL       Skip_Blanks
+   CMP      R8,#'#'
+   BEQ      DT_SI_Immediate
+   BL       Decode_Rs_Register
+   ORR      R9,R9,#1 << 4
+   B        DT_Write_Instruction
+
+.DT_SI_Immediate
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   CMP      R0,#0
+   BICEQ    R9,R9,#%11 << 5
+   AND      R0,R0,#&1F
+   ORR      R9,R9,R0,LSL #7
+   B        DT_Write_Instruction

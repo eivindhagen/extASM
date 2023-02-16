@@ -1,0 +1,17 @@
+
+; >-------------------------------------------------------------<
+
+.DT_B                                  ;_R8 = "B"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'F'
+   CMPNE    R8,#'f'
+   BEQ      DT_BFC_BFI
+   CMP      R8,#'I'
+   CMPNE    R8,#'i'
+   BEQ      DT_BIC
+   CMP      R8,#'K'
+   CMPNE    R8,#'k'
+   BEQ      DT_BKPT
+   ;------> B    Cond   L[        imm24         ]
+   MOV      R9,#%00001010000000000000000000000000
+   B        DT_BRANCH

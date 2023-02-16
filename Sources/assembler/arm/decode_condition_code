@@ -1,0 +1,132 @@
+
+; >-------------------------------------------------------------<
+
+.Decode_ConditionCode                  ;_R8 = Possibly first char of CC, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BIC      R0,R8,#32
+   MOV      R2,#CC_AL                  ; AL default
+   LDRB     R1,[R10]                   ; R1 = Possibly second char of CC
+   BIC      R1,R1,#32
+   CMP      R0,#'A'
+   CMPEQ    R1,#'L'
+   MOVEQ    R2,#CC_AL
+   BEQ      DCC_Found
+   CMP      R0,#'C'
+   BEQ      DCC_C
+   CMP      R0,#'E'
+   CMPEQ    R1,#'Q'
+   MOVEQ    R2,#CC_EQ
+   BEQ      DCC_Found
+   CMP      R0,#'G'
+   BEQ      DCC_G
+   CMP      R0,#'H'
+   BEQ      DCC_H
+   CMP      R0,#'L'
+   BEQ      DCC_L
+   CMP      R0,#'M'
+   CMPEQ    R1,#'I'
+   MOVEQ    R2,#CC_MI
+   BEQ      DCC_Found
+   CMP      R0,#'N'
+   BEQ      DCC_N
+   CMP      R0,#'P'
+   CMPEQ    R1,#'L'
+   MOVEQ    R2,#CC_PL
+   BEQ      DCC_Found
+   CMP      R0,#'V'
+   BEQ      DCC_V
+
+   CMP      R8,#'$'
+   BNE      DCC_End
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R2,R0
+   SUB      R10,R10,#2
+   LDRB     R8,[R10],#1
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   LDRNEB   R8,[R10],#1
+   CMP      R8,#'#'
+   LDREQB   R8,[R10],#1
+   B        DCC_End
+
+.DCC_C                                 ; CS CC
+   CMP      R1,#'S'
+   MOVEQ    R2,#CC_CS
+   BEQ      DCC_Found
+   CMP      R1,#'C'
+   MOVEQ    R2,#CC_CC
+   BEQ      DCC_Found
+   B        DCC_End
+
+.DCC_G                                 ; GE GT
+   CMP      R1,#'E'
+   MOVEQ    R2,#CC_GE
+   BEQ      DCC_Found
+   CMP      R1,#'T'
+   MOVEQ    R2,#CC_GT
+   BEQ      DCC_Found
+   B        DCC_End
+
+.DCC_H                                 ; HI HS
+   CMP      R1,#'I'
+   MOVEQ    R2,#CC_HI
+   BEQ      DCC_Found
+   CMP      R1,#'S'
+   MOVEQ    R2,#CC_HS
+   BEQ      DCC_Found
+   B        DCC_End
+
+.DCC_L                                 ; LS LT LE LO
+   CMP      R1,#'S'
+   MOVEQ    R2,#CC_LS
+   BEQ      DCC_Found
+   CMP      R1,#'T'
+   MOVEQ    R2,#CC_LT
+   BEQ      DCC_Found
+   CMP      R1,#'E'
+   MOVEQ    R2,#CC_LE
+   BEQ      DCC_Found
+   CMP      R1,#'O'
+   MOVEQ    R2,#CC_LO
+   BEQ      DCC_Found
+   B        DCC_End
+
+.DCC_N                                 ; NE NV
+   CMP      R1,#'E'
+   MOVEQ    R2,#CC_NE
+   BEQ      DCC_Found
+   CMP      R1,#'V'
+   MOVEQ    R2,#CC_NV
+   BEQ      DCC_Found
+   B        DCC_End
+
+.DCC_V                                 ; VS VC
+   CMP      R1,#'S'
+   MOVEQ    R2,#CC_VS
+   BEQ      DCC_Found
+   CMP      R1,#'C'
+   MOVEQ    R2,#CC_VC
+   BEQ      DCC_Found
+   B        DCC_End
+
+.DCC_Found
+   ADD      R10,R10,#1                 ; R10-> First char after CC
+   LDRB     R8,[R10],#1                ; R8 = First char after CC
+
+.DCC_End
+   ORR      R9,R9,R2,LSL #CC_Pos
+   CMP      R2,#CC_NV
+   MOVEQ    R0,#&40                    ; Asm_Warning #&40 = Use of NV condition code is deprecated
+   BLEQ     Asm_Warning
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDMEQFD  R13!,{R15}
+   ADR      R0,CC_Counters
+   LDR      R1,[R0,R2,LSL #2]
+   ADD      R1,R1,#1
+   STR      R1,[R0,R2,LSL #2]
+   LDMFD    R13!,{R15}

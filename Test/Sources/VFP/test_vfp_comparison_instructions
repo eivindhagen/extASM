@@ -1,0 +1,26 @@
+
+#name <Tmp$Dir>.^.^.test_vfp_comparison_instructions
+
+#area test,code
+
+FCMPS     S1,S2            ; Compare S1 with S2
+FCMPSEQ   S1,S2
+FCMPD     D1,D2
+FCMPDEQ   D1,D2
+
+FCMPES    S1,S2            ; Compare S1 with S2 (with exceptions)
+FCMPESEQ  S1,S2
+FCMPD     D1,D2
+FCMPDEQ   D1,D2
+
+FCMPZS    S1               ; Compare S1 with 0
+FCMPZSEQ  S1
+FCMPZD    D1
+FCMPZDEQ  D1
+
+FCMPEZS   S1               ; Compare S1 with 0 (with exceptions)
+FCMPEZSEQ S1
+FCMPEZD   D1
+FCMPEZDEQ D1
+
+#end

@@ -1,0 +1,162 @@
+
+; >-------------------------------------------------------------<
+
+.Asm_AutoExpand_Summary
+   STMFD    R13!,{R4-R11,R14}
+   ADR      R4,Expand_Counters
+   ADR      R5,AE_Summary_Indicies
+   ADR      R6,AE_Summary_Text_Start
+   ADR      R7,AE_Summary_Text_End
+   ADR      R10,Block
+   ADR      R8,AE_Total
+   MOV      R0,#0
+   MOV      R1,#0
+   STMIA    R8,{R0,R1}
+
+.AE_Summary_Loop
+   LDRB     R11,[R5],#1
+   CMP      R11,#1
+   BNE      AE_No_New_List
+   MOV      R9,R8
+   ADR      R8,AE_FP_Total
+   MOV      R0,#0
+   MOV      R1,#0
+   STMIA    R8,{R0,R1}
+   B        AE_Summary_Loop
+
+.AE_No_New_List
+   MOV      R0,R6
+   MOV      R1,R10
+   BL       StrCopy
+   MOV      R6,R0
+   CMP      R11,#0
+   BEQ      AE_No_Constant
+   SUB      R2,R11,#&10
+   ADD      R2,R4,R2,LSL #3
+   LDMIA    R2,{R2,R3}
+   LDMIA    R8,{R0,R14}
+   ADD      R0,R0,R2
+   ADD      R14,R14,R3
+   STMIA    R8,{R0,R14}
+   ADR      R0,AE_WTLine_5
+   SUB      R1,R1,#1
+   BL       Print_String
+
+.AE_No_Constant
+   MOV      R0,R10
+   MOV      R1,#TextColour_Info
+   BL       Wimp_Text_AddColourLine
+   CMP      R6,R7
+   BNE      AE_Summary_Loop
+
+   ADR      R0,AE_WTLine_1
+   MOV      R1,#TextColour_Info
+   LDMIA    R9,{R2,R3}
+   BL       Wimp_Text_AddColourLine
+
+   ADR      R0,AE_WTLine_2
+   MOV      R1,#TextColour_Info
+   LDMIA    R8,{R2,R3}
+   BL       Wimp_Text_AddColourLine
+
+   ADR      R0,AE_WTLine_3
+   MOV      R1,#TextColour_Info
+   LDR      R2,Num_Fast_NOPs
+   BL       Wimp_Text_AddColourLine
+
+   ADR      R0,AE_WTLine_4
+   MOV      R1,#TextColour_Info
+   LDR      R2,Num_Fallback_NOPs
+   BL       Wimp_Text_AddColourLine
+   BL       Asm_List_FPPOOL_Variables
+   BL       Wimp_Text_AddBlankLine
+   LDMFD    R13!,{R4-R11,R15}
+
+.AE_Total      DBD   2
+.AE_FP_Total   DBD   2
+.AE_WTLine_1   DCB   "Total auto-expansion      : %d times, %d bytes",0
+.AE_WTLine_2   DCB   "Total FP auto-expansion   : %d times, %d bytes",0
+.AE_WTLine_3   DCB   "Number of 'Fast-NOPs'     : %d",0
+.AE_WTLine_4   DCB   "Number of 'Fallback-NOPs' : %d",0
+.AE_WTLine_5   DCB   " - %d times, %d bytes",0
+   ALIGN
+.AE_Summary_Indicies
+   DCB   0,0,0,&10,&11,&12,0,&13,&14,&15,0,&16,&17,&18,0,1,0,0,&20,0,&21,&22,0,&23,&24,0
+   ALIGN
+
+.AE_Summary_Text_Start
+   DCB   0
+   DCB   "Auto-expansion",0
+   DCB   "--------------",0
+   DCB   "ALU                          ",0 ; &10
+   DCB   "ADR                          ",0 ; &11
+   DCB   "Load/Store                   ",0 ; &12
+   DCB   0
+   DCB   "ALU,        using TEMP reg   ",0 ; &13
+   DCB   "Load/Store, using TEMP reg   ",0 ; &14
+   DCB   "Macro TR,   using TEMP reg   ",0 ; &15
+   DCB   0
+   DCB   "ALU,        using stacked reg",0 ; &16
+   DCB   "Load/Store, using stacked reg",0 ; &17
+   DCB   "Macro TR,   using stacked reg",0 ; &18
+   DCB   0
+   DCB   "FP Auto-expansion",0
+   DCB   "-----------------",0
+   DCB   "FPU                          ",0 ; &20
+   DCB   0
+   DCB   "FPU,        using FPTEMP reg ",0 ; &21
+   DCB   "Macro TF,   using FPTEMP reg ",0 ; &23
+   DCB   0
+   DCB   "FPU,        using stacked reg",0 ; &24
+   DCB   "Macro TF,   using stacked reg",0 ; &26
+   DCB   "   ",0
+.AE_Summary_Text_End
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Asm_List_FPPOOL_Variables
+   STMFD    R13!,{R4-R6,R14}
+   LDR      R0,FPPOOL_Num
+   CMP      R0,#0
+   LDMEQFD  R13!,{R4-R6,R15}
+   BL       Wimp_Text_AddBlankLine
+   MOV      R0,#Flex_VarList
+   BL       Flex_Adr
+   LDR      R6,VarList_Size
+   SUB      R1,R6,#1
+   BIC      R0,R0,R1                   ; Data must lie on the size of each element boundary
+   ADD      R4,R0,R6                   ; for the sort to work
+   LDR      R0,Prev_Variable_Offset
+   ADD      R5,R4,R0
+
+.ALFPV_Loop
+   LDR      R0,[R4],#16
+   CMP      R6,#16
+   BICEQ    R0,R0,#&FF000000
+   LDRB     R1,[R0,#16]
+   CMP      R1,#'#'
+   BNE      ALFPV_End
+   LDRB     R1,[R0,#17]
+   CMP      R1,#'F'
+   BNE      ALFPV_End
+   LDRB     R1,[R0,#18]
+   CMP      R1,#'P'
+   BNE      ALFPV_Loop
+   LDR      R2,[R0,#4]
+   LDR      R3,[R0,#8]
+   LDR      R1,[R0,#36]
+   LDR      R0,[R0,#40]
+   STMFD    R13!,{R0,R1}
+   ADR      R0,ALFPV_WTLine
+   MOV      R1,#TextColour_Info
+   BL       Wimp_Text_AddColourLine
+   ADD      R13,R13,#8
+
+.ALFPV_End
+   CMP      R4,R5
+   BLT      ALFPV_Loop
+   LDMFD    R13!,{R4-R6,R15}
+
+.ALFPV_WTLine DCB   "(%10s) - Line %6d #fppool - %d times, %d bytes",0
+   ALIGN

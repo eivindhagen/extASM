@@ -1,0 +1,26 @@
+
+macro Call Reg:r
+{
+   MOV      R14,R15
+   MOV      R15,Reg
+}
+
+macro CheckForNULL Reg:r
+{
+   TSTNE    Reg,R8
+   TSTNE    Reg,R8,LSL #8
+   TSTNE    Reg,R8,LSL #16
+   TSTNE    Reg,R8,LSL #24
+}
+
+macro mdiv Result:r,Reg1:r,Reg2:r
+{
+   STMFD    R13!,{R9-R12,R14}
+   MOV      R10,Result
+   MOV      R11,Reg1
+   MOV      R12,Reg2
+   BL       Div
+   MOV      Result,R10
+   MOV      Reg1,R11
+   LDMFD    R13!,{R9-R12,R14}
+}

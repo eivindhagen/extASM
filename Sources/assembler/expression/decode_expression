@@ -1,0 +1,1284 @@
+
+; >-------------------------------------------------------------<
+
+.Decode_Int_Expr
+   STMFD    R13!,{R14}
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Decode_Expr                           ;~R0 = Value or string address (if integer or string)
+   STMFD    R13!,{R4,R5,R14}           ;~F0 = Value (if FP-value)
+   MOV      R0,#15                     ;~R1 = Type of value (Int_Value, FP_Value, String_Value)
+   STR      R0,RELATIVE_Register_Read  ;~R8 = Next char
+   MOV      R5,#0                      ;~R14 = Signal error
+   STR      R5,DV_Warning              ;       (-2 = Warning, variable not found, but it is
+   BL       Decode_Value               ;        first pass, -3 = End of expression)
+   CMN      R14,#3
+   BEQ      DE_End
+
+.DE_Loop
+   MOV      R4,R10
+   BL       DE_Level_9
+   CMN      R14,#3
+   BEQ      DE_End
+   CMP      R10,R4
+   BNE      DE_Loop
+   MOV      R0,#&48                    ; Asm_Error #&48 = Mystical operation '<Character>'
+   LDRB     R2,[R10,#-1]
+   B        Asm_Error
+
+.DE_End
+   CMP      R1,#2
+   BNE      DE_Not_String
+   STMFD    R13!,{R0,R1}
+   BL       StrLen
+   CMP      R0,#Max_String_Size
+   MOVGT    R0,#&3D                    ; Asm_Error #&3D = String too long
+   BGT      Asm_Error
+   LDMFD    R13!,{R0,R1}
+
+.DE_Not_String
+   LDR      R14,DV_Warning
+   LDMFD    R13!,{R4,R5,R15}
+
+.Mismatch_Num
+   MOV      R0,#&45                    ; Asm_Error #&45 = Type mismatch: number needed
+   B        Asm_Error
+
+.Mismatch_Str
+   MOV      R0,#&46                    ; Asm_Error #&46 = Type mismatch: string needed
+   B        Asm_Error
+
+.Missing_Parenthesis
+   MOV      R0,#&47                    ; Asm_Error #&47 = Missing ")"
+   B        Asm_Error
+
+.DE_Level_0
+   STMFD    R13!,{R14}
+   CMP      R8,#')'
+   MVNEQ    R14,#2
+   LDMFD    R13!,{R15}
+
+.DE_Level_2
+   CMP      R8,#'^'
+   BEQ      DE_Power
+   STMFD    R13!,{R14}
+   BL       DE_Level_0
+   LDMFD    R13!,{R15}
+
+.DE_Level_3                            ;_R0 = Current value, ~R0 = New value
+   CMP      R8,#'*'                    ; OPERATORS * / MOD
+   BEQ      DE_Multiply
+   CMP      R8,#'/'
+   BEQ      DE_Divide
+   CMP      R8,#'D'
+   CMPNE    R8,#'d'
+   BEQ      DE_DIV
+   CMP      R8,#'M'
+   CMPNE    R8,#'m'
+   BEQ      DE_MOD
+   STMFD    R13!,{R14}
+   BL       DE_Level_2
+   LDMFD    R13!,{R15}
+
+.DE_Level_4                            ;_R0 = Current value, ~R0 = New value
+   CMP      R8,#'+'                    ; OPERATORS + -
+   BEQ      DE_Add
+   CMP      R8,#'-'
+   BEQ      DE_Subtract
+   STMFD    R13!,{R14}
+   BL       DE_Level_3
+   LDMFD    R13!,{R15}
+
+.DE_Level_6                            ;_R0 = Current value, ~R0 = New value
+   CMP      R8,#'<'                    ; OPERATORS == < > <= => =< >= <> !=, INDIRECT << >>
+   BEQ      DE_LT_LE_NotEqual_SHL      ; <, <=, <>, <<
+   CMP      R8,#'>'                    ; >, >=, >>
+   BEQ      DE_GT_GE_SHR
+   CMP      R8,#'='                    ; ==, =<, =>
+   BEQ      DE_Equal_LE_GE
+   LDRB     R2,[R10]
+   CMP      R8,#'!'
+   CMPEQ    R2,#'='
+   BEQ      DE_NotEqual                ; !=
+   STMFD    R13!,{R14}
+   BL       DE_Level_4
+   LDMFD    R13!,{R15}
+
+.DE_Level_7                            ;_R0 = Current value, ~R0 = New value
+   LDRB     R2,[R10]                   ; OPERATORS AND
+   BIC      R2,R2,#32
+   LDRB     R3,[R10,#1]
+   BIC      R3,R3,#32
+   CMP      R8,#'A'
+   CMPNE    R8,#'a'
+   CMPEQ    R2,#'N'
+   CMPEQ    R3,#'D'
+   BEQ      DE_AND
+   STMFD    R13!,{R14}
+   BL       DE_Level_6
+   LDMFD    R13!,{R15}
+
+.DE_Level_8                            ;_R0 = Current value, ~R0 = New value
+   LDRB     R2,[R10]                   ; OPERATORS EOR
+   BIC      R2,R2,#32
+   LDRB     R3,[R10,#1]
+   BIC      R3,R3,#32
+   CMP      R8,#'E'
+   CMPNE    R8,#'e'
+   CMPEQ    R2,#'O'
+   CMPEQ    R3,#'R'
+   BEQ      DE_EOR
+   STMFD    R13!,{R14}
+   BL       DE_Level_7
+   LDMFD    R13!,{R15}
+
+.DE_Level_9                            ;_R0 = Current value, ~R0 = New value
+   LDRB     R2,[R10]                   ; OPERATORS OR
+   BIC      R2,R2,#32
+   CMP      R8,#'O'
+   CMPNE    R8,#'o'
+   CMPEQ    R2,#'R'
+   BEQ      DE_OR
+   STMFD    R13!,{R14}
+   BL       DE_Level_8
+   LDMFD    R13!,{R15}
+
+.DE_Power
+   ; R0  - Current integer value or string address (if integer or string)
+   ; R1  - Value type of current value             (0 = Integer, 1 = FP-value, 2 = String)
+   ; R4  - First operand               (if integer or string)
+   ; R5  - Value type of first operand
+   ; R6  - Expression pointer (progress pointer)
+   ; R14 - Signal (-2 = Error, -3 = End of expression)
+   ;
+   ; F0  - Current FP-value            (if FP-value)
+   ; F4  - First operand               (if FP-value)
+   ;
+   STMFD    R13!,{R4-R6,R14}
+   SFMFD    F4,1,[R13]!
+   MOV      R4,R0
+   MOV      R5,R1
+   MVFE     F4,F0
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3                     ; End of expression?
+   BEQ      DEPOW_End
+
+.DEPOW_Loop                            ; Call higher levels until the operator
+   MOV      R6,R10                     ; cannot be matched
+   BL       DE_Level_0                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6                     ; Has it found a match?
+   BNE      DEPOW_Loop                 ; If so, try next operator
+
+.DEPOW_End
+   CMP      R5,#0                      ; Are both operators integers?
+   CMPEQ    R1,#0
+   BNE      DEPOW_FP
+   ; Integers
+   ;
+   CMP      R0,#0                      ; Exponent=0?
+   MOVEQ    R0,#1                      ; Result=1
+   LFMEQFD  F4,1,[R13]!
+   LDMEQFD  R13!,{R4-R6,R15}
+   BLT      DEPOW_FP                   ; Negative exponent, go to FP-routine
+   STMFD    R13!,{R0,R1,R4,R5}
+   MOVS     R1,R4
+   MOVEQ    R0,#0
+   BEQ      DEPOW_End2
+
+.DEPOW_Loop2
+   SUBS     R0,R0,#1
+   MOVEQ    R0,R4
+   BEQ      DEPOW_End2
+   MOV      R2,R4
+   MUL      R4,R1,R4                   ; Result=Result*First operand
+   MOV      R3,R4
+   mdiv     R5,R3,R1                   ; Newresult=Result/First operand (backtracking)
+   CMP      R5,R2                      ; Newresult=Result?
+   LDMNEFD  R13!,{R0,R1,R4,R5}
+   BNE      DEPOW_FP                   ; Overflow, go to FP-routine
+   B        DEPOW_Loop2
+
+.DEPOW_End2
+   ADD      R13,R13,#16
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_2                 ; Retry same level
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R4-R6,R15}
+
+   ; Floating Point
+   ;
+.DEPOW_FP
+   CMP      R5,#1
+   FLTLTEZ  F4,R4
+   BGT      Mismatch_Num
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   CMFE     F4,#0
+   BGT      DEPOW_End3
+   BEQ      DEPOW_Zero
+   RNDE     F1,F0                      ; First operand<0 and second operand is not an
+   CMFE     F0,F1                      ; integer?
+   MOVNE    R0,#&42                    ; Asm_Error #&42 = Logarithm range
+   BNE      Asm_Error
+   B        DEPOW_End3
+
+.DEPOW_Zero
+   CMFE     F0,#0                      ; First operand=0 and second operand<0?
+   MOVLE    R0,#&40                    ; Asm_Error #&40 = Division by zero
+   BLE      Asm_Error
+
+.DEPOW_End3
+   POWE     F0,F4,F0
+   MOV      R1,#1
+   CMN      R14,#3
+   BLNE     DE_Level_2                 ; Retry same level
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R4-R6,R15}
+
+.DE_Multiply
+   STMFD    R13!,{R4-R6,R14}
+   SFMFD    F4,1,[R13]!
+   MOV      R4,R0
+   MOV      R5,R1
+   MVFE     F4,F0
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEMUL_End
+
+.DEMUL_Loop
+   MOV      R6,R10
+   BL       DE_Level_2                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEMUL_Loop
+
+.DEMUL_End
+   CMP      R5,#0
+   CMPEQ    R1,#0
+   BNE      DEMUL_FP
+   ; Integer
+   ;
+   MOV      R6,R0
+   MULS     R0,R4,R0
+   BEQ      DEMUL_End2
+   MOV      R2,R0
+   mdiv     R3,R2,R6
+   CMP      R3,R4
+   MOVNE    R0,R6
+   BNE      DEMUL_FP                   ; Overflow, go to FP-routine
+
+.DEMUL_End2
+   CMN      R14,#3
+   BLNE     DE_Level_3                 ; Retry same level
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R4-R6,R15}
+
+   ; Floating Point
+   ;
+.DEMUL_FP
+   CMP      R5,#1
+   FLTLTEZ  F4,R4
+   BGT      Mismatch_Num
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   MUFE     F0,F4,F0
+   MOV      R1,#1
+   CMN      R14,#3
+   BLNE     DE_Level_3                 ; Retry same level
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R4-R6,R15}
+
+.DE_DIV
+   STMFD    R13!,{R4-R6,R14}
+   LDRB     R2,[R10]
+   BIC      R2,R2,#32
+   LDRB     R3,[R10,#1]
+   BIC      R3,R3,#32
+   CMP      R2,#'I'
+   CMPEQ    R3,#'V'
+   LDMNEFD  R13!,{R4-R6,R15}
+   ADD      R10,R10,#2
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R4,R0
+   MOV      R5,R1
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEDIVI_End
+
+.DEDIVI_Loop
+   MOV      R6,R10
+   BL       DE_Level_2                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEDIVI_Loop
+
+.DEDIVI_End
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMP      R0,#0
+   MOVEQ    R0,#&40                    ; Asm_Error #&40 = Division by zero
+   BEQ      Asm_Error
+   mdiv     R1,R4,R0
+   MOV      R0,R1
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_3                 ; Retry same level
+   LDMFD    R13!,{R4-R6,R15}
+
+.DE_Divide
+   STMFD    R13!,{R4-R6,R14}
+   SFMFD    F4,1,[R13]!
+   MOV      R4,R0
+   MOV      R5,R1
+   MVFE     F4,F0
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEDIV_End
+
+.DEDIV_Loop
+   MOV      R6,R10
+   BL       DE_Level_2                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEDIV_Loop
+
+   ; Floating Point
+   ;
+.DEDIV_End
+   CMP      R5,#1
+   FLTLTEZ  F4,R4
+   BGT      Mismatch_Num
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   CMFE     F0,#0
+   MOVEQ    R0,#&40                    ; Asm_Error #&40 = Division by zero
+   BEQ      Asm_Error
+   DVFE     F0,F4,F0
+   MOV      R1,#1
+   CMN      R14,#3
+   BLNE     DE_Level_3                 ; Retry same level
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R4-R6,R15}
+
+.DE_MOD
+   STMFD    R13!,{R4-R6,R14}
+   LDRB     R2,[R10]
+   BIC      R2,R2,#32
+   LDRB     R3,[R10,#1]
+   BIC      R3,R3,#32
+   CMP      R2,#'O'
+   CMPEQ    R3,#'D'
+   LDMNEFD  R13!,{R4-R6,R15}
+   ADD      R10,R10,#2
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R4,R0
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEMOD_End
+
+.DEMOD_Loop
+   MOV      R6,R10
+   BL       DE_Level_2                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEMOD_Loop
+
+.DEMOD_End
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMP      R0,#0
+   MOVEQ    R0,#&40                    ; Asm_Error #&40 = Division by zero
+   BEQ      Asm_Error
+   mdiv     R1,R4,R0
+   MOV      R0,R4
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_3                 ; Retry same level
+   LDMFD    R13!,{R4-R6,R15}
+
+.DE_Add
+   STMFD    R13!,{R6,R14}
+   SFMFD    F4,1,[R13]!
+   CMP      R5,#2
+   BLEQ     Stack_String
+   STMFD    R13!,{R4,R5}
+   MOV      R5,R1
+   CMP      R1,#1
+   MVFEQE   F4,F0
+   MOVLE    R4,R0
+   ADRGT    R4,StrBuffer2
+   MOVGT    R1,R4
+   BLGT     StrCopy
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEADD_End
+
+.DEADD_Loop
+   MOV      R6,R10
+   BL       DE_Level_3                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEADD_Loop
+
+.DEADD_End
+   CMP      R5,#0
+   CMPEQ    R1,#0
+   BNE      DEADD_FP_String
+   ; Integer
+   ;
+   MOV      R2,R0
+   ADDS     R0,R4,R0
+   MOVVS    R0,R2                      ; Overflow, go to FP-routine
+   BVS      DEADD_FP_String
+   CMN      R14,#3
+   BLNE     DE_Level_4                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DEADD_FP_String
+   CMP      R5,#1
+   BGT      DEADD_String
+   ; Floating Point
+   ;
+   FLTLTEZ  F4,R4
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   ADFE     F0,F4,F0
+   MOV      R1,#1
+   CMN      R14,#3
+   BLNE     DE_Level_4                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+   ; String
+   ;
+.DEADD_String
+   CMP      R1,#2
+   BLT      Mismatch_Str
+   MOV      R6,R14
+   MOV      R5,R0
+   MOV      R0,R4
+   BL       StrLen
+   ADD      R1,R4,R0
+   MOV      R0,R5
+   BL       StrCopy
+   MOV      R0,R4
+   MOV      R1,R5
+   BL       StrCopy
+   MOV      R0,R5
+   MOV      R1,#2
+   CMN      R6,#3
+   BEQ      DEADD_String_No_Retry
+   BL       DE_Level_4                 ; Retry same level
+   MOV      R6,R14
+
+.DEADD_String_No_Retry
+   LDMFD    R13!,{R4,R5}
+   CMP      R5,#2
+   BLEQ     Unstack_String
+   MOV      R14,R6
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DE_Subtract
+   STMFD    R13!,{R4-R6,R14}
+   SFMFD    F4,1,[R13]!
+   MOV      R4,R0
+   MOV      R5,R1
+   MVFE     F4,F0
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DESUB_End
+
+.DESUB_Loop
+   MOV      R6,R10
+   BL       DE_Level_3                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DESUB_Loop
+
+.DESUB_End
+   CMP      R5,#0
+   CMPEQ    R1,#0
+   BNE      DESUB_FP
+   ; Integer
+   ;
+   MOV      R2,R0
+   SUBS     R0,R4,R0
+   MOVVS    R0,R2
+   BVS      DESUB_FP
+   CMN      R14,#3
+   BLNE     DE_Level_4                 ; Retry same level
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R4-R6,R15}
+
+.DESUB_FP
+   ; Floating Point
+   ;
+   CMP      R5,#1
+   FLTLTEZ  F4,R4
+   BGT      Mismatch_Num
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   SUFE     F0,F4,F0
+   MOV      R1,#1
+   CMN      R14,#3
+   BLNE     DE_Level_4                 ; Retry same level
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R4-R6,R15}
+
+.DE_SHL
+   STMFD    R13!,{R4-R6,R14}
+   ADD      R10,R10,#1
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R4,R0
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMN      R14,#3
+   BEQ      DESHL_End
+
+.DESHL_Loop
+   MOV      R6,R10
+   BL       DE_Level_4                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DESHL_Loop
+
+.DESHL_End
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R0,R4,LSL R0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4-R6,R15}
+
+.DE_SHR
+   STMFD    R13!,{R4-R7,R14}
+   ADD      R10,R10,#1
+   LDRB     R2,[R10]
+   CMP      R2,#'>'
+   MOVEQ    R7,#1
+   MOVNE    R7,#0
+   ADDEQ    R10,R10,#1
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R4,R0
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DESHR_End
+
+.DESHR_Loop
+   MOV      R6,R10
+   BL       DE_Level_4                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DESHR_Loop
+
+.DESHR_End
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMP      R7,#1
+   MOVEQ    R0,R4,LSR R0
+   MOVNE    R0,R4,ASR R0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4-R7,R15}
+
+.DE_LT_LE_NotEqual_SHL
+   LDRB     R2,[R10]
+   CMP      R2,#'='
+   BEQ      DE_LE
+   CMP      R2,#'>'
+   BEQ      DE_NotEqual
+   CMP      R2,#'<'
+   BEQ      DE_SHL
+   ; DE_LT
+   ;
+   STMFD    R13!,{R6,R14}
+   SFMFD    F4,1,[R13]!
+   CMP      R5,#2
+   BLEQ     Stack_String
+   STMFD    R13!,{R4,R5}
+   MOV      R5,R1
+   CMP      R1,#1
+   MVFEQE   F4,F0
+   MOVLE    R4,R0
+   ADRGT    R4,StrBuffer2
+   MOVGT    R1,R4
+   BLGT     StrCopy
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DELT_End
+
+.DELT_Loop
+   MOV      R6,R10
+   BL       DE_Level_4                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DELT_Loop
+
+.DELT_End
+   CMP      R5,#0
+   CMPEQ    R1,#0
+   BNE      DELT_FP_String
+   ; Integer
+   ;
+   CMP      R4,R0
+   MVNLT    R0,#0
+   MOVGE    R0,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+   ; Floating Point
+   ;
+.DELT_FP_String
+   CMP      R5,#1
+   BGT      DELT_String
+   FLTLTEZ  F4,R4
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   CMFE     F4,F0
+   MVNLT    R0,#0
+   MOVGE    R0,#0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+   ; String
+   ;
+.DELT_String
+   CMP      R1,#2
+   BLT      Mismatch_Str
+   MOV      R6,R14
+   MOV      R1,R0
+   MOV      R0,R4
+   BL       StrCmp
+   CMP      R0,#0
+   MVNLT    R0,#0
+   MOVGE    R0,#0
+   MOV      R1,#0
+   CMN      R6,#3
+   BEQ      DELT_String_No_Retry
+   BL       DE_Level_4                 ; Retry same level
+   MOV      R6,R14
+
+.DELT_String_No_Retry
+   LDMFD    R13!,{R4,R5}
+   CMP      R5,#2
+   BLEQ     Unstack_String
+   MOV      R14,R6
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DE_LE
+   STMFD    R13!,{R6,R14}
+   SFMFD    F4,1,[R13]!
+   ADD      R10,R10,#1
+   CMP      R5,#2
+   BLEQ     Stack_String
+   STMFD    R13!,{R4,R5}
+   MOV      R5,R1
+   CMP      R1,#1
+   MVFEQE   F4,F0
+   MOVLE    R4,R0
+   ADRGT    R4,StrBuffer2
+   MOVGT    R1,R4
+   BLGT     StrCopy
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DELE_End
+
+.DELE_Loop
+   MOV      R6,R10
+   BL       DE_Level_4                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DELE_Loop
+
+.DELE_End
+   CMP      R5,#0
+   CMPEQ    R1,#0
+   BNE      DELE_FP_String
+   ; Integer
+   ;
+   CMP      R4,R0
+   MVNLE    R0,#0
+   MOVGT    R0,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DELE_FP_String
+   CMP      R5,#1
+   BGT      DELE_String
+   ; Floating Point
+   ;
+   FLTLTEZ  F4,R4
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   CMFE     F4,F0
+   MVNLE    R0,#0
+   MOVGT    R0,#0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+   ; String
+   ;
+.DELE_String
+   CMP      R1,#2
+   BLT      Mismatch_Str
+   MOV      R6,R14
+   MOV      R1,R0
+   MOV      R0,R4
+   BL       StrCmp
+   CMP      R0,#0
+   MVNLE    R0,#0
+   MOVGT    R0,#0
+   MOV      R1,#0
+   CMN      R6,#3
+   BEQ      DELE_String_No_Retry
+   BL       DE_Level_4                 ; Retry same level
+   MOV      R6,R14
+
+.DELE_String_No_Retry
+   LDMFD    R13!,{R4,R5}
+   CMP      R5,#2
+   BLEQ     Unstack_String
+   MOV      R14,R6
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DE_NotEqual
+   STMFD    R13!,{R6,R14}
+   SFMFD    F4,1,[R13]!
+   ADD      R10,R10,#1
+   CMP      R5,#2
+   BLEQ     Stack_String
+   STMFD    R13!,{R4,R5}
+   MOV      R5,R1
+   CMP      R1,#1
+   MVFEQE   F4,F0
+   MOVLE    R4,R0
+   ADRGT    R4,StrBuffer2
+   MOVGT    R1,R4
+   BLGT     StrCopy
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DENE_End
+
+.DENE_Loop
+   MOV      R6,R10
+   BL       DE_Level_4                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DENE_Loop
+
+.DENE_End
+   CMP      R5,#0
+   CMPEQ    R1,#0
+   BNE      DENE_FP_String
+   ; Integer
+   ;
+   CMP      R4,R0
+   MVNNE    R0,#0
+   MOVEQ    R0,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DENE_FP_String
+   CMP      R5,#1
+   BGT      DENE_String
+   ; Floating Point
+   ;
+   FLTLTEZ  F4,R4
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   CMFE     F4,F0
+   MVNNE    R0,#0
+   MOVEQ    R0,#0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+   ; String
+   ;
+.DENE_String
+   CMP      R1,#2
+   BLT      Mismatch_Str
+   MOV      R6,R14
+   MOV      R1,R0
+   MOV      R0,R4
+   BL       StrCmp
+   CMP      R0,#0
+   MVNNE    R0,#0
+   MOVEQ    R0,#0
+   MOV      R1,#0
+   CMN      R6,#3
+   BEQ      DENE_String_No_Retry
+   BL       DE_Level_4                 ; Retry same level
+   MOV      R6,R14
+
+.DENE_String_No_Retry
+   LDMFD    R13!,{R4,R5}
+   CMP      R5,#2
+   BLEQ     Unstack_String
+   MOV      R14,R6
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DE_GT_GE_SHR
+   LDRB     R2,[R10]
+   CMP      R2,#'='
+   BEQ      DE_GE
+   CMP      R2,#'>'
+   BEQ      DE_SHR
+   ; DE_GT
+   ;
+   STMFD    R13!,{R6,R14}
+   SFMFD    F4,1,[R13]!
+   CMP      R5,#2
+   BLEQ     Stack_String
+   STMFD    R13!,{R4,R5}
+   MOV      R5,R1
+   CMP      R1,#1
+   MVFEQE   F4,F0
+   MOVLE    R4,R0
+   ADRGT    R4,StrBuffer2
+   MOVGT    R1,R4
+   BLGT     StrCopy
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEGT_End
+
+.DEGT_Loop
+   MOV      R6,R10
+   BL       DE_Level_4                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEGT_Loop
+
+.DEGT_End
+   CMP      R5,#0
+   CMPEQ    R1,#0
+   BNE      DEGT_FP_String
+   ; Integer
+   ;
+   CMP      R4,R0
+   MVNGT    R0,#0
+   MOVLE    R0,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DEGT_FP_String
+   CMP      R5,#1
+   BGT      DEGT_String
+   ; Floating Point
+   ;
+   FLTLTEZ  F4,R4
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   CMFE     F4,F0
+   MVNGT    R0,#0
+   MOVLE    R0,#0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+   ; String
+   ;
+.DEGT_String
+   CMP      R1,#2
+   BLT      Mismatch_Str
+   MOV      R6,R14
+   MOV      R1,R0
+   MOV      R0,R4
+   BL       StrCmp
+   CMP      R0,#0
+   MVNGT    R0,#0
+   MOVLE    R0,#0
+   MOV      R1,#0
+   CMN      R6,#3
+   BEQ      DEGT_String_No_Retry
+   BL       DE_Level_4                 ; Retry same level
+   MOV      R6,R14
+
+.DEGT_String_No_Retry
+   LDMFD    R13!,{R4,R5}
+   CMP      R5,#2
+   BLEQ     Unstack_String
+   MOV      R14,R6
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DE_GE
+   STMFD    R13!,{R6,R14}
+   SFMFD    F4,1,[R13]!
+   ADD      R10,R10,#1
+   CMP      R5,#2
+   BLEQ     Stack_String
+   STMFD    R13!,{R4,R5}
+   MOV      R5,R1
+   CMP      R1,#1
+   MVFEQE   F4,F0
+   MOVLE    R4,R0
+   ADRGT    R4,StrBuffer2
+   MOVGT    R1,R4
+   BLGT     StrCopy
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEGE_End
+
+.DEGE_Loop
+   MOV      R6,R10
+   BL       DE_Level_4                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEGE_Loop
+
+.DEGE_End
+   CMP      R5,#0
+   CMPEQ    R1,#0
+   BNE      DEGE_FP_String
+   ; Integer
+   ;
+   CMP      R4,R0
+   MVNGE    R0,#0
+   MOVLT    R0,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DEGE_FP_String
+   CMP      R5,#1
+   BGT      DEGE_String
+   ; Floating Point
+   ;
+   FLTLTEZ  F4,R4
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   CMFE     F4,F0
+   MVNGE    R0,#0
+   MOVLT    R0,#0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+   ; String
+   ;
+.DEGE_String
+   CMP      R1,#2
+   BLT      Mismatch_Str
+   MOV      R6,R14
+   MOV      R1,R0
+   MOV      R0,R4
+   BL       StrCmp
+   CMP      R0,#0
+   MVNGE    R0,#0
+   MOVLT    R0,#0
+   MOV      R1,#0
+   CMN      R6,#3
+   BEQ      DEGE_String_No_Retry
+   BL       DE_Level_4                 ; Retry same level
+   MOV      R6,R14
+
+.DEGE_String_No_Retry
+   LDMFD    R13!,{R4,R5}
+   CMP      R5,#2
+   BLEQ     Unstack_String
+   MOV      R14,R6
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DE_Equal_LE_GE
+   LDRB     R2,[R10]
+   CMP      R2,#'<'
+   BEQ      DE_LE
+   CMP      R2,#'>'
+   BEQ      DE_GE
+   CMP      R2,#'='
+   BEQ      DE_Equal
+   MOV      R0,#&49                    ; Asm_Error #&49 = Assignment operator not implemented (use '==' for equality test)
+   B        Asm_Error
+
+.DE_Equal
+   STMFD    R13!,{R6,R14}
+   SFMFD    F4,1,[R13]!
+   ADD      R10,R10,#1
+   CMP      R5,#2
+   BLEQ     Stack_String
+   STMFD    R13!,{R4,R5}
+   MOV      R5,R1
+   CMP      R1,#1
+   MVFEQE   F4,F0
+   MOVLE    R4,R0
+   ADRGT    R4,StrBuffer2
+   MOVGT    R1,R4
+   BLGT     StrCopy
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEEQ_End
+
+.DEEQ_Loop
+   MOV      R6,R10
+   BL       DE_Level_4                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEEQ_Loop
+
+.DEEQ_End
+   CMP      R5,#0
+   CMPEQ    R1,#0
+   BNE      DEEQ_FP_String
+   ; Integer
+   ;
+   CMP      R4,R0
+   MVNEQ    R0,#0
+   MOVNE    R0,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DEEQ_FP_String
+   CMP      R5,#1
+   BGT      DEEQ_String
+   ; Floating Point
+   ;
+   FLTLTEZ  F4,R4
+   CMP      R1,#1
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   CMFE     F4,F0
+   MVNEQ    R0,#0
+   MOVNE    R0,#0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_6                 ; Retry same level
+   LDMFD    R13!,{R4,R5}
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+   ; String
+   ;
+.DEEQ_String
+   CMP      R1,#2
+   BLT      Mismatch_Str
+   MOV      R6,R14
+   MOV      R1,R0
+   MOV      R0,R4
+   BL       StrCmp
+   CMP      R0,#0
+   MVNEQ    R0,#0
+   MOVNE    R0,#0
+   MOV      R1,#0
+   CMN      R6,#3
+   BEQ      DEEQ_String_No_Retry
+   BL       DE_Level_4                 ; Retry same level
+   MOV      R6,R14
+
+.DEEQ_String_No_Retry
+   LDMFD    R13!,{R4,R5}
+   CMP      R5,#2
+   BLEQ     Unstack_String
+   MOV      R14,R6
+   LFMFD    F4,1,[R13]!
+   LDMFD    R13!,{R6,R15}
+
+.DE_AND
+   STMFD    R13!,{R4-R6,R14}
+   ADD      R10,R10,#2
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R4,R0
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEAND_End
+
+.DEAND_Loop
+   MOV      R6,R10
+   BL       DE_Level_6                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEAND_Loop
+
+.DEAND_End
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   AND      R0,R4,R0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_7                 ; Retry same level
+   LDMFD    R13!,{R4-R6,R15}
+
+.DE_EOR
+   STMFD    R13!,{R4-R6,R14}
+   ADD      R10,R10,#2
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R4,R0
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEEOR_End
+
+.DEEOR_Loop
+   MOV      R6,R10
+   BL       DE_Level_7                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEEOR_Loop
+
+.DEEOR_End
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   EOR      R0,R4,R0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_8                 ; Retry same level
+   LDMFD    R13!,{R4-R6,R15}
+
+.DE_OR
+   STMFD    R13!,{R4-R6,R14}
+   ADD      R10,R10,#1
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   MOV      R4,R0
+   LDRB     R8,[R10],#1
+   BL       Decode_Value
+   CMN      R14,#3
+   BEQ      DEOR_End
+
+.DEOR_Loop
+   MOV      R6,R10
+   BL       DE_Level_8                 ; Call one level higher
+   CMN      R14,#3
+   CMPNE    R10,R6
+   BNE      DEOR_Loop
+
+.DEOR_End
+   CMP      R1,#1
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   ORR      R0,R4,R0
+   MOV      R1,#0
+   CMN      R14,#3
+   BLNE     DE_Level_9                 ; Retry same level
+   LDMFD    R13!,{R4-R6,R15}
+
+; >-------------------------------------------------------------<
+
+.Stack_String                          ;_R4-> String
+   SUB      R2,R13,#&100
+   STMFD    R2!,{R0,R1,R5,R14}
+   MOV      R5,R2
+   MOV      R0,R4
+   BL       StrLen
+   SUB      R13,R13,R0
+   SUB      R13,R13,#5
+   BIC      R13,R13,#3
+   STR      R4,[R13]
+   MOV      R0,R4
+   ADD      R1,R13,#4
+   BL       StrCopy
+   LDMFD    R5,{R0,R1,R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Unstack_String
+   SUB      R2,R13,#&100
+   STMFD    R2!,{R0,R1,R5,R14}
+   MOV      R5,R2
+   LDR      R1,[R13],#4
+   MOV      R0,R13
+   BL       StrCopy
+   TST      R0,#3
+   BICNE    R0,R0,#3
+   ADDNE    R0,R0,#4
+   MOV      R13,R0
+   LDMFD    R5,{R0,R1,R5,R15}

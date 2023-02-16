@@ -1,0 +1,505 @@
+
+; >-------------------------------------------------------------<
+
+.DT_MLA_MLS                            ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   ;------> MLA  Cond       S[Rd][Ra][Rm]    [Rn]
+   MOVEQ    R9,#%00000000001000000000000010010000
+   BEQ      DT_ALU_MUL
+   CMP      R8,#'S'
+   ;------> MLS  Cond        [Rd][Ra][Rm]    [Rn]
+   MOVEQ    R9,#%00000000011000000000000010010000
+   BEQ      DT_ALU_MUL
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_MUF_MUL                            ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   ;------> MUL  Cond       S[Rd][Ra][Rm]    [Rn]
+   MOVEQ    R9,#%00000000000000000000000010010000
+   BEQ      DT_ALU_MUL
+   CMP      R8,#'F'
+   ;------> MUF  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110000100000000000100000000
+   BEQ      DT_FPU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SML                                ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_SMLA
+   CMP      R8,#'S'
+   BEQ      DT_SMLS
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SMLA                               ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   ;------> SMLAD Cond        [Rd][Ra][Rm]  M [Rn]
+   MOVEQ    R9,# %00000111000000000000000000000000
+   BEQ      DT_SMLxD
+   B        DT_SMLx
+
+; >-------------------------------------------------------------<
+
+.DT_SMLS                               ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   ;------> SMLSD Cond        [Rd][Ra][Rm]  M [Rn]
+   MOVEQ    R9,# %00000111000000000000000001000000
+   BEQ      DT_SMLxD
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   ;------> SMLSLD Cond        [Rd][Ra][Rm]  M [Rn]
+   MOVEQ    R9,#  %00000111010000000000000001010000
+   BEQ      DT_SMLxD
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SMLx
+   CMP      R8,#'L'
+   BEQ      DT_SMLAL
+   CMP      R8,#'W'
+   BEQ      DT_SMLAW
+   ;------> SMLA<N><M> Cond        [Rd][Ra][Rm] NM [Rn]
+   MOV      R9,#      %00000001000000000000000010000000
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ORREQ    R9,R9,#1 << 5
+   CMPNE    R8,#'B'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ORREQ    R9,R9,#1 << 6
+   CMPNE    R8,#'B'
+   BNE      DT_Unknown
+   B        DT_ALU_Long_Mul_Rd_Last
+
+; >-------------------------------------------------------------<
+
+.DT_SMLxD                              ;_R8 = "D"
+   ;------> SMLxD   Cond        [Rd][Ra][Rm]  M [Rn]
+   ORR      R9,R9,#%00000000000000000000000000010000
+   LDRB     R8,[R10]
+   CMP      R8,#'X'
+   CMPNE    R8,#'x'
+   ORREQ    R9,R9,#1 << 5
+   ADDEQ    R10,R10,#1
+   MOV      R4,#0
+   B        DT_ALU_Long_Mul_Rd_Last
+
+; >-------------------------------------------------------------<
+
+.DT_SMLAL                              ;_R8 = "L"
+   LDRB     R8,[R10]
+   CMP      R8,#'D'
+   CMPNE    R8,#'d'
+   ADDEQ    R10,R10,#1
+   BEQ      DT_SMLALD
+   CMP      R8,#'B'
+   CMPNE    R8,#'b'
+   CMPNE    R8,#'T'
+   CMPNE    R8,#'t'
+   ;------> SMLAL Cond       SRdHiRdLo[Rm]    [Rn]
+   MOVNE    R9,# %00000000111000000000000010010000
+   MOVNE    R4,#1
+   BNE      DT_ALU_Long_Mul
+   ;------> SMLAL<N><M> Cond        RdHiRdLo[Rm] NM [Rm]
+   MOV      R9,#       %00000001010000000000000010000000
+   MOV      R4,#0
+   ADD      R10,R10,#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ORREQ    R9,R9,#1 << 5
+   CMPNE    R8,#'B'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ORREQ    R9,R9,#1 << 6
+   CMPNE    R8,#'B'
+   BNE      DT_Unknown
+   B        DT_ALU_Long_Mul
+
+; >-------------------------------------------------------------<
+
+.DT_SMLALD                             ;_R8 = "D"/"d"
+   ;------> SMLALD Cond        RdHiRdLo[Rm]  x [Rn]
+   MOV      R9,#  %00000111010000000000000000010000
+   LDRB     R8,[R10]
+   CMP      R8,#'X'
+   CMPNE    R8,#'x'
+   ORREQ    R9,R9,#1 << 5
+   ADDEQ    R10,R10,#1
+   MOV      R4,#0
+   B        DT_ALU_Long_Mul
+
+; >-------------------------------------------------------------<
+
+.DT_SMLAW                              ;_R8 = "W"
+   ;------> SMLAW<M> Cond        [Rd][Ra][Rm] M  [Rn]
+   MOV      R9,#    %00000001001000000000000010000000
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ORREQ    R9,R9,#1 << 6
+   CMPNE    R8,#'B'
+   BNE      DT_Unknown
+   B        DT_ALU_Long_Mul_Rd_Last
+
+; >-------------------------------------------------------------<
+
+.DT_SMM                                ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BEQ      DT_SMML
+   CMP      R8,#'U'
+   BEQ      DT_SMMU
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SMML                               ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   ;------> SMMLA Cond        [Rd][Ra][Rm]  R [Rn]
+   MOVEQ    R9,# %00000111010100000000000000010000
+   BEQ      DT_SMMLx
+   CMP      R8,#'S'
+   ;------> SMMLS Cond        [Rd][Ra][Rm]  R [Rn]
+   MOVEQ    R9,# %00000111010100000000000011010000
+
+.DT_SMMLx
+   LDRB     R8,[R10]
+   CMP      R8,#'R'
+   CMPNE    R8,#'r'
+   ORREQ    R9,R9,#1 << 5
+   ADDEQ    R10,R10,#1
+   B        DT_ALU_Long_Mul_Rd_Last
+
+; >-------------------------------------------------------------<
+
+.DT_SMMU                               ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   ;------> SMMUL Cond        [Rd]    [Rm]  R [Rn]
+   MOV      R9,# %00000111010100001111000000010000
+   LDRB     R8,[R10]
+   CMP      R8,#'R'
+   CMPNE    R8,#'r'
+   ORREQ    R9,R9,#1 << 5
+   ADDEQ    R10,R10,#1
+   B        DT_ALU_Extended_MUL
+
+; >-------------------------------------------------------------<
+
+.DT_SMU                                ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_SMUAD
+   CMP      R8,#'L'
+   BEQ      DT_SMUL
+   CMP      R8,#'S'
+   BEQ      DT_SMUSD
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SMUAD                              ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   ;------> SMUAD Cond        [Rd]    [Rm]  X [Rn]
+   MOV      R9,# %00000111000000001111000000010000
+   LDRB     R8,[R10]
+   CMP      R8,#'X'
+   CMPNE    R8,#'x'
+   ORREQ    R9,R9,#1 << 5
+   ADDEQ    R10,R10,#1
+   B        DT_ALU_Extended_MUL
+
+; >-------------------------------------------------------------<
+
+.DT_SMUL                               ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BEQ      DT_SMULL
+   CMP      R8,#'W'
+   BEQ      DT_SMULW
+   ;------> SMUL<N><M> Cond        [Rd]    [Rm] MN [Rn]
+   MOV      R9,#      %00000001011000000000000010000000
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ORREQ    R9,R9,#1 << 5
+   CMPNE    R8,#'B'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ORREQ    R9,R9,#1 << 6
+   CMPNE    R8,#'B'
+   BNE      DT_Unknown
+   B        DT_ALU_Extended_MUL
+
+; >-------------------------------------------------------------<
+
+.DT_SMULL
+   ;------> SMULL Cond       SRdHiRdLo[Rm]    [Rn]
+   MOV      R9,# %00000000110000000000000010010000
+   MOV      R4,#1
+   B        DT_ALU_Long_Mul
+
+; >-------------------------------------------------------------<
+
+.DT_SMULW                              ;_R8 = "W"
+   ;------> SMULW<M> Cond        [Rd]    [Rm] M  [Rn]
+   MOV      R9,#    %00000001001000000000000010100000
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ORREQ    R9,R9,#1 << 6
+   CMPNE    R8,#'B'
+   BNE      DT_Unknown
+   B        DT_ALU_Extended_MUL
+
+; >-------------------------------------------------------------<
+
+.DT_SMUSD                              ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   ;------> SMUSD Cond        [Rd]    [Rm]  x [Rn]
+   MOV      R9,# %00000111000000001111000001010000
+   LDRB     R8,[R10]
+   CMP      R8,#'X'
+   CMPNE    R8,#'x'
+   ORREQ    R9,R9,#1 << 5
+   ADDEQ    R10,R10,#1
+   B        DT_ALU_Extended_MUL
+
+; >-------------------------------------------------------------<
+
+.DT_UMA_UML_UMU                        ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_UMAAL
+   CMP      R8,#'L'
+   BEQ      DT_UMLAL
+   CMP      R8,#'U'
+   BEQ      DT_UMULL
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_UMAAL                              ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   ;------> UMAAL Cond        RdHiRdLo[Rm]    [Rn]
+   MOVEQ    R9,# %00000000010000000000000010010000
+   MOVEQ    R4,#0
+   BEQ      DT_ALU_Long_Mul
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_UMLAL                              ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   ;------> UMLAL Cond       SRdHiRdLo[Rm]    [Rn]
+   MOVEQ    R9,# %00000000101000000000000010010000
+   MOVEQ    R4,#1
+   BEQ      DT_ALU_Long_Mul
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_UMULL                               ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   ;------> UMULL Cond       SRdHiRdLo[Rm]    [Rn]
+   MOVEQ    R9,# %00000000100000000000000010010000
+   MOVEQ    R4,#1
+   BEQ      DT_ALU_Long_Mul
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_MUL
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DTAMUL_No_Stat
+   ADR      R0,Code_Counters+16*4
+   TST      R9,#1 << 21
+   ADDNE    R0,R0,#4
+   LDR      R1,[R0]
+   ADD      R1,R1,#1
+   STR      R1,[R0]
+
+.DTAMUL_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = "S" or CC or Blank
+   BL       Decode_ConditionCode
+   CMP      R8,#'S'
+   CMPNE    R8,#'s'
+   TSTEQ    R9,#1 << 22                ; MLS?
+   ORREQ    R9,R9,#1 << 20
+   LDREQB   R8,[R10],#1
+   BL       Ensure_Blank
+
+   BL       Decode_Register            ;_R0 = Dest Register bits
+   CMP      R0,#15
+   MOVEQ    R0,#&03                    ; Asm_Error #&03 = MUL/DIV Rd=PC
+   BEQ      Asm_Error
+   ORR      R9,R9,R0,LSL #Rn_Pos       ; Insert Rd bits
+   MOV      R4,R0                      ; R4=Rd
+   BL       Decode_Operand_Rm_Register
+   CMP      R0,R4                      ; Rd = Rm -> Zero result
+   MOVEQ    R0,#&04                    ; Asm_Error #&04 = MUL/DIV Rd=Rm or DIV Rd=Rs or DIV Rm=Rs
+   BEQ      Asm_Error
+   MOV      R5,R0
+   BL       Decode_Operand_Rs_Register
+   CMP      R0,#&F
+   CMPNE    R4,#&F
+   CMPNE    R5,#&F
+   MOVEQ    R0,#&32                    ; Asm_Warning #&32 = R15 should not be used as operand or destination for MUL or MLA
+   BLEQ     Asm_Warning
+
+   TST      R9,#1 << 21
+   BEQ      DT_Write_Instruction
+   BL       Decode_Operand_Rd_Register
+   CMP      R0,#&F
+   MOVEQ    R0,#&32                    ; Asm_Warning #&32 = R15 should not be used as operand or destination for MUL or MLA
+   BLEQ     Asm_Warning
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_Extended_MUL
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DT_AWM_No_Stat
+   ADR      R0,Code_Counters+16*4
+   LDR      R1,[R0]
+   ADD      R1,R1,#1
+   STR      R1,[R0]
+
+.DT_AWM_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = "S" or CC or Blank
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Rn_Register         ; Dest Register bits
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   MOV      R4,R0
+   BL       Decode_Operand_Rm_Register ; Operand 1 bits
+   MOV      R5,R0
+   BL       Decode_Operand_Rs_Register ; Operand 2 bits
+   CMP      R0,#&F
+   CMPNE    R4,#&F
+   CMPNE    R5,#&F
+   MOVEQ    R0,#&32                    ; Asm_Warning #&32 = R15 should not be used as operand or destination for multiplication instructions
+   BLEQ     Asm_Warning
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_Long_Mul                       ;_R4 = 0 - No "S" option, 1 - "S" option
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DT_ALM_No_Stat
+   ADR      R0,Code_Counters+16*4
+   LDR      R1,[R0]
+   ADD      R1,R1,#1
+   STR      R1,[R0]
+
+.DT_ALM_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = "S" or CC or Blank
+   BL       Decode_ConditionCode
+   CMP      R8,#'S'
+   CMPNE    R8,#'s'
+   CMPEQ    R4,#1
+   ORREQ    R9,R9,#Update_PSR_Bit
+   LDREQB   R8,[R10],#1
+   BL       Decode_Destination_Register
+   MOV      R5,R0
+   BL       Decode_Operand_Rn_Register
+   MOV      R6,R0
+   BL       Decode_Operand_Rm_Register
+   MOV      R7,R0
+   BL       Decode_Operand_Rs_Register
+   CMP      R0,#&F
+   CMPNE    R5,#&F
+   CMPNE    R6,#&F
+   CMPNE    R7,#&F
+   MOVEQ    R0,#&32                    ; Asm_Warning #&32 = R15 should not be used as operand or destination for multiplication instructions
+   BLEQ     Asm_Warning
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_Long_Mul_Rd_Last
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DT_ALMRL_No_Stat
+   ADR      R0,Code_Counters+16*4
+   LDR      R1,[R0]
+   ADD      R1,R1,#1
+   STR      R1,[R0]
+
+.DT_ALMRL_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = CC or Blank
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Rn_Register
+   MOV      R5,R0
+   BL       Decode_Operand_Rm_Register
+   MOV      R6,R0
+   BL       Decode_Operand_Rs_Register
+   MOV      R7,R0
+   BL       Decode_Operand_Rd_Register
+   CMP      R0,#&F
+   CMPNE    R5,#&F
+   CMPNE    R6,#&F
+   CMPNE    R7,#&F
+   MOVEQ    R0,#&32                    ; Asm_Warning #&32 = R15 should not be used as operand or destination for multiplication instructions
+   BLEQ     Asm_Warning
+   B        DT_Write_Instruction

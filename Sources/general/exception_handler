@@ -1,0 +1,60 @@
+
+; >-------------------------------------------------------------<
+
+.Install_Exception_Handler
+   STMFD    R13!,{R14}
+   MOV      R0,#6
+   ADR      R1,ExceptionHandler
+   MOV      R2,#0
+   ADR      R3,Exception
+   SWI      OS_ChangeEnvironment
+   ADR      R14,Exception_Old
+   STMIA    R14,{R0-R3}
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Deinstall_Exception_Handler
+   STMFD    R13!,{R14}
+   ADR      R14,Exception_Old
+   LDMFD    R14,{R0-R3}
+   SWI      OS_ChangeEnvironment
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.ExceptionHandler
+   ADR      R13,Block+&100
+   LDR      R0,Exception+4             ; Load exception code
+   TEMP     R1
+   TEQ      R0,#&80000201              ; Floating point exception: overflow
+   MOVEQ    R0,#&72                    ; Asm_Error #&72 = Floating Point overflow
+   BEQ      Asm_Error
+   TEQ      R0,#&80000200              ; Floating point exception: invalid operation
+   MOVEQ    R0,#&3A                    ; Asm_Error #&3A = Number too big, 32 bit only
+   BEQ      Asm_Error
+   LOCK     R1
+   BL       Deinstall_Exception_Handler
+   ADR      R0,EH_Error
+   ADR      R6,Block
+   ADD      R1,R6,#4
+   ADRL     R2,Exception+8             ; Exception message
+   LDR      R3,Source_LeafName
+   LDR      R4,Source_Line
+   STMFD    R13!,{R4}
+   BL       Print_String
+   ADD      R13,R13,#4
+   MOV      R0,R6
+   MOV      R1,#3
+   ADR      R2,Task_Name
+   SWI      Wimp_ReportError
+   CMP      R1,#1
+   BNE      Quit
+   BL       Install_Exception_Handler
+   ADR      R14,Internal_Context
+   LDMIA    R14,{R0,R13}
+   MOV      R15,R0
+
+.EH_Error      DCB   "%s  --- Error in '%s', line : %d  --- 'OK' to try to continue, or 'Cancel' to quit!",0
+   ALIGN
+.Exception_Old DBD   4

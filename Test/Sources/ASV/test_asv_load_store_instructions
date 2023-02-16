@@ -1,0 +1,94 @@
+
+#name <Tmp$Dir>.^.^.test_asv_load_store_instructions
+
+#area test,code
+
+; VLDR
+
+VLDR        S1,[R2]
+VLDREQ      S1,[R2]
+
+VLDR        D1,[R2]
+VLDREQ      D1,[R2]
+
+VLDR        S1,[R2,#&100]
+VLDR        S1,[R2,#+&100]
+VLDR        S1,[R2,#-&100]
+
+VLDR        S1,vldr_address
+VLDR        D1,vldr_address
+
+.vldr_address
+
+; VSTR
+
+VSTR        S1,[R2]
+VSTREQ      S1,[R2]
+
+VSTR        D1,[R2]
+VSTREQ      D1,[R2]
+
+VSTR        S1,[R2,#&100]
+VSTR        S1,[R2,#+&100]
+VSTR        S1,[R2,#-&100]
+
+VSTR        S1,vstr_address
+VSTR        D1,vstr_address
+
+.vstr_address
+
+; VLDM
+
+VLDMIA      R1,{S2}
+VLDMIAEQ    R1,{S2}
+
+VLDMIA      R1,{D2}
+VLDMIAEQ    R1,{D2}
+
+VLDMDB      R1,{S2}
+VLDMDBEQ    R1,{S2}
+
+VLDMDB      R1,{D2}
+VLDMDBEQ    R1,{D2}
+
+VLDMIA      R1!,{S2}
+VLDMIA      R1,{S1,S2,S3}
+VLDMIA      R1,{S1-S3}
+VLDMIA      R1,{S1-S3,S4}
+
+; VSTM
+
+VSTMIA      R1,{S2}
+VSTMIAEQ    R1,{S2}
+
+VSTMIA      R1,{D2}
+VSTMIAEQ    R1,{D2}
+
+VSTMDB      R1,{S2}
+VSTMDBEQ    R1,{S2}
+
+VSTMDB      R1,{D2}
+VSTMDBEQ    R1,{D2}
+
+VSTMIA      R1!,{S2}
+VSTMIA      R1,{S1,S2,S3}
+VSTMIA      R1,{S1-S3}
+VSTMIA      R1,{S1-S3,S4}
+
+; VPOP
+
+VPOP        {S1} ; VLDMFD R13!,{S1}
+VPOPEQ      {S1}
+
+VPOP        {D1}
+VPOPEQ      {D1}
+
+; VPUSH
+
+VPUSH       {S1} ; VSTMFD R13!,{S1}
+VPUSHEQ     {S1}
+
+VPUSH       {D1}
+VPUSHEQ     {D1}
+
+#end

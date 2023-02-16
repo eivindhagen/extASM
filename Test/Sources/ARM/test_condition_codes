@@ -1,0 +1,25 @@
+
+#name <Tmp$Dir>.^.^.test_condition_codes
+
+#area test,code
+
+MOV     R1,#0
+MOVEQ   R1,#0
+MOVNE   R1,#0
+MOVGT   R1,#0
+MOVGE   R1,#0
+MOVLE   R1,#0
+MOVLT   R1,#0
+MOVHI   R1,#0
+MOVHS   R1,#0
+MOVLS   R1,#0
+MOVLO   R1,#0
+MOVCS   R1,#0
+MOVCC   R1,#0
+MOVMI   R1,#0
+MOVPL   R1,#0
+MOVVS   R1,#0
+MOVVC   R1,#0
+MOVAL   R1,#0
+
+#end

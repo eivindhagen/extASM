@@ -1,0 +1,94 @@
+
+; >-------------------------------------------------------------<
+
+.DT_S                                  ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   ; SADD8 | SADD16 | SADDSUBX | SASX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110000100000000000000000000
+   BEQ      DT_ADD_ADDSUBX_ASX
+   CMP      R8,#'B'
+   BEQ      DT_SBC_SBFX
+   CMP      R8,#'E'
+   BEQ      DT_SEL_SETEND_SEV
+   CMP      R8,#'F'
+   BEQ      DT_SFM
+   CMP      R8,#'H'
+   BEQ      DT_SHADD_SHADDSUBX_SHASX_SHSUB_SHSUBADDX_SHSAX
+   CMP      R8,#'I'
+   BEQ      DT_SIN
+   CMP      R8,#'M'
+   BEQ      DT_SMC_SML_SMM_SMU
+   CMP      R8,#'Q'
+   BEQ      DT_SQT
+   CMP      R8,#'R'
+   BEQ      DT_SRS
+   CMP      R8,#'S'
+   BEQ      DT_SSAT_SSAX_SSUB_SSUBADDX
+   CMP      R8,#'T'
+   BEQ      DT_STC_STF_STM_STR_STRUCT
+   CMP      R8,#'U'
+   BEQ      DT_SUB_SUF
+   CMP      R8,#'V'
+   BEQ      DT_SVC
+   CMP      R8,#'W'
+   BEQ      DT_SWI_SWP
+   CMP      R8,#'X'
+   MOVEQ    R9,#0
+   BEQ      DT_xXT
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SBC_SBFX                           ;_R8 = "B"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   ;------> SBC  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000000110000000000000000000000
+   BEQ      DT_ALU_D12
+   CMP      R8,#'F'
+   BEQ      DT_SBFX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SEL_SETEND_SEV                     ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BEQ      DT_SEL
+   CMP      R8,#'T'
+   BEQ      DT_SETEND
+   CMP      R8,#'V'
+   BEQ      DT_SEV
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SMC_SML_SMM_SMU                    ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BEQ      DT_SMC
+   CMP      R8,#'L'
+   BEQ      DT_SML
+   CMP      R8,#'M'
+   BEQ      DT_SMM
+   CMP      R8,#'U'
+   BEQ      DT_SMU
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SWI_SWP                            ;_R8 = "W"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BEQ      DT_SWI
+   CMP      R8,#'P'
+   BEQ      DT_SWP
+   B        DT_Unknown

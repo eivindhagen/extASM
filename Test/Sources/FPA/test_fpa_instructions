@@ -1,0 +1,52 @@
+
+#name <Tmp$Dir>.^.^.test_fpa_instructions
+
+#area test,code
+
+MVFS    F1,F2    ; F1=F2
+MNFS    F1,F2    ; F1=-F2
+ABSS    F1,F2    ; F1=ABS F2
+SQTS    F1,F2    ; F1=SQR F2
+LOGS    F1,F2    ; F1=LOG F2
+LGNS    F1,F2    ; F1=LGN F2
+EXPS    F1,F2    ; F1=EXP F2
+SINS    F1,F2    ; F1=SIN F2
+COSS    F1,F2    ; F1=COS F2
+TANS    F1,F2    ; F1=TAN F2
+ASNS    F1,F2    ; F1=ASN F2
+ACSS    F1,F2    ; F1=ACS F2
+ATNS    F1,F2    ; F1=ATN F2
+RNDS    F1,F2    ; F1=ROUND F2
+URDS    F1,F2    ; F1=ROUND F2 (unnormalised)
+NRMS    F1,F2    ; F1=normalise F2
+
+ADFS    F1,F2,F3 ; F1=F2+F3
+SUFS    F1,F2,F3 ; F1=F2-F3
+RSFS    F1,F2,F3 ; F1=F3-F2
+MUFS    F1,F2,F3 ; F1=F2*F3
+DVFS    F1,F2,F3 ; F1=F2/F3
+RDFS    F1,F2,F3 ; F1=F3/F2
+RMFS    F1,F2,F3 ; F1=F2 MOD F3
+FMLS    F1,F2,F3 ; F1=F2*F3 (single precision only)
+FDVS    F1,F2,F3 ; F1=F2/F3 (single precision only)
+FRDS    F1,F2,F3 ; F1=F2 MOD F3 (single precision only)
+POWS    F1,F2,F3 ; F1=F2^F3
+RPWS    F1,F2,F3 ; F1=F3^F2
+POLS    F1,F2,F3 ; F1=polar angle of (F2,F3)
+
+CMF     F1,F2    ; Compare F1 with F2
+CNF     F1,F2    ; Compare F1 with -F2
+CMFE    F1,F2    ; Compare F1 with F2 (with exception)
+CNFE    F1,F2    ; Compare F1 with -F2 (with exception)
+
+MVFEQS  F1,F2
+MVFEQSP F1,F2
+MVFSP   F1,F2
+MVFSM   F1,F2
+MVFSZ   F1,F2
+
+MVFS    F1,#1.0
+MVFS    F1,#0.5
+MVFS    F1,#10.0
+
+#end

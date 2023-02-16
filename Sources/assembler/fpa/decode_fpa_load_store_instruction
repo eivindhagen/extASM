@@ -1,0 +1,467 @@
+
+; >-------------------------------------------------------------<
+
+.DT_LFM                                ;_R8 = "F"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   ;------> LFM  Cond   PUYWL[Rn]XFd     [Offset]
+   MOVEQ    R9,#%00001100000100000000001000000000
+   BEQ      DT_LFM_SFM
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SFM                                ;_R8 = "F"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   ;------> SFM  Cond   PUYWL[Rn]XFd     [Offset]
+   MOVEQ    R9,#%00001100000000000000001000000000
+   BEQ      DT_LFM_SFM
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_LDF_STF
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DTMEMF_No_Stat
+   ADR      R0,Code_Counters+67*4
+   TST      R9,#1 << 20
+   ADDNE    R0,R0,#4
+   LDR      R1,[R0]
+   ADD      R1,R1,#1
+   STR      R1,[R0]
+
+.DTMEMF_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = "S" or CC or Blank
+   BL       Decode_ConditionCode
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BEQ      DTMF_Precision_Done
+   CMP      R8,#'D'
+   ORREQ    R9,R9,#%00000001 << 15
+   BEQ      DTMF_Precision_Done
+   CMP      R8,#'E'
+   ORREQ    R9,R9,#%10000000 << 15
+   BEQ      DTMF_Precision_Done
+   CMP      R8,#'P'
+   ORREQ    R9,R9,#%10000001 << 15
+   MOVNE    R0,#&70                    ; Asm_Error #&70 = Floating Point precision must be specified
+   BNE      Asm_Error
+
+.DTMF_Precision_Done
+   LDRB     R8,[R10],#1
+   BL       Decode_FP_Destination_Register
+
+.DTMF_Before_Comma
+   BL       Ensure_Comma
+   BL       Skip_Blanks
+   CMP      R8,#'['
+   BNE      DTMF_Expr
+
+   STR      R11,AutoExpand_Pointer
+   LDRB     R8,[R10],#1
+   BL       Decode_Rn_Register
+   BL       Skip_Blanks
+   CMP      R8,#','
+   MOVEQ    R5,#1                      ; If comma after register, set pre-index flag
+   BEQ      DTMF_Pre_Post_Index
+   CMP      R8,#']'
+   MOVNE    R0,#&20                    ; Asm_Error #&20 = Missing ","
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#','
+   MOVEQ    R5,#0                      ; Clear pre-index flag
+   ORREQ    R9,R9,#Write_Back_Bit
+   BEQ      DTMF_Pre_Post_Index
+   ORR      R9,R9,#Add_Bit+Preindexed_Bit
+   CMP      R8,#'!'
+   ORREQ    R9,R9,#Write_Back_Bit
+   LDREQB   R8,[R10],#1
+   ANDEQ    R0,R9,#&F << Rn_Pos
+   CMPEQ    R0,#&F << Rn_Pos
+   MOVEQ    R0,#&33                    ; Asm_Warning #&33 = Write-back should not be specified if R15 is used as base register (Rn)
+   BLEQ     Asm_Warning
+   B        DT_Write_Instruction
+
+.DTMF_Pre_Post_Index
+   CMP      R5,#0
+   ANDEQ    R0,R9,#&F << Rn_Pos
+   CMPEQ    R0,#&F << Rn_Pos
+   MOVEQ    R0,#&33                    ; Asm_Warning #&33 = Write-back should not be specified if R15 is used as base register (Rn)
+   BLEQ     Asm_Warning
+
+   ORR      R9,R9,R5,LSL #24           ; Set possible Pre-index
+   LDRB     R8,[R10],#1
+   BL       Ensure_Pound
+   BL       Decode_Int_Expr
+   CMP      R0,#0
+   RSBLT    R0,R0,#0
+   ORRGE    R9,R9,#Add_Bit
+   TST      R0,#3
+   MOVNE    R0,#&80                    ; Asm_Error #&80 = Immediate offset in Load/Store FP must be word-aligned
+   BNE      Asm_Error
+   MOV      R4,R0
+   CMP      R5,#1                      ; Is it pre-indexed?
+   BNE      DTMF_Check_Index
+   CMP      R8,#']'
+   MOVNE    R0,#&12                    ; Asm_Error #&12 = Missing "]"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#'!'
+   ORREQ    R9,R9,#Write_Back_Bit
+   LDREQB   R8,[R10],#1
+   ANDEQ    R0,R9,#&F << Rn_Pos
+   CMPEQ    R0,#&F << Rn_Pos
+   MOVEQ    R0,#&33                    ; Asm_Warning #&33 = Write-back should not be specified if R15 is used as base register (Rn)
+   BLEQ     Asm_Warning
+
+.DTMF_Check_Index
+   CMP      R4,#&3FC
+   BHI      DTMF_Not_Write_Instruction
+   ORR      R9,R9,R4,LSR #2            ; Insert Immediate constant offset
+   B        DT_Write_Instruction
+
+   ; Auto-expansion is needed. Code it as ADD or SUB, followed by, or following, LDF or STF
+   ;
+   ; LDF/STF   Fd,[Rn,#&12344]  --->  ADD       TempReg,Rn,#&12000
+   ;                                  LDF/STF   Fd,[TempReg,#&344]
+   ;
+   ; LDF/STF   Fd,[Rn,#&12344]! --->  ADD       Rn,Rn,#&12000
+   ;                                  LDF/STF   Fd,[Rn,#&344]!
+   ;
+   ; LDF/STF   Fd,[Rn],#&12344  --->  LDF/STF   Fd,[Rn],#&344
+   ;                                  ADD       Rn,Rn,#&12000
+   ;
+   ; R9 =  LDF/STF   Fd,[Rn,#0]{!} or
+   ;       LDF/STF   Fd,[Rn],#0
+   ;
+.DTMF_Not_Write_Instruction
+   BL       Push_Temp_Info
+   AND      R0,R9,#&F << Rn_Pos
+   STR      R0,AutoExpand_Rn
+   CMP      R5,#1
+   BNE      DTMF_No_TempReg_Post
+
+   TST      R9,#Write_Back_Bit
+   BNE      DTMF_No_TempReg_Pre
+   ; Allocate a temp-reg
+   ;
+   MOV      R1,#1
+   AND      R2,R9,#&F << Rn_Pos        ; Get Rn
+   MOV      R2,R2,LSR #Rn_Pos
+   MOV      R0,R1,LSL R2               ; NEED Rn
+   STR      R0,TEMP_Needed             ; Save NEED register list
+   LDR      R7,TEMP_Stacked
+   BL       Get_Temp_Reg
+   MOV      R6,R0
+   LDR      R0,TEMP_Stacked
+   CMP      R0,R7
+   MOVEQ    R0,#&14                    ; Asm_Warning #&14 = Auto-expansion, using TEMP register (Load/Store)
+   MOVNE    R0,#&17                    ; Asm_Warning #&17 = Auto-expansion, using stacked register (Load/Store)
+   STR      R0,AutoExpand_Number
+   BL       Push_Temp_Reg
+
+   ; ADD      TempReg,Rn,#Offset
+   ; LDF/STF  Fd,[TempReg,#Offset]
+   ;
+   BIC      R9,R9,#&F << Rn_Pos
+   ORR      R9,R9,R6,LSL #Rn_Pos
+   B        DTMF_Offset
+
+.DTMF_No_TempReg_Post
+   ; LDF/STF Fd,[Rn],#Offset
+   ; ADD     Rn,Rn,#Offset
+   ;
+   AND      R0,R4,#&3FC
+   ORR      R9,R9,R0,LSR #2
+   BL       Write_Instruction
+
+.DTMF_No_TempReg_Pre
+   ; ADD     Rn,Rn,#Offset
+   ; LDF/STF Fd,[Rn,#Offset]
+   ;
+   MOV      R0,#&12                    ; Asm_Warning #&12 = Auto-expansion (Load/Store)
+   STR      R0,AutoExpand_Number
+   AND      R0,R9,#&F << Rn_Pos
+   MOV      R6,R0,LSR #Rn_Pos
+
+.DTMF_Offset
+   MOV      R7,R9
+   AND      R9,R9,#&F0000000           ; Get condition code
+   TST      R7,#1 << 23                ; 0=Down=SUB, 1=Up=ADD
+   ;                I
+   ORRNE    R9,R9,#%10100 << 21        ; R9 = ADD Fd,Rn,#Immediate Value
+   ORREQ    R9,R9,#%10010 << 21        ;   or SUB Fd,Rn,#Immediate Value
+   LDR      R0,AutoExpand_Rn
+   ORR      R9,R9,R0                   ; Rn is the same
+   ORR      R9,R9,R6,LSL #Rd_Pos       ; Rd is Rn or TempReg
+   BIC      R0,R4,#&3FC                ; High offset
+   BL       Code_Immediate             ;_R0 = Immediate value
+   CMN      R14,#1                     ; Check if coded value is okay
+   BEQ      DTMF_Not_Write_Instruction2
+   ORR      R9,R9,R0
+   BL       Write_Instruction          ; Write ADD or SUB instruction
+   B        DTMF_Not_Write_Instruction_End2
+
+.DTMF_Not_Write_Instruction2
+   BIC      R0,R4,#&3FC
+   BL       AutoExpand                 ; Immediate failed, 1 instruction is not enough!
+
+.DTMF_Not_Write_Instruction_End2
+   CMP      R5,#0
+   BEQ      DTMF_End
+
+   ; Now ADD or SUB is coded, store the original LDF/STF
+   ;
+   AND      R0,R4,#&3FC                ; Low offset
+   ORR      R9,R7,R0,LSR #2            ; Restore LDF/STF instruction
+   BL       Write_Instruction
+   B        DTMF_End
+
+.DTMF_Expr
+   ORR      R9,R9,#1 << 24             ; MUST be pre-indexed
+   BL       Decode_Int_Expr            ; Memory address (LDF/STF)
+   CMN      R14,#2
+   BNE      DTMFE_Not_Write_Instruction
+   B        DT_Write_Instruction       ; Warning, might be a forward reference...
+
+.DTMFE_Not_Write_Instruction
+   BL       DT_MEM_F_Expr
+   B        DT_End
+
+.DTMF_End
+   BL       Pop_Temp_Reg
+   BL       Pop_Temp_Info
+   LDR      R0,Options
+   TST      R0,#Option_AutoExpand
+   BEQ      DT_End
+   LDR      R0,AutoExpand_Pointer
+   SUB      R2,R11,R0
+   SUBS     R2,R2,#4
+   LDRNE    R0,AutoExpand_Number
+   BLNE     AutoExpand_Message
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_LFM_SFM
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DTMEMFM_No_Stat
+   ADR      R0,Code_Counters+69*4
+   TST      R9,#1 << 20
+   ADDNE    R0,R0,#4
+   LDR      R1,[R0]
+   ADD      R1,R1,#1
+   STR      R1,[R0]
+
+.DTMEMFM_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = CC or PU
+   BL       Decode_ConditionCode
+
+   ;------> Might be syntax (1) or (2)
+   ;        (1) <LFM|SFM>{cond} Fd,<count>,[Rn]
+   ;                                       [Rn,#<expr>]{!}
+   ;                                       [Rn],#<expr>
+   ;                                       <expr>
+   ;
+   ;        (2) <LFM|SFM>{cond}<FD|EA> Fd,<count>,[Rn]{!}
+   ;
+   CMP      R8,#' '                    ; Blanks not allowed in mode 2
+   CMPNE    R8,#&09
+   BEQ      DTMFM_Mode_1
+   ;------> Decode PU bits as if it was a SFM (EOR later if it's LFM)
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DTMFM_FD
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   MOVNE    R0,#&84                    ; Asm_Error #&84 = Illegal LFM/SFM PU-bits
+   BNE      Asm_Error
+   MOV      R0,#1
+   B        DTMFM_Turn
+
+.DTMFM_FD
+   CMP      R8,#'F'
+   MOVNE    R0,#&84                    ; Asm_Error #&84 = Illegal LFM/SFM PU-bits
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   MOVNE    R0,#&84                    ; Asm_Error #&84 = Illegal LFM/SFM PU-bits
+   BNE      Asm_Error
+   MOV      R0,#2
+
+.DTMFM_Turn
+   TST      R9,#1 << 20                ; Revert if LFM
+   EORNE    R0,R0,#3
+   ORR      R9,R9,R0,LSL #23           ; Insert PU bits
+   LDRB     R8,[R10],#1                ; Read next Blank
+   BL       Decode_FP_Destination_Register
+   BL       Ensure_Comma
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMP      R0,#1
+   RSBGES   R1,R0,#4
+   MOVLT    R0,#&85                    ; Asm_Error #&85 = Illegal count (1-4)
+   BLT      Asm_Error
+   TST      R0,#1
+   ORRNE    R9,R9,#1 << 15
+   TST      R0,#2
+   ORRNE    R9,R9,#1 << 22
+   BL       Ensure_Comma
+   BL       Ensure_Open_Bracket
+   BL       Decode_Rn_Register
+   BL       Skip_Blanks
+   CMP      R8,#']'
+   MOVNE    R0,#&12                    ; Asm_Error #&12 = Missing "]"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#'!'
+   ORREQ    R9,R9,#Write_Back_Bit
+   LDREQB   R8,[R10],#1
+   ANDEQ    R0,R9,#&F << Rn_Pos
+   CMPEQ    R0,#&F << Rn_Pos
+   MOVEQ    R0,#&33                    ; Asm_Warning #&33 = Write-back should not be specified if R15 is used as base register (Rn)
+   BLEQ     Asm_Warning
+   ;------> Seems I need to calculate the offset myself
+   TST      R9,#1 << 24                ; If post-indexed and no write-back, don't
+   TSTEQ    R9,#1 << 21                ; insert any offset
+   BEQ      DT_Write_Instruction
+   MOV      R0,#0
+   TST      R9,#1 << 15
+   ORRNE    R0,R0,#1
+   TST      R9,#1 << 22
+   ORRNE    R0,R0,#2
+   CMP      R0,#0
+   ADDEQ    R0,R0,#4                   ; R0 = Regs to transfer (1-4)
+   ADD      R0,R0,R0,LSL #1            ; R0 = 3 * Regs (number of words used)
+   ORR      R9,R9,R0                   ; Insert offset bits (number of words)
+   B        DT_Write_Instruction
+
+.DTMFM_Mode_1
+   STR      R11,AutoExpand_Pointer
+   BL       Decode_FP_Destination_Register
+   BL       Ensure_Comma
+   BL       Decode_Value
+   CMP      R1,#FP_Value
+   FIXEQZ   R0,F0
+   BGT      Mismatch_Num
+   CMP      R0,#1
+   RSBGES   R1,R0,#4
+   MOVLT    R0,#&85                    ; Asm_Error #&85 = Illegal count (1-4)
+   BLT      Asm_Error
+   TST      R0,#1
+   ORRNE    R9,R9,#1 << 15
+   TST      R0,#2
+   ORRNE    R9,R9,#1 << 22
+   B        DTMF_Before_Comma
+
+; >-------------------------------------------------------------<
+
+.DT_MEM_F_Expr                         ;_R0 = Address to get to
+   STMFD    R13!,{R4-R7,R14}
+   STR      R11,AutoExpand_Pointer
+   MOV      R4,R0                      ; Save memory location
+   LDR      R0,RELATIVE_Register_Read
+   ORR      R9,R9,R0,LSL #16
+   CMP      R0,#15
+   MOVNE    R5,R4
+   BNE      DTMFE_Not_R15
+   LDR      R1,Object_Base
+   LDR      R2,Object_Size
+   ADD      R1,R1,R2                   ; R1 = PC (not pipelined)
+   ADD      R1,R1,#8                   ; R1 = PC (pipelined)
+   SUB      R5,R4,R1                   ; R5 = Offset from PC
+
+.DTMFE_Not_R15
+   CMP      R5,#0
+   RSBLT    R5,R5,#0
+   ORRGE    R9,R9,#Add_Bit
+   TST      R5,#3
+   MOVNE    R0,#&80                    ; Asm_Error #&80 = Immediate offset in Load/Store FP must be word-aligned
+   BNE      Asm_Error
+   BICS     R0,R5,#&3FC
+   BNE      DTMFE_Not_Write_Instruction2
+   ORR      R9,R9,R5,LSR #2            ; Insert Immediate constant offset (word offset)
+   BL       Write_Instruction
+   LDMFD    R13!,{R4-R7,R15}
+
+   ;------> EXTENDED MEMORY ADDRESSING!
+   ;        ===========================
+   ; R4 - Address to get to
+   ; R5 - Offset
+   ; R6 - TempReg
+   ;
+.DTMFE_Not_Write_Instruction2
+   BL       Push_Temp_Info
+   LDR      R7,TEMP_Stacked
+   BL       Get_Temp_Reg
+   MOV      R6,R0
+   LDR      R0,TEMP_Stacked
+   CMP      R0,R7
+   MOVEQ    R0,#&14                    ; Asm_Warning #&14 = Auto-expansion, using TEMP register (Load/Store)
+   MOVNE    R0,#&17                    ; Asm_Warning #&17 = Auto-expansion, using stacked register (Load/Store)
+   STR      R0,AutoExpand_Number
+   BL       Push_Temp_Reg
+   LDR      R3,RELATIVE_Register_Read
+   CMP      R3,#15
+   BNE      DTMFE_Not_R15_2
+   ;------> Recalculate offset, temp-register stack stuff might have skewed things
+   LDR      R1,Object_Base
+   LDR      R2,Object_Size
+   ADD      R1,R1,R2                   ; R1 = PC (not pipelined)
+   ADD      R1,R1,#8                   ; R1 = PC (pipelined)
+   SUB      R5,R4,R1                   ; R0 = Offset from PC
+
+.DTMFE_Not_R15_2
+   CMP      R5,#0
+   RSBLT    R5,R5,#0                   ; NEG offset if negative, default is negative
+   ORRGE    R9,R9,#1 << 23             ; Set index ADD bit if not negative
+   BIC      R0,R5,#&3FC                ; R0 = High remain
+   BIC      R9,R9,#&F << Rn_Pos
+   ORR      R9,R9,R6,LSL #Rn_Pos       ; Rn=TempReg
+   MOV      R7,R9                      ; Save LDF/STF instruction
+   AND      R9,R9,#&F0000000
+   ;------> Create ADR instruction to get inside LDF/STF range
+   TST      R7,#1 << 23                ; 0=Down=SUB, 1=Up=ADD
+   ;                I
+   ORRNE    R9,R9,#%10100 << 21        ; R9 = ADD Rd,Rn,#Immediate Value
+   ORREQ    R9,R9,#%10010 << 21        ;   or SUB Rd,Rn,#Immediate Value
+   ORR      R9,R9,R6,LSL #Rd_Pos       ; Rd=TempReg
+   ORR      R9,R9,R3,LSL #Rn_Pos       ; Rn=Relative register
+   BL       Code_Immediate             ;_R0 = Immediate value
+   CMN      R14,#1                     ; Check if coded value is okay
+   BEQ      DTMFE_Not_Write_Instruction3
+   ORR      R9,R9,R0
+   BL       Write_Instruction          ; Write ADR instruction
+   B        DTMFE_Not_Write_Instruction_End3
+
+.DTMFE_Not_Write_Instruction3
+   BIC      R0,R5,#&3FC
+   BL       AutoExpand                 ; Immediate failed, 1 instruction is not enough!
+
+.DTMFE_Not_Write_Instruction_End3
+   AND      R0,R5,#&3FC                ; R0 = Low offset
+   ORR      R9,R7,R0,LSR #2            ; Insert Immediate constant offset (word offset)
+   BL       Write_Instruction
+   BL       Pop_Temp_Reg
+   BL       Pop_Temp_Info
+   LDR      R0,Options
+   TST      R0,#Option_AutoExpand
+   LDMEQFD  R13!,{R4-R7,R15}
+   LDR      R0,AutoExpand_Pointer
+   SUB      R2,R11,R0
+   SUBS     R2,R2,#4
+   LDRNE    R0,AutoExpand_Number
+   BLNE     AutoExpand_Message
+   LDMFD    R13!,{R4-R7,R15}

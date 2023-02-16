@@ -1,0 +1,91 @@
+
+; >-------------------------------------------------------------<
+
+.DT_FPLOCK_FPTEMP                      ;_R8 = "P"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BEQ      DT_FPLOCK
+   ; FPTEMP
+   ;
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   ADRL     R0,Decode_FP_Register
+   BL       Decode_Register_List
+   LDR      R1,FPTEMP_Status
+   ORR      R1,R1,R0
+   STR      R1,FPTEMP_Status
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_FPLOCK                             ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'K'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   ADRL     R0,Decode_FP_Register
+   BL       Decode_Register_List
+   LDR      R1,FPTEMP_Status
+   BIC      R1,R1,R0
+   STR      R1,FPTEMP_Status
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_LOCK                               ;_R8 = "C"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'K'
+   BNE      DT_Unknown
+   ;------> LOCK
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   ADRL     R0,Decode_Register
+   BL       Decode_Register_List       ; R0 = List bits
+   LDR      R1,TEMP_Status             ; R1 = List of TEMPed registers
+   BIC      R1,R1,R0                   ; LOCK selected registers
+   STR      R1,TEMP_Status
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_TEMP                               ;_R8 = "M"
+   ;------> Check for TEMP
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DT_Unknown
+   ;------> TEMP
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   ADRL     R0,Decode_Register
+   BL       Decode_Register_List       ; R0 = List bits
+   LDR      R1,TEMP_Status             ; R1 = List of TEMPed registers
+   ORR      R1,R1,R0                   ; TEMP selected registers
+   STR      R1,TEMP_Status
+   B        DT_End

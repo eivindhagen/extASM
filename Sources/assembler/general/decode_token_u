@@ -1,0 +1,62 @@
+
+; >-------------------------------------------------------------<
+
+.DT_U                                  ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   ; UADD8 | UADD16 | UADDSUBX | UASX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110010100000000000000000000
+   BEQ      DT_ADD_ADDSUBX_ASX
+   CMP      R8,#'B'
+   BEQ      DT_UBFX
+   CMP      R8,#'H'
+   BEQ      DT_UHADD_UHADDSUBX_UHASX_UHSUB_UHSUBADDX_UHSAX
+   CMP      R8,#'M'
+   BEQ      DT_UMA_UML_UMU
+   CMP      R8,#'Q'
+   BEQ      DT_UQADD_UQADDSUBX_UQASX_UQSUB_UQSUBADDX_UQSAX
+   CMP      R8,#'R'
+   BEQ      DT_URD
+   CMP      R8,#'S'
+   BEQ      DT_USAD_USAT_USAX_USUB_USUBADDX
+   CMP      R8,#'X'
+   MOVEQ    R9,#1 << 22
+   BEQ      DT_xXT
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_USAD_USAT_USAX_USUB_USUBADDX       ;_R8 = "S"
+   LDRB     R8,[R10]
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   ADDEQ    R10,R10,#1
+   BEQ      DT_USAD_USAT_USAX
+   CMP      R8,#'U'
+   ; USUB8 | USUB16 | USUBADDX
+   ;
+   ;------> Op   Cond         [Rn][Rd]       [Rm]
+   MOVEQ    R9,#%00000110010100000000000000000000
+   BEQ      DT_SUB_SUBADDX_SAX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_USAD_USAT_USAX                     ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BEQ      DT_USAD
+   CMP      R8,#'T'
+   ;------> USATxx Cond            [Rd]        [Rn]
+   MOVEQ    R9,#  %00000110111000000000000000000000
+   BEQ      DT_xSAT
+   CMP      R8,#'X'
+   SUBEQ    R10,R10,#2
+   ;------> USAX Cond         [Rn][Rd]       [Rm]
+   MOVEQ    R9,#%00000110010100000000000000000000
+   BEQ      DT_SUB_SUBADDX_SAX
+   B        DT_Unknown

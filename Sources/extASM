@@ -1,0 +1,152 @@
+
+#name <Tmp$Dir>.^.!extASM.!RunImageNew
+
+; >-------------------------------------------------------------<
+
+; General
+
+#include "<Tmp$Dir>.general.constants"
+#include "<Tmp$Dir>.general.main"
+#include "<Tmp$Dir>.general.error_handling"
+#include "<Tmp$Dir>.general.exception_handler"
+#include "<Tmp$Dir>.general.flex"
+#include "<Tmp$Dir>.general.initialise"
+#include "<Tmp$Dir>.general.messages"
+#include "<Tmp$Dir>.general.preprocessor"
+#include "<Tmp$Dir>.general.string"
+#include "<Tmp$Dir>.general.tempregs"
+#include "<Tmp$Dir>.general.throwback"
+#include "<Tmp$Dir>.general.variables"
+#include "<Tmp$Dir>.general.vdu"
+
+; Info
+
+#include "<Tmp$Dir>.info.autoexpansion_info"
+#include "<Tmp$Dir>.info.pie_chart"
+#include "<Tmp$Dir>.info.statistics"
+#include "<Tmp$Dir>.info.variable_macro_info"
+
+; Macro
+
+#include "<Tmp$Dir>.macro.debug"
+#include "<Tmp$Dir>.macro.general"
+#include "<Tmp$Dir>.macro.graphics"
+#include "<Tmp$Dir>.macro.macros"
+#include "<Tmp$Dir>.macro.macroscanner"
+
+; WIMP
+
+#include "<Tmp$Dir>.wimp.data_transfer"
+#include "<Tmp$Dir>.wimp.general"
+#include "<Tmp$Dir>.wimp.help"
+#include "<Tmp$Dir>.wimp.icon"
+#include "<Tmp$Dir>.wimp.menu"
+#include "<Tmp$Dir>.wimp.misc_messages"
+#include "<Tmp$Dir>.wimp.options"
+#include "<Tmp$Dir>.wimp.templates"
+#include "<Tmp$Dir>.wimp.text"
+#include "<Tmp$Dir>.wimp.wimp_handler"
+#include "<Tmp$Dir>.wimp.window"
+
+; Assembler
+;
+; General
+
+#include "<Tmp$Dir>.assembler.general.assembler"
+#include "<Tmp$Dir>.assembler.general.decode_token"
+#include "<Tmp$Dir>.assembler.general.decode_token_a"
+#include "<Tmp$Dir>.assembler.general.decode_token_b"
+#include "<Tmp$Dir>.assembler.general.decode_token_c"
+#include "<Tmp$Dir>.assembler.general.decode_token_d"
+#include "<Tmp$Dir>.assembler.general.decode_token_e"
+#include "<Tmp$Dir>.assembler.general.decode_token_f"
+#include "<Tmp$Dir>.assembler.general.decode_token_i"
+#include "<Tmp$Dir>.assembler.general.decode_token_l"
+#include "<Tmp$Dir>.assembler.general.decode_token_m"
+#include "<Tmp$Dir>.assembler.general.decode_token_n"
+#include "<Tmp$Dir>.assembler.general.decode_token_o"
+#include "<Tmp$Dir>.assembler.general.decode_token_p"
+#include "<Tmp$Dir>.assembler.general.decode_token_r"
+#include "<Tmp$Dir>.assembler.general.decode_token_s"
+#include "<Tmp$Dir>.assembler.general.decode_token_t"
+#include "<Tmp$Dir>.assembler.general.decode_token_u"
+#include "<Tmp$Dir>.assembler.general.decode_token_v"
+#include "<Tmp$Dir>.assembler.general.decode_token_w"
+#include "<Tmp$Dir>.assembler.general.decode_token_y"
+#include "<Tmp$Dir>.assembler.general.decode_token_switch"
+#include "<Tmp$Dir>.assembler.general.messages"
+#include "<Tmp$Dir>.assembler.general.parsing"
+
+; ARM
+
+#include "<Tmp$Dir>.assembler.arm.decode_alu_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_alu_operand"
+#include "<Tmp$Dir>.assembler.arm.decode_arm_fpa_register_transfer_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_arm_register"
+#include "<Tmp$Dir>.assembler.arm.decode_branch_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_condition_code"
+#include "<Tmp$Dir>.assembler.arm.decode_coprocessor_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_exception_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_extending_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_load_store_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_misc_data_processing_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_misc_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_multiply_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_packing_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_psr_register"
+#include "<Tmp$Dir>.assembler.arm.decode_register_list"
+#include "<Tmp$Dir>.assembler.arm.decode_saturating_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_shift"
+#include "<Tmp$Dir>.assembler.arm.decode_shift_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_simd_instruction"
+#include "<Tmp$Dir>.assembler.arm.decode_system_instruction"
+#include "<Tmp$Dir>.assembler.arm.encode_alu_instruction"
+
+; FPA
+
+#include "<Tmp$Dir>.assembler.fpa.decode_fpa_data_processing_instruction"
+#include "<Tmp$Dir>.assembler.fpa.decode_fpa_operand"
+#include "<Tmp$Dir>.assembler.fpa.decode_fpa_register"
+#include "<Tmp$dir>.assembler.fpa.decode_fpa_load_store_instruction"
+#include "<Tmp$Dir>.assembler.fpa.encode_fpa_instruction"
+
+; VFP
+
+#include "<Tmp$Dir>.assembler.vfp.decode_vfp_data_processing_instruction"
+#include "<Tmp$Dir>.assembler.vfp.decode_vfp_load_store_instruction"
+#include "<Tmp$Dir>.assembler.vfp.decode_vfp_operand"
+#include "<Tmp$Dir>.assembler.vfp.decode_vfp_register"
+#include "<Tmp$Dir>.assembler.vfp.decode_vfp_register_transfer_instruction"
+
+; Advanced SIMD and VFP
+
+#include "<Tmp$Dir>.assembler.asv.decode_asv_addition_and_subtraction_instruction"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_comparison_instruction"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_conversion_instruction"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_data_processing_instruction"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_load_store_instruction"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_load_store_structure_instruction1"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_load_store_structure_instruction2"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_load_store_structure_instruction3"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_load_store_structure_instruction4"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_logical_instruction"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_multiply_instruction"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_register_transfer_instruction"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_shift_instruction"
+#include "<Tmp$Dir>.assembler.asv.decode_asv_common"
+
+; Extra
+
+#include "<Tmp$Dir>.assembler.extra.decode_block_directive"
+#include "<Tmp$Dir>.assembler.extra.decode_data_directive"
+#include "<Tmp$Dir>.assembler.extra.decode_extra_instruction"
+#include "<Tmp$Dir>.assembler.extra.decode_struct"
+#include "<Tmp$Dir>.assembler.extra.decode_temp_register_management"
+
+; Expression
+
+#include "<Tmp$Dir>.assembler.expression.decode_constant"
+#include "<Tmp$Dir>.assembler.expression.decode_expression"
+#include "<Tmp$Dir>.assembler.expression.decode_value"
+
+#include "<Tmp$Dir>.general.data"

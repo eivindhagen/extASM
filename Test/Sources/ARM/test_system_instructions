@@ -1,0 +1,106 @@
+
+#name <Tmp$Dir>.^.^.test_system_instructions
+
+#area test,code
+
+; CPS
+
+CPS     #%10000                  ; Change processor state
+
+CPSIE   F
+CPSIE   I
+CPSIE   IF
+CPSIE   A
+CPSIE   AF
+CPSIE   AI
+CPSIE   AIF
+
+CPSIE   AIF,#%10000
+
+; MRS
+
+MRS     R1,CPSR                  ; R1=CPSR
+MRSEQ   R1,CPSR
+MRS     R1,APSR
+MRS     R1,SPSR
+
+; MSR
+
+MSR     APSR_NZCVQ,#%11111       ; CPSR=<flags>
+MSR     APSR_G,#%1
+MSR     APSR_NZCVQG,#%111111
+MSR     CPSR_F,R1
+MSREQ   CPSR_F,R1
+MSR     CPSR_F,#1
+MSR     CPSR_S,#1
+MSR     CPSR_SF,#1
+MSR     CPSR_X,#1
+MSR     CPSR_XF,#1
+MSR     CPSR_XS,#1
+MSR     CPSR_XSF,#1
+MSR     CPSR_C,#1
+MSR     CPSR_CF,#1
+MSR     CPSR_CS,#1
+MSR     CPSR_CSF,#1
+MSR     CPSR_CX,#1
+MSR     CPSR_CXF,#1
+MSR     CPSR_CXS,#1
+MSR     CPSR_CXSF,#1
+MSR     SPSR_F,#1
+MSR     SPSR_S,#1
+MSR     SPSR_SF,#1
+MSR     SPSR_X,#1
+MSR     SPSR_XF,#1
+MSR     SPSR_XS,#1
+MSR     SPSR_XSF,#1
+MSR     SPSR_C,#1
+MSR     SPSR_CF,#1
+MSR     SPSR_CS,#1
+MSR     SPSR_CSF,#1
+MSR     SPSR_CX,#1
+MSR     SPSR_CXF,#1
+MSR     SPSR_CXS,#1
+MSR     SPSR_CXSF,#1
+
+; RFE
+
+RFEDA   R1!                      ; Return from exception
+RFEDB   R1
+RFEIA   R1
+RFEIB   R1
+
+; SMC
+
+SMC   #1
+SMCEQ #1
+
+; SRS
+
+SRSDA   R13,#%10000              ; Store return state
+SRSDB   R13,#%10000
+SRSIA   R13,#%10000
+SRSIB   R13,#%10000
+
+; VMRS
+
+VMRS    R1,FPEXC                 ; R1=Register
+VMRS    R1,FPSCR
+VMRS    R1,FPSID
+VMRS    R1,MVFR0
+VMRS    R1,MVFR1
+VMRS    R1,FPINST
+VMRS    R1,FPINST2
+VMRSEQ  APSR_NZCV,FPSCR
+
+FMSTAT                           ; VMRS APSR_nzcv,FPSCR
+
+; VMSR
+
+VMSR    FPEXC,R1                 ; Register=R1
+VMSR    FPSID,R1
+VMSR    FPSCR,R1
+VMSR    FPINST,R1
+VMSR    FPINST2,R1
+VMSREQ  FPEXC,R1
+
+#end

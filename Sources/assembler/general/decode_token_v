@@ -1,0 +1,319 @@
+
+; >-------------------------------------------------------------<
+
+.DT_V                                  ;_R8 = "V"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_VABA_VABD_VABS_VAC_VADD_VAND
+   CMP      R8,#'B'
+   BEQ      DT_VBIC_VBIF_VBIT_VBSL
+   CMP      R8,#'C'
+   BEQ      DT_VCx_VCLS_VCLZ_VCMP_VCNT_VCVT
+   CMP      R8,#'D'
+   BEQ      DT_VDIV_VDUP
+   CMP      R8,#'E'
+   BEQ      DT_VEOR_VEXT
+   CMP      R8,#'H'
+   BEQ      DT_VHADD_VHSUB
+   CMP      R8,#'L'
+   BEQ      DT_VLD
+   CMP      R8,#'M'
+   BEQ      DT_VMAX_VMIN_VML_VMOV_VMRS_VMSR_VMUL_VMVN
+   CMP      R8,#'N'
+   BEQ      DT_VNEG_VNMLA_VNMLS_VNMUL
+   CMP      R8,#'O'
+   BEQ      DT_VORN_VORR
+   CMP      R8,#'P'
+   BEQ      DT_VPAD_VPMAX_VPMIN_VPOP_VPUSH
+   CMP      R8,#'Q'
+   BEQ      DT_VQ
+   CMP      R8,#'R'
+   BEQ      DT_VR
+   CMP      R8,#'S'
+   BEQ      DT_VS
+   CMP      R8,#'T'
+   BEQ      DT_VTBL_VTBX_VTRN_VTST
+   CMP      R8,#'U'
+   BEQ      DT_VUZP
+   CMP      R8,#'Z'
+   BEQ      DT_VZIP
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VABA_VABD_VABS_VAC_VADD_VAND       ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BEQ      DT_VABA_VABD_VABS
+   CMP      R8,#'C'
+   BEQ      DT_VAC
+   CMP      R8,#'D'
+   BEQ      DT_VADD
+   CMP      R8,#'N'
+   BEQ      DT_VAND
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VDIV_VDUP                          ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BEQ      DT_VDIV
+   CMP      R8,#'U'
+   BEQ      DT_VDUP
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VEOR_VEXT                          ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BEQ      DT_VEOR
+   CMP      R8,#'X'
+   BEQ      DT_VEXT
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VMAX_VMIN_VML_VMOV_VMRS_VMSR_VMUL_VMVN ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_VMAX
+   CMP      R8,#'I'
+   BEQ      DT_VMIN
+   CMP      R8,#'L'
+   BEQ      DT_VMLA_VMLS
+   CMP      R8,#'O'
+   BEQ      DT_VMOV
+   CMP      R8,#'R'
+   BEQ      DT_VMRS
+   CMP      R8,#'S'
+   BEQ      DT_VMSR
+   CMP      R8,#'U'
+   BEQ      DT_VMUL
+   CMP      R8,#'V'
+   BEQ      DT_VMVN
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VNEG_VNMLA_VNMLS_VNMUL             ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BEQ      DT_VNEG
+   CMP      R8,#'M'
+   BEQ      DT_VNMLA_VNMLS_VNMUL
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VPAD_VPMAX_VPMIN_VPOP_VPUSH        ;_R8 = "P"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_VPAD
+   CMP      R8,#'M'
+   BEQ      DT_VPMAX_VPMIN
+   CMP      R8,#'O'
+   BEQ      DT_VPOP
+   CMP      R8,#'U'
+   BEQ      DT_VPUSH
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VCx_VCLS_VCLZ_VCMP_VCNT_VCVT       ;_R8 = "C"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BEQ      DT_VCEQ
+   CMP      R8,#'G'
+   BEQ      DT_VCGE_VCGT
+   CMP      R8,#'L'
+   BEQ      DT_VCLE_VCLS_VCLT_VCLZ
+   CMP      R8,#'M'
+   BEQ      DT_VCMP
+   CMP      R8,#'N'
+   BEQ      DT_VCNT
+   CMP      R8,#'V'
+   BEQ      DT_VCVT
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VCLE_VCLS_VCLT_VCLZ                ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BEQ      DT_VCLE
+   CMP      R8,#'S'
+   ;------> VCLS          D  sz  [Vd]     QM [Vm]
+   MOVEQ    R9,#%11110011101100000000010000000000
+   BEQ      DT_SIMD_S_8_16_32_Xd_Xm
+   CMP      R8,#'T'
+   BEQ      DT_VCLT
+   CMP      R8,#'Z'
+   ;------> VCLZ          D  sz  [Vd]     QM [Vm]
+   MOVEQ    R9,#%11110011101100000000010010000000
+   MOVEQ    R4,#VFP_Operand_32
+   BEQ      DT_SIMD_X_Xd_Xm
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VQ                                 ;_R8 = "Q"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_VQABS_VQADD
+   CMP      R8,#'D'
+   BEQ      DT_VQDMLA_VQDMLS_VQDMUL
+   CMP      R8,#'M'
+   BEQ      DT_VQMOVN_VQMOVUN
+   CMP      R8,#'N'
+   BEQ      DT_VQNEG
+   CMP      R8,#'R'
+   BEQ      DT_VQR
+   CMP      R8,#'S'
+   BEQ      DT_VQS
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VQABS_VQADD                        ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BEQ      DT_VQABS
+   CMP      R8,#'D'
+   BEQ      DT_VQADD
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VQR                                ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BEQ      DT_VQRDMULH
+   CMP      R8,#'S'
+   BEQ      DT_VQRSHL_VQRSHRN_VQRSHRUN
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VQS                                ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BEQ      DT_VQSHL_VQSHLU_VQSHRN_VQSHRUN
+   CMP      R8,#'U'
+   BEQ      DT_VQSUB
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VR                                 ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_VRADDHN
+   CMP      R8,#'E'
+   BEQ      DT_VRECPE_VRECPS_VREV
+   CMP      R8,#'H'
+   BEQ      DT_VRHADD
+   CMP      R8,#'S'
+   BEQ      DT_VRS
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VRECPE_VRECPS_VREV                 ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BEQ      DT_VRECPE_VRECPS
+   CMP      R8,#'V'
+   BEQ      DT_VREV
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VRECPE_VRECPS                      ;_R8 = "C"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   ; VRECPE.<U|F>32 Qd, Qm
+   ; VRECPE.<U|F>32 Dd, Dm
+   ;
+   ;------> VRECPE        D  sz  [Vd]   F QM [Vm]
+   MOVEQ    R9,#%11110011101100110000010000000000
+   BEQ      DT_SIMD_U_F_32_Xd_Xm
+   CMP      R8,#'S'
+   ; VRECPS.F32 Qd, Qn, Qm
+   ; VRECPS.F32 Dd, Dn, Dm
+   ;
+   ;------> VRECPS        D s[Vn][Vd]    NQM [Vm]
+   MOVEQ    R9,#%11110010000000000000111100010000
+   MOVEQ    R4,#0
+   BEQ      DT_SIMD_F32_Xd_Xn_Xm
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VRS                                ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BEQ      DT_VRSHL_VRSHR_VRSHRN
+   CMP      R8,#'Q'
+   BEQ      DT_VRSQRTE_VRSQRTS
+   CMP      R8,#'R'
+   BEQ      DT_VRSRA
+   CMP      R8,#'U'
+   BEQ      DT_VRSUBHN
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VS                                 ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BEQ      DT_VSHL_VSHR
+   CMP      R8,#'L'
+   BEQ      DT_VSLI
+   CMP      R8,#'Q'
+   BEQ      DT_VSQRT
+   CMP      R8,#'R'
+   BEQ      DT_VSRA_VSRI
+   CMP      R8,#'T'
+   BEQ      DT_VST
+   CMP      R8,#'U'
+   BEQ      DT_VSUB
+   CMP      R8,#'W'
+   BEQ      DT_VSWP
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VTBL_VTBX_VTRN_VTST                ;_R8 = "T"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BEQ      DT_VTBL_VTBX
+   CMP      R8,#'R'
+   BEQ      DT_VTRN
+   CMP      R8,#'S'
+   BEQ      DT_VTST
+   B        DT_Unknown

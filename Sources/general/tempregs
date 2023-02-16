@@ -1,0 +1,273 @@
+
+; >-------------------------------------------------------------<
+
+.Get_Temp_Reg                          ;~R0 = Temp Reg
+   LDR      R0,TEMP_Stacked            ; R0 = List of STACKed registers (regs to be stacked)
+   LDR      R1,TEMP_Used               ; R1 = List of USEd registers (TEMP_Status regs used)
+   LDR      R2,TEMP_Needed_Macro       ; R2 = List of Macro NEEDed registers
+   LDR      R3,TEMP_Needed             ; R3 = List of NEEDed registers (current instruction)
+   ORR      R2,R2,R3                   ; Combine Macro NEEDed and NEEDed registers
+   ORR      R2,R2,R0                   ; NEED all STACKed registers
+   ORR      R2,R2,R1                   ; NEED all USEd registers
+   MOV      R0,#0
+   STR      R0,TEMP_Needed             ; Clear NEEDed registers
+   LDR      R3,TEMP_Status             ; R3 = TEMPed registers
+   BICS     R3,R3,R2                   ; Remove NEEDed registers
+   BEQ      GTR_Failed
+   MOV      R2,#1                      ; R2 = Mask bit
+   MOV      R0,#0                      ; R0 = TempReg searcher (R0 -> R14)
+
+._Loop
+   TST      R3,R2,LSL R0               ; 1 = TEMP, 0 = LOCK
+   ORRNE    R1,R1,R2,LSL R0            ; USE TempReg
+   STRNE    R1,TEMP_Used
+   MOVNE    R15,R14                    ;~R0 = Return value (temp reg)
+   ADD      R0,R0,#1
+   CMP      R0,#14
+   BLE      _Loop
+
+.GTR_Failed                            ; Try stacking some NOT-NEEDed registers
+   MOV      R0,#0
+   MOV      R1,#1
+
+._Loop
+   CMP      R0,#13
+   MOVGE    R0,#&25                    ; Asm_Error #&25 = No TempReg available
+   BGE      Asm_Error
+   TST      R2,R1,LSL R0               ; Check if this reg is NEEDed
+   ADDNE    R0,R0,#1                   ; Try next one then
+   BNE      _Loop
+   LDR      R3,TEMP_Stacked            ; Set which reg to push (temp reg)
+   ORR      R3,R3,R1,LSL R0
+   STR      R3,TEMP_Stacked
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Push_Temp_Reg                         ; Stack temp regs that are not free
+   LDR      R0,TEMP_Stacked
+   CMP      R0,#0
+   MOVEQ    R15,R14
+   STMFD    R13!,{R9,R14}
+   ;------> STM  Cond   PUSWL[Rn][Register list ]
+   MOV      R9,#%11101001001011010000000000000000 ; STMFD   R13!,{}
+   ORR      R9,R9,R0
+   BL       Write_Instruction
+   LDMFD    R13!,{R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Pop_Temp_Reg                          ; Unstack if temp regs are stacked
+   LDR      R0,TEMP_Stacked
+   CMP      R0,#0
+   MOVEQ    R15,R14
+   STMFD    R13!,{R9,R14}
+   ;------> LDM  Cond   PUSWL[Rn][Register list ]
+   MOV      R9,#%11101000101111010000000000000000 ; LDMFD   R13!,{}
+   ORR      R9,R9,R0
+   BL       Write_Instruction
+   LDMFD    R13!,{R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Get_FP_Temp_Reg                       ;~R0 = FP Temp Reg
+   STMFD    R13!,{R4,R14}
+   LDR      R0,FPTEMP_Stacked          ; R0 = List of STACKed registers (regs to be stacked)
+   LDR      R1,FPTEMP_Used             ; R1 = List of USEd regs (FPTEMP_Status regs used)
+   LDR      R2,FPTEMP_Needed_Macro     ; R2 = List of Macro NEEDed registers
+   LDR      R3,FPTEMP_Needed           ; R3 = List of NEEDed registers (current instruction)
+   ORR      R2,R2,R3                   ; Combine Macro NEEDed and NEEDed registers
+   ORR      R2,R2,R0                   ; NEED all STACKed registers
+   ORR      R2,R2,R1                   ; NEED all USEd registers
+   MOV      R0,#0
+   STR      R0,FPTEMP_Needed           ; Clear NEEDed registers
+   LDR      R3,FPTEMP_Status           ; R3 = FPTEMPed registers
+   MOV      R4,#1                      ; R4 = Mask bit
+   BICS     R3,R3,R2                   ; Remove NEEDed registers
+   BEQ      GFPTR_Failed
+   MOV      R0,#0                      ; R0 = FPTEMPReg searcher (F0-F7)
+
+._Loop
+   TST      R3,R4,LSL R0               ; 1 = FPTEMP, 0 = FPLOCK
+   ORRNE    R1,R1,R4,LSL R0            ; USE TempReg
+   STRNE    R1,FPTEMP_Used
+   LDMNEFD  R13!,{R4,R15}
+   ADD      R0,R0,#1
+   CMP      R0,#7
+   BLE      _Loop
+
+.GFPTR_Failed                          ; Try stacking some NOT-NEEDed registers
+   LDR      R3,FPTEMP_NumRegs
+   CMP      R3,#0
+   BNE      GFPTR_Not_First
+   ; First register to be stacked
+   ;
+   MOV      R0,#0
+
+._Loop
+   CMP      R0,#7
+   MOVGT    R0,#&26                    ; Asm_Error #&26 = No FPTempReg available
+   BGT      Asm_Error
+   TST      R2,R4,LSL R0               ; Check if this reg is NEEDed
+   ADDNE    R0,R0,#1                   ; Try next one then
+   BNE      _Loop
+   STR      R0,FPTEMP_FirstReg
+   STR      R4,FPTEMP_NumRegs
+   MOV      R1,R4,LSL R0
+   STR      R1,FPTEMP_Stacked
+   LDMFD    R13!,{R4,R15}
+
+.GFPTR_Not_First
+   ; Subsequent registers to be stacked
+   ;
+   CMP      R3,#4
+   MOVEQ    R0,#&26                    ; Asm_Error #&26 = No FPTempReg available
+   BEQ      Asm_Error
+   LDR      R0,FPTEMP_FirstReg
+   ADD      R0,R0,R3
+   AND      R0,R0,#7
+   TST      R2,R4,LSL R0
+   MOVNE    R0,#&26                    ; Asm_Error #&26 = No FPTempReg available
+   BNE      Asm_Error
+   ADD      R1,R0,R3
+   ADD      R3,R3,#1
+   STR      R3,FPTEMP_NumRegs
+   LDR      R1,FPTEMP_Stacked
+   ORR      R1,R1,R4,LSL R0
+   STR      R1,FPTEMP_Stacked
+   LDMFD    R13!,{R4,R15}
+
+; >-------------------------------------------------------------<
+
+.Push_FP_Temp_Reg                      ; Stack temp regs that are not free
+   LDR      R0,FPTEMP_NumRegs
+   CMP      R0,#0
+   MOVEQ    R15,R14
+   STMFD    R13!,{R9,R14}
+   ;------> SFM  Cond   PUYWL[Rn]XFd     [Offset]
+   MOV      R9,#%11101101001011010000001000000000 ; SFMFD FirstReg,NumRegs,[R13]!
+   LDR      R1,FPTEMP_FirstReg         ; SFM   FirstReg,NumRegs,[R13,#-NumRegs*12]!
+   ORR      R9,R9,R1,LSL #Rd_Pos
+   AND      R2,R0,#3
+   TST      R2,#2
+   ORRNE    R9,R9,#1 << 22
+   TST      R2,#1
+   ORRNE    R9,R9,#1 << 15
+   ADD      R0,R0,R0,LSL #1
+   ORR      R9,R9,R0
+   BL       Write_Instruction
+   LDMFD    R13!,{R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Pop_FP_Temp_Reg                       ; Unstack if temp regs are stacked
+   LDR      R0,FPTEMP_NumRegs
+   CMP      R0,#0
+   MOVEQ    R15,R14
+   STMFD    R13!,{R9,R14}
+   ;------> LFM  Cond   PUYWL[Rn]XFd     [Offset]
+   MOV      R9,#%11101100101111010000001000000000 ; LFMFD FirstReg,NumRegs,[R13]!
+   LDR      R1,FPTEMP_FirstReg         ; LFM   FirstReg,NumRegs,[R13],#NumRegs*12
+   ORR      R9,R9,R1,LSL #Rd_Pos
+   AND      R2,R0,#3
+   TST      R2,#2
+   ORRNE    R9,R9,#1 << 22
+   TST      R2,#1
+   ORRNE    R9,R9,#1 << 15
+   ADD      R0,R0,R0,LSL #1
+   ORR      R9,R9,R0
+   BL       Write_Instruction
+   LDMFD    R13!,{R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Push_Temp_Info
+   ADR      R0,Stack_Frame
+   LDMIA    R0,{R1-R3}
+   STMFD    R13!,{R1-R3}               ; Push TEMP_Needed_Macro, TEMP_Stacked and TEMP_Used
+   ORR      R1,R1,R2                   ; NEED all STACKed registers
+   MOV      R2,#0                      ; Clear STACKed
+   STMIA    R0,{R1,R2}                 ; Store NEEDed and STACKed
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Pop_Temp_Info
+   ADR      R0,Stack_Frame
+   LDMFD    R13!,{R1-R3}               ; Pop TEMP_Needed_Macro, TEMP_Stacked and TEMP_Used
+   STMIA    R0,{R1-R3}
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Push_FP_Temp_Info
+   SUB      R0,R13,#64
+   STMFD    R0!,{R4-R6,R14}
+   ADR      R1,Stack_Frame+32
+   LDMIA    R1,{R2-R6}                 ; Push FPTEMP_Needed_Macro, FPTEMP_Stacked,
+   STMFD    R13!,{R2-R6}               ; FPTEMP_Used, FPTEMP_FirstReg and FPTEMP_NumRegs
+   ORR      R2,R2,R3                   ; FPNEED all FPSTACKed registers
+   MOV      R6,#0                      ; Clear FPNumRegs
+   STMIA    R1,{R2-R6}                 ; Store FP information
+   LDMFD    R0!,{R4-R6,R15}
+
+; >-------------------------------------------------------------<
+
+.Pop_FP_Temp_Info
+   SUB      R0,R13,#64
+   STMFD    R0!,{R4-R6,R14}
+   ADR      R1,Stack_Frame+32
+   LDMFD    R13!,{R2-R6}
+   STMIA    R1,{R2-R6}
+   LDMFD    R0!,{R4-R6,R15}
+
+; >-------------------------------------------------------------<
+
+.Push_Temp_Info_Macro
+   SUB      R0,R13,#64
+   STMFD    R0!,{R4-R9,R14}
+   ADR      R1,Stack_Frame
+   LDMIA    R1,{R2-R9}                 ; Push TEMP_Needed_Macro, TEMP_Stacked, TEMP_Used and
+   STMFD    R13!,{R2-R9}               ; other macro information
+   ORR      R2,R2,R3                   ; NEED all STACKed registers
+   MOV      R3,#0                      ; Clear STACKed
+   STMIA    R1,{R2,R3}                 ; Store NEEDed and STACKed
+
+   ADD      R1,R1,#32
+   LDMIA    R1,{R2-R6}
+   STMFD    R13!,{R2-R6}
+   CMP      R6,#0
+   BEQ      PUSHTIM_End
+   ; FPNEED all FPSTACKed registers
+   ;
+   MOV      R1,#1
+
+._Loop
+   AND      R3,R5,#7
+   ORR      R2,R2,R1,LSL R3
+   SUBS     R6,R6,#1
+   BNE      _Loop
+   MOV      R3,#0                      ; Clear FPSTACKed
+   STMIA    R1,{R2,R3}
+
+.PUSHTIM_End
+   LDR      R1,Macro_Level             ; Higher macro level
+   ADD      R1,R1,#1
+   STR      R1,Macro_Level
+   LDMFD    R0!,{R4-R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Pop_Temp_Info_Macro
+   SUB      R0,R13,#64
+   STMFD    R0!,{R4-R9,R14}
+   ADR      R1,Stack_Frame+32
+   LDMFD    R13!,{R2-R6}
+   STMIA    R1,{R2-R6}
+   SUB      R1,R1,#32
+   LDMFD    R13!,{R2-R9}              ; Pop TEMP_Needed_Macro, TEMP_Stacked, TEMP_Used and
+   STMIA    R1,{R2-R9}                ; other macro information
+   LDR      R1,Macro_Level
+   SUB      R1,R1,#1                  ; Lower macro level
+   STR      R1,Macro_Level
+   LDMFD    R0!,{R4-R9,R15}

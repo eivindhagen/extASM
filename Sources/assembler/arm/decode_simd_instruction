@@ -1,0 +1,317 @@
+
+; >-------------------------------------------------------------<
+
+.DT_Q                                  ;_R8 = "Q"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   ; QADD8 | QADD16 | QADDSUBX | QASX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110001000000000000000000000
+   BEQ      DT_ADD_ADDSUBX_ASX
+   CMP      R8,#'D'
+   BEQ      DT_QDADD_QDSUB
+   CMP      R8,#'S'
+   ; QSUB8 | QSUB16 | QSUBADDX | QSAX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110001000000000000000000000
+   BEQ      DT_SUB_SUBADDX_SAX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_QDADD_QDSUB                        ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_QDADD
+   CMP      R8,#'S'
+   BEQ      DT_QDSUB
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_QDADD                              ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   ;------> QDADD Cond        [Rn][Rd]        [Rm]
+   MOV      R9,# %00000001010000000000000001010000
+   B        DT_ALU_D12_Register
+
+; >-------------------------------------------------------------<
+
+.DT_QDSUB                              ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'U'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BNE      DT_Unknown
+   ;------> QDSUB Cond        [Rn][Rd]        [Rm]
+   MOV      R9,# %00000001011000000000000001010000
+   B        DT_ALU_D12_Register
+
+; >-------------------------------------------------------------<
+
+.DT_SHADD_SHADDSUBX_SHASX_SHSUB_SHSUBADDX_SHSAX ;_R8 = "H"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   ; SHADD8 | SHADD16 | SHADDSUBX | SHASX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110001100000000000000000000
+   BEQ      DT_ADD_ADDSUBX_ASX
+   CMP      R8,#'S'
+   ; SHSUB8 | SHSUB16 | SHSUBADDX | SHSAX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110001100000000000000000000
+   BEQ      DT_SUB_SUBADDX_SAX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SSAT_SSAX_SSUB_SSUBADDX            ;_R8 = "S"
+   LDRB     R8,[R10]
+   BIC      R8,R8,#32
+   CMP      R8,#'U'
+   ; SSUB8 | SSUB16 | SSUBADDX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110000100000000000000000000
+   BEQ      DT_SUB_SUBADDX_SAX
+   CMP      R8,#'A'
+   BNE      DT_Unknown
+   ADD      R10,R10,#1
+   LDRB     R8,[R10]
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ADDEQ    R10,R10,#1
+   ;------> SSATxx Cond            [Rd]        [Rn]
+   MOVEQ    R9,#  %00000110101000000000000000000000
+   BEQ      DT_xSAT
+   CMP      R8,#'X'
+   ;------> SSAX Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110000100000000000000000000
+   BEQ      DT_SAX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_UHADD_UHADDSUBX_UHASX_UHSUB_UHSUBADDX_UHSAX ;_R8 = "H"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   ; UHADD8 | UHADD16 | UHADDSUBX | UHASX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110011100000000000000000000
+   BEQ      DT_ADD_ADDSUBX_ASX
+   CMP      R8,#'S'
+   BNE      DT_Unknown
+   ; UHSUB8 | UHSUB16 | UHSUBADDX | UHSAX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110011100000000000000000000
+   BEQ      DT_SUB_SUBADDX_SAX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_UQADD_UQADDSUBX_UQASX_UQSUB_UQSUBADDX_UQSAX ;_R8 = "Q"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   ; UQADD8 | UQADD16 | UQADDSUBX | UQASX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110011000000000000000000000
+   BEQ      DT_ADD_ADDSUBX_ASX
+   CMP      R8,#'S'
+   BNE      DT_Unknown
+   ; UQSUB8 | UQSUB16 | UQSUBADDX | UQSAX
+   ;
+   ;------> Op   Cond        [Rn][Rd]        [Rm]
+   MOVEQ    R9,#%00000110011000000000000000000000
+   BEQ      DT_SUB_SUBADDX_SAX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ADD_ADDSUBX_ASX                    ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BEQ      DT_ADD_ADDSUBX
+   CMP      R8,#'S'
+   BEQ      DT_ASX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ADD_ADDSUBX                        ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   CMP      R8,#'1'
+   BEQ      DT_ADD16
+   CMP      R8,#'8'
+   BEQ      DT_ADD8
+   CMP      R8,#'S'
+   CMPNE    R8,#'s'
+   BEQ      DT_ADDSUBX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ASX                                ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'X'
+   ;------> xASX    Cond        [Rn][Rd]        [Rm]
+   ORREQ    R9,R9,#%00000000000000000000111100110000
+   BEQ      Decode_SIMD_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SUB_SUBADDX_SAX                    ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'U'
+   BEQ      DT_SUB_SUBADDX
+   CMP      R8,#'A'
+   BEQ      DT_SAX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SUB_SUBADDX                        ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   CMP      R8,#'1'
+   BEQ      DT_SUB16
+   CMP      R8,#'8'
+   BEQ      DT_SUB8
+   CMP      R8,#'A'
+   CMPNE    R8,#'a'
+   BEQ      DT_SUBADDX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SAX                                ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'X'
+   ;------> xSAX    Cond        [Rn][Rd]        [Rm]
+   ORREQ    R9,R9,#%00000000000000000000111101010000
+   BEQ      Decode_SIMD_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ADD16                              ;_R8 = "1"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'6'
+   BNE      DT_Unknown
+   ;------> xADD16  Cond        [Rn][Rd]        [Rm]
+   ORREQ    R9,R9,#%00000000000000000000111100010000
+   BEQ      Decode_SIMD_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SUB16                              ;_R8 = "1"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'6'
+   BNE      DT_Unknown
+   ;------> xSUB16  Cond        [Rn][Rd]        [Rm]
+   ORREQ    R9,R9,#%00000000000000000000111101110000
+   BEQ      Decode_SIMD_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ADD8                               ;_R8 = "8"
+   ;------> xADD8   Cond        [Rn][Rd]        [Rm]
+   ORR      R9,R9,#%00000000000000000000111110010000
+   B        Decode_SIMD_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_SUB8                               ;_R8 = "8"
+   ;------> xSUB8   Cond        [Rn][Rd]        [Rm]
+   ORR      R9,R9,#%00000000000000000000111111110000
+   B        Decode_SIMD_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_ADDSUBX                            ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'U'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'X'
+   ;------> xADDSUBX Cond        [Rn][Rd]        [Rm]
+   ORREQ    R9,R9,# %00000000000000000000111100110000
+   BEQ      Decode_SIMD_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SUBADDX                            ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'X'
+   ;------> xSUBADDX Cond        [Rn][Rd]        [Rm]
+   ORREQ    R9,R9,# %00000000000000000000111101010000
+   BEQ      Decode_SIMD_Instruction
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.Decode_SIMD_Instruction
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Register
+   TST      R9,#1 << 1
+   BNE      DSI_No_Ra
+   ORR      R9,R9,R0,LSL #Rd_Pos
+   BL       Decode_Operand_Register
+
+.DSI_No_Ra
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   BL       Decode_Operand_Two_Register
+   B        DT_Write_Instruction

@@ -1,0 +1,319 @@
+
+; >-------------------------------------------------------------<
+
+.DT_FCVT                               ;_R8 = "V"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BEQ      DT_FCVTDS
+   CMP      R8,#'S'
+   BEQ      DT_FCVTSD
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FCVTDS                             ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_Unknown
+   ;------> FCVTDS Cond            [Dd]        [Fm]
+   MOV      R9,#  %00001110101101110000101011000000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_VFP_D_Destination_Register
+   BL       Decode_VFP_S_Operand_Two
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FCVTSD                             ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   ;------> FCVTSD Cond            [Dd]        [Fm]
+   MOV      R9,#  %00001110101101110000101111000000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_VFP_S_Destination_Register
+   BL       Decode_VFP_D_Operand_Two
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FSITO                              ;_R8 = "I"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   ;------> FSITOx Cond     D      [Fd]   x  M [Fn]
+   MOVEQ    R9,#  %00001110101110000000101011000000
+   BEQ      DT_VFP_D2_xS
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FUITO                              ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   ;------> FUITOx Cond     D      [Fd]   x  M [Fn]
+   MOVEQ    R9,#  %00001110101110000000101001000000
+   BEQ      DT_VFP_D2_xS
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FTOSI                              ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   ;------> FTOSIx  Cond     D      [Fd]    Z M [Fm]
+   MOVEQ    R9,#   %00001110101111010000101001000000
+   BEQ      DT_VFP_D2_Sx
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FTOUI                              ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   ;------> FTOUIx  Cond     D      [Fd]    Z M [Fm]
+   MOVEQ    R9,#   %00001110101111000000101001000000
+   BEQ      DT_VFP_D2_Sx
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FMD                                ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BEQ      DT_FMDHR
+   CMP      R8,#'L'
+   BEQ      DT_FMDLR
+   CMP      R8,#'R'
+   BEQ      DT_FMDRR
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FMDHR                              ;_R8 = "H"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   ;------> FMDHR Cond        [Dn][Rd]
+   MOVEQ    R9,# %00001110001000000000101100010000
+   BEQ      DT_FMDxR
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FMDLR                              ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   ;------> FMDLR Cond        [Dn][Rn]
+   MOVEQ    R9,# %00001110000000000000101100010000
+   BEQ      DT_FMDxR
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FMDxR
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_VFP_D_Register
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   BL       Ensure_Comma
+   BL       Decode_Rd_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FMDRR                              ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   ;------> FMDRR Cond        [Rn][Rd]        [Dm]
+   MOV      R9,# %00001100010000000000101100010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_VFP_D_Register
+   ORR      R9,R9,R0,LSL #Rm_Pos
+   BL       Ensure_Comma
+   BL       Decode_Rd_Register
+   BL       Ensure_Comma
+   BL       Decode_Rn_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FMR                                ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BEQ      DT_FMRDH_FMRDL
+   CMP      R8,#'R'
+   BEQ      DT_FMRRD_FMRRS
+   CMP      R8,#'X'
+   BEQ      DT_FMRX
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FMRDH_FMRDL                        ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   ;------> FMRDH Cond        [Dn][Rd]
+   MOVEQ    R9,# %00001110001100000000101100010000
+   BEQ      DT_FMRDx
+   CMP      R8,#'L'
+   ;------> FMRDL Cond        [Dn][Rd]
+   MOVEQ    R9,# %00001110000100000000101100010000
+   BEQ      DT_FMRDx
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FMRDx
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   BL       Decode_VFP_D_Operand_One
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FMRRD_FMRRS                        ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BEQ      DT_FMRRD
+   CMP      R8,#'S'
+   BEQ      DT_FMRRS
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_FMRRD                              ;_R8 = "D"
+   ;------> FMRRD Cond        [Rn][Rd]        [Dm]
+   MOV      R9,# %00001100010100000000101100010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Rn_Register
+   BL       Decode_VFP_D_Operand_Two
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FMRRS                              ;_R8 = "S"
+   ;------> FMRRS Cond        [Rn][Rd]        [Sm]
+   MOV      R9,# %00001100010100000000101000010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Rn_Register
+   ADR      R0,Decode_VFP_Register
+   BL       Decode_Register_List
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FMRX                               ;_R8 = "X"
+   ;------> FMRX Cond        Reg [Rd]
+   MOV      R9,#%00001110111100000000101000010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   BL       Ensure_Comma
+   BL       Decode_VFP_System_Register
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FMSR                               ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'R'
+   CMPNE    R8,#'r'
+   BEQ      DT_FMSRR
+   ;------> FMSR Cond        [Fn][Rd]    N
+   MOV      R9,#%00001110000000000000101000010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_VFP_S_Register
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   BL       Decode_Operand_Rd_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FMSRR                              ;_R8 = "R"/"r"
+   ;------> FMSRR Cond        [Rn][Rd]      M [Sm]
+   MOV      R9,# %00001100010000000000101000010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   ADR      R0,Decode_VFP_Register
+   BL       Decode_Register_List
+   BL       Decode_Operand_Rd_Register
+   BL       Decode_Operand_Rn_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FMSTAT                             ;_R8 = "T"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   ;------> FMSTAT Cond
+   MOV      R9,#  %00001110111100011111101000010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_FMXR                               ;_R8 = "X"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   ;------> FMXR Cond        Reg [Rd]
+   MOV      R9,#%00001110111000000000101000010000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_VFP_System_Register
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   BL       Decode_Operand_Rd_Register
+   B        DT_Write_Instruction

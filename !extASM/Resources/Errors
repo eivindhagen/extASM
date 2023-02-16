@@ -1,0 +1,221 @@
+; Groups
+; ------
+; 0  - Data processing
+; 1  - Load/store
+; 2  - General and misc. ARM
+; 3  - Variables and values
+; 4  - Functions
+; 5  - Structures, relatives and macros
+; 6  - Assembler switches
+; 7  - FP Data processing
+; 8  - FP Load/store
+; 9  - AOF
+; A  - VFP/SIMD
+; B  - Coprocessor
+; C  - Saturation
+;
+#&00 = Unknown error
+;
+; Group 0 - Data processing
+; -------------------------
+;
+; Shift
+;
+#&01 = Illegal shift
+#&02 = Index register shift error
+; MUL/DIV
+;
+#&03 = MUL/DIV Rd=PC
+#&04 = MUL/DIV Rd=Rm or DIV Rd=Rs or DIV Rm=Rs
+; Data processing
+;
+#&05 = Value outside 1-32
+#&06 = Cannot use xPSR_flg in this instruction
+#&07 = Illegal PSR register
+#&08 = EXG Rd=Rn
+#&09 = Illegal register
+#&0A = Too big constant
+#&0B = Illegal mode bits
+#&0C = Illegal bitfield
+#&0D = Number too big, 4 bit only
+#&0E = Illegal operand type
+#&0F = Instruction must be unconditional
+;
+; Group 1 - Load/store
+; --------------------
+;
+#&10 = Trans bit illegal on Pre-Index
+#&11 = Missing "["
+#&12 = Missing "]"
+#&13 = Illegal LDM/STM PU-bits
+#&14 = Offset must be +/- 4095
+#&15 = Target registers must be successive
+#&16 = Target registers must be the same type
+#&17 = Only single and double precision registers allowed
+#&18 = Max 16 double precision registers
+#&19 = Offset must be +/- 1020 (word-aligned)
+;
+; Group 2 - General and misc. ARM
+; -------------------------------
+;
+; General
+;
+#&20 = Missing ","
+#&21 = Missing "{"
+#&22 = Missing "}"
+#&23 = Syntax error
+#&24 = Syntax overflow (too many operands)
+#&25 = No TempReg available
+#&26 = No FPTempReg available
+#&27 = Missing "#"
+#&28 = Missing """
+#&29 = Branch or branch with link out of range
+#&2A = Value exceeds 16 bit
+#&2B = File '%s' not found
+#&2C = Missing " "
+#&2D = All operands must be of the same register type
+#&2E = Illegal SIMD register
+#&2F = Unimplemented instruction
+;
+; Group 3 - Variables and values
+; ------------------------------
+;
+; Variables
+;
+#&30 = Unknown variable, '%s'
+#&31 = Reuse of label, '%s'
+#&32 = Unknown variable operation
+#&33 = Maximum length of variable name is 46 characters
+#&34 = Missing variable
+#&35 = Variable in parameter header, '%s', already in use
+; Values
+;
+#&36 = Bad constant
+#&37 = Only one decimal point allowed
+#&38 = Number too big, 8 bit only
+#&39 = Number too big, 16 bit only
+#&3A = Number too big, 32 bit only
+#&3B = Quotes missing in character ('.')
+#&3C = Quotes missing in string ("...")
+#&3D = String too long
+#&3E = Missing ">" for ASCII value or variable in string
+#&3F = Only integer after 'E' allowed
+;
+; Group 4 - Functions and operators
+; ---------------------------------
+;
+; Functions and operators
+;
+#&40 = Division by zero
+#&41 = Negative square root
+#&42 = Logarithm range
+#&43 = Too big number for arc Sine or arc Cosine
+#&44 = Floating Point number too big for chosen precision
+#&45 = Type mismatch: number needed
+#&46 = Type mismatch: string needed
+#&47 = Missing ")"
+#&48 = Mystical operation '%c'
+#&49 = Assignment operator not implemented (use '==' for equality test)
+;
+; Group 5 - Structures, relatives and macros
+; ------------------------------------------
+; Structures
+;
+#&50 = Too many nested 'struct's, maximum 16
+#&51 = Not used
+; Macros
+;
+#&52 = Unknown parameter type in macro header (R, F, I, X, S, TR, TF only)
+#&53 = Missing parameter type in macro header
+#&54 = Redefinition of macro, '%s'
+#&55 = Maximum length of macro name is 43 characters
+#&56 = Temp-registers must be last on macro parameter list
+#&57 = When using stacked temp-registers in macros, only registers in macro header can be used
+; Relatives
+;
+#&58 = 'relative's can not be nested
+#&59 = Not used
+;
+; Group 6 - Assembler switches
+; ----------------------------
+;
+; Assembler switches
+;
+#&60 = Unknown assembler switch
+#&61 = #else without #if
+#&62 = #endif without #if
+#&63 = Not used
+#&64 = #endr without #rept
+#&65 = Too many nested #if's, maximum 16
+#&66 = Too many nested '#rept's, maximum 16
+#&67 = Missing #endif
+#&68 = Missing #endr
+#&69 = Number of #rept repetitions must be non-zero
+#&6A = #fppool not allowed in struct or relative area
+;
+; Group 7 - FP Dataprocessing
+; ---------------------------
+;
+; FP Data processing
+;
+#&70 = Floating Point precision must be specified
+#&71 = Illegal Floating Point rounding mode
+#&72 = Floating Point overflow
+#&73 = Missing #fppool
+;
+; Group 8 - FP Load/store
+; -----------------------
+;
+; LDF/STF
+;
+#&80 = Immediate offset in Load/Store FP must be word-aligned
+#&81 = Not used
+#&82 = Not used
+#&83 = Not used
+; LFM/SFM
+;
+#&84 = Illegal LFM/SFM PU-bits
+#&85 = Illegal count (1-4)
+;
+; Group 9 - ARM Object Format
+; ---------------------------
+;
+; ARM Object Format
+;
+#&90 = Unknown parameter in #area, must be 'code', 'noinit' or 'readonly'
+#&91 = 'ReadOnly' can not be used for zero-initialised data
+#&92 = Unknown second parameter for #area, must be 'readonly'
+#&93 = #end without #area
+#&94 = #import outside #area definition
+#&95 = Symbol in #export already exists
+#&96 = #export outside #area definition
+#&97 = Missing '#|% <size>' in 'Noinit' area
+#&98 = #entry outside #area-#end
+#&99 = No areas defined
+#&9A = Missing #end
+#&9B = Symbol in #import already exists in same area
+;
+; Group A - VFP/SIMD
+; -------------------
+;
+#&A0 = Illegal scalar specifier
+#&A1 = Illegal register for instruction
+#&A2 = Immediate value can not be represented
+#&A3 = Offset must be +/- 1020 (word-aligned)
+#&A4 = Register list must be continuous
+#&A5 = Bad register list
+#&A6 = Bad alignment
+#&A8 = Missing operand type
+#&A9 = First target register must be even and not R14
+#&AA = Bad system register
+;
+; Group B - Coprocessor
+; ---------------------
+;
+#&B0 = Illegal coprocessor opcode
+#&B1 = Illegal coprocessor
+#&B2 = Illegal coprocessor register
+;
+; Group C - Saturation
+; ---------------------
+#&C0 = Bad saturation bit position

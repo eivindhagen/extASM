@@ -1,0 +1,768 @@
+
+; >-------------------------------------------------------------<
+
+.DT_LDC_LDF_LDM_LDR                    ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   ;------> LDC  Cond   PUDWL[Rn]CRd [CP][Offset]
+   MOVEQ    R9,#%00001100000100000000000000000000
+   BEQ      DT_LDC_STC
+   CMP      R8,#'F'
+   ;------> LDF  Cond   PUYWL[Rn]XFd     [Offset]
+   MOVEQ    R9,#%00001100000100000000000100000000
+   BEQ      DT_LDF_STF
+   CMP      R8,#'M'
+   ;------> LDM  Cond   PUSWL[Rn][Register list ]
+   MOVEQ    R9,#%00001000000100000000000000000000
+   BEQ      DT_LDM_STM
+   CMP      R8,#'R'
+   MOVEQ    R4,#Load_Bit
+   MOVEQ    R5,#0
+   BEQ      DT_LDR_STR
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_STC_STF_STM_STR_STRUCT             ;_R8 = "T"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   ;------> STC  Cond   PUDWL[Rn]CRd [CP][Offset]
+   MOVEQ    R9,#%00001100000000000000000000000000
+   BEQ      DT_LDC_STC
+   CMP      R8,#'F'
+   ;------> STF  Cond   PUYWL[Rn]XFd     [Offset]
+   MOVEQ    R9,#%00001100000000000000000100000000
+   BEQ      DT_LDF_STF
+   CMP      R8,#'M'
+   ;------> STM  Cond   PUSWL[Rn][Register list ]
+   MOVEQ    R9,#%00001000000000000000000000000000
+   BEQ      DT_LDM_STM
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   LDRB     R0,[R10]
+   BIC      R0,R0,#32
+   CMP      R0,#'U'
+   MOVNE    R4,#0
+   MOVNE    R5,#Store_Double_Bit
+   BNE      DT_LDR_STR
+   ADD      R10,R10,#1                 ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BEQ      Decode_Struct
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_POP                                ;_R8 = "P"
+   ;------> POP  Cond            [Register list ]
+   MOV      R9,#%00001000101111010000000000000000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   ADRL     R0,Decode_Register
+   BL       Decode_Bracketed_Register_List
+   ORR      R9,R9,R0
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_PUSH                               ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BNE      DT_Unknown
+   ;------> PUSH Cond            [Register list ]
+   MOV      R9,#%00001001001011010000000000000000
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   ADR      R0,Decode_Register
+   BL       Decode_Bracketed_Register_List
+   ORR      R9,R9,R0
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_LDR_STR                            ;_R8 = "R"
+   MOV      R9,#0
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   CMPNE    R8,#'B'
+   CMPNE    R8,#'b'
+   CMPNE    R8,#'T'
+   CMPNE    R8,#'t'
+   ;------> xxx     Cond  IPUBWL[Rn][Rd][  Offset  ]
+   ORREQ    R9,R9,#%00000100000000000000000000000000
+   ORREQ    R9,R9,R4
+   BEQ      DT_LDR_STR_LDRB_STRB
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   ;------> xxxD    Cond   PU W [Rn][Rd][  Offset  ]
+   ORREQ    R9,R9,#%00000000000000000000000011010000
+   ORREQ    R9,R9,R5
+   BEQ      DT_LDRD_STRD_LDRH_STRH_LDRSB_LDRSH
+   CMP      R8,#'E'
+   BEQ      DT_LDREX_STREX
+   CMP      R8,#'H'
+   ;------> xxxH    Cond   PU WL[Rn][Rd][  Offset  ]
+   ORREQ    R9,R9,#%00000000000000000000000010110000
+   ORREQ    R9,R9,R4
+   BEQ      DT_LDRD_STRD_LDRH_STRH_LDRSB_LDRSH
+   CMP      R8,#'S'
+   CMPEQ    R4,#Load_Bit
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   ;------> LDRSB   Cond   PU W [Rn][Rd][  Offset  ]
+   ORREQ    R9,R9,#%00000000000100000000000011010000
+   ORREQ    R9,R9,R5
+   BEQ      DT_LDRD_STRD_LDRH_STRH_LDRSB_LDRSH
+   CMP      R8,#'H'
+   ;------> LDRSH   Cond   PU WL[Rn][Rd][  Offset  ]
+   ORREQ    R9,R9,#%00000000000000000000000011110000
+   ORREQ    R9,R9,R4
+   BEQ      DT_LDRD_STRD_LDRH_STRH_LDRSB_LDRSH
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_LDREX_STREX                        ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'X'
+   BNE      DT_Unknown
+   ORR      R9,R9,R4
+   LDRB     R8,[R10],#1
+   CMP      R8,#'B'
+   CMPNE    R8,#'b'
+   ;------> xxxEXB  Cond       L[Rn][Rd]
+   ORREQ    R9,R9,#%00000001110000000000111110010000
+   BEQ      DT_LDREXx_STREXx
+   CMP      R8,#'D'
+   CMPNE    R8,#'d'
+   ;------> xxxEXD  Cond       L[Rn][Rd]
+   ORREQ    R9,R9,#%00000001101000000000111110010000
+   BEQ      DT_LDREXx_STREXx
+   CMP      R8,#'H'
+   CMPNE    R8,#'h'
+   ;------> xxxEXH  Cond       L[Rn][Rd]
+   ORREQ    R9,R9,#%00000001111000000000111110010000
+   BEQ      DT_LDREXx_STREXx
+   ;------> xxxEX   Cond       L[Rn][Rd]
+   ORR      R9,R9,#%00000001100000000000111110010000
+   B        DT_LDREXx_STREXx
+
+; >-------------------------------------------------------------<
+
+.DT_LDR_STR_LDRB_STRB
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DT_LDR_STR_No_Stat
+   ADR      R0,Code_Counters+18*4
+   TST      R9,#1 << 20
+   ADDNE    R0,R0,#4
+   LDR      R1,[R0]
+   ADD      R1,R1,#1
+   STR      R1,[R0]
+
+.DT_LDR_STR_No_Stat
+   CMP      R8,#'B'
+   CMPNE    R8,#'b'
+   ORREQ    R9,R9,#Load_Store_Byte_Bit
+   LDREQB   R8,[R10],#1                ; R8 = "T" or Blank
+   CMP      R8,#'T'
+   CMPNE    R8,#'t'
+   MOVEQ    R4,#1                      ; Set Trans option
+   MOVNE    R4,#0                      ; Clear Trans option
+   LDREQB   R8,[R10],#1
+   STR      R11,AutoExpand_Pointer
+   BL       Decode_Destination_Register
+   BL       Ensure_Comma
+   BL       Skip_Blanks
+   CMP      R8,#'['
+   BNE      DT_LDR_STR_Expr
+   LDRB     R8,[R10],#1
+   BL       Decode_Rn_Register
+   BL       Skip_Blanks
+   CMP      R8,#','
+   MOVEQ    R5,#1                      ; If comma after register, set pre-index flag
+   BEQ      DT_LDR_STR_Pre_Post_Index
+   CMP      R8,#']'                    ; If end brace, then might be post-indexed
+   MOVNE    R0,#&20                    ; Asm_Error #&20 = Missing ","
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#','                    ; If comma after end brace, then it is post-indexed
+   MOVEQ    R5,#0                      ; Clear pre-index flag
+   BEQ      DT_LDR_STR_Pre_Post_Index
+   ORR      R9,R9,#Add_Bit
+   CMP      R4,#1
+   ORREQ    R9,R9,#Write_Back_Bit
+
+.DT_LDR_STR_Check_WriteBack
+   CMP      R8,#'!'
+   ORREQ    R9,R9,#Write_Back_Bit
+   LDREQB   R8,[R10],#1
+   ANDEQ    R0,R9,#&F << Rn_Pos
+   CMPEQ    R0,#&F << Rn_Pos
+   MOVEQ    R0,#&33                    ; Asm_Warning #&33 = Write-back should not be specified if R15 is used as base register (Rn)
+   BLEQ     Asm_Warning
+   B        DT_Write_Instruction
+
+.DT_LDR_STR_Pre_Post_Index             ;_R8 =","
+   CMP      R5,#1
+   CMPEQ    R4,#1                      ; Is pre-index and Trans option flags set?
+   MOVEQ    R0,#&10                    ; Asm_Error #&10 = Trans bit illegal on Pre-Index
+   BEQ      Asm_Error
+   CMP      R5,#0
+   ANDEQ    R0,R9,#&F << Rn_Pos
+   CMPEQ    R0,#&F << Rn_Pos
+   MOVEQ    R0,#&33                    ; Asm_Warning #&33 = Write-back should not be specified if R15 is used as base register (Rn)
+   BLEQ     Asm_Warning
+   ORR      R9,R9,R5,LSL #Preindexed_Pos
+   ORR      R9,R9,R4,LSL #Write_Back_Pos ; Set possible Trans bit
+   ;------> Might be register-indexed or constant-indexed
+   LDRB     R8,[R10],#1                ; R8 = "#" for immediate constant, else it's a register
+   BL       Skip_Blanks
+   CMP      R8,#'#'
+   BNE      DT_LDR_STR_Reg             ; Not "#", so MUST be a register index
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   CMP      R0,#0
+   RSBLT    R0,R0,#0
+   ORRGE    R9,R9,#Add_Bit
+   MOV      R4,R0
+   CMP      R5,#1                      ; Is it pre-indexed?
+   BNE      DT_LDR_STR_Check_Index
+   CMP      R8,#']'
+   MOVNE    R0,#&12                    ; Asm_Error #&12 = Missing "]"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#'!'
+   ORREQ    R9,R9,#Write_Back_Bit
+   LDREQB   R8,[R10],#1
+   ANDEQ    R0,R9,#&F << Rn_Pos
+   CMPEQ    R0,#&F << Rn_Pos
+   MOVEQ    R0,#&33                    ; Asm_Warning #&33 = Write-back should not be specified if R15 is used as base register (Rn)
+   BLEQ     Asm_Warning
+
+.DT_LDR_STR_Check_Index
+   BICS     R0,R4,#&FFF
+   BNE      DT_LDR_STR_Not_Write_Instruction
+   ORR      R9,R9,R4                   ; Insert Immediate constant offset
+   B        DT_Write_Instruction
+
+   ; Auto-expansion is needed. Code it as ADD or SUB, followed by, or following, LDR or STR
+   ;
+   ; LDR/STR   Rd,[Rn,#&12344]  --->  ADD       Rd,Rn,#&12000
+   ;                                  LDR/STR   Rd,[Rd,#&344]
+   ;
+   ; LDR/STR   Rd,[Rn,#&12344]! --->  ADD       Rn,Rn,#&12000
+   ;                                  LDR/STR   Rd,[Rn,#&344]!
+   ;
+   ; LDR/STR   Rd,[Rn,#&12344]! --->  ADD       TempReg,Rn,#&12000   ; Rd=Rn
+   ;                                  LDR/STR   Rd,[TempReg,#&344]!
+   ;                                  None/MOV  Rn,TempReg
+   ;
+   ; LDR/STR   Rd,[Rn],#&12344  --->  LDR/STR   Rd,[Rn],#&344
+   ;                                  ADD       Rn,Rn,#&12000
+   ;
+   ; R9 =  LDR/STR   Rd,[Rn,#0]{!} or
+   ;       LDR/STR   Rd,[Rn],#0
+   ;
+.DT_LDR_STR_Not_Write_Instruction
+   BL       Push_Temp_Info
+   MOV      R0,#0
+   STR      R0,AutoExpand_Make_MOV
+   AND      R0,R9,#&F << Rn_Pos
+   STR      R0,AutoExpand_Rn
+   CMP      R5,#1
+   BNE      DT_LDR_STR_No_TempReg_Post
+   AND      R0,R9,#&F << Rd_Pos
+   MOV      R6,R0,LSR #Rd_Pos
+   TST      R9,#1 << 20
+   BEQ      DT_LDR_STR_STR
+   TST      R9,#1 << 21
+   BNE      DT_LDR_STR_No_TempReg_Pre
+   MOV      R0,#&12                    ; Asm_Warning #&12 = Auto-expansion (Load/Store)
+   STR      R0,AutoExpand_Number
+   B        DT_LDR_STR_TempReg
+
+.DT_LDR_STR_STR
+   TST      R9,#1 << 21
+   BEQ      DT_LDR_STR_Get_TempReg
+   AND      R0,R9,#&F << Rn_Pos
+   CMP      R6,R0,LSR #Rn_Pos
+   BNE      DT_LDR_STR_No_TempReg_Pre
+   STR      R0,AutoExpand_Make_MOV
+
+.DT_LDR_STR_Get_TempReg
+   ; Allocate a temp-reg
+   ;
+   MOV      R1,#1
+   AND      R2,R9,#&F << Rd_Pos        ; Get Rd
+   MOV      R2,R2,LSR #Rd_Pos
+   AND      R2,R9,#&F << Rn_Pos        ; Get Rn
+   MOV      R0,R1,LSL R2               ; NEED Rd
+   MOV      R2,R2,LSR #Rn_Pos
+   ORR      R0,R0,R1,LSL R2            ; NEED Rn
+   STR      R0,TEMP_Needed             ; Save NEED register list
+   LDR      R7,TEMP_Stacked
+   BL       Get_Temp_Reg
+   MOV      R6,R0
+   LDR      R0,TEMP_Stacked
+   CMP      R0,R7
+   MOVEQ    R0,#&14                    ; Asm_Warning #&14 = Auto-expansion, using TEMP register (Load/Store)
+   MOVNE    R0,#&17                    ; Asm_Warning #&17 = Auto-expansion, using stacked register (Load/Store)
+   STR      R0,AutoExpand_Number
+   BL       Push_Temp_Reg
+
+.DT_LDR_STR_TempReg
+   ; ADD      TempReg,Rn,#Offset
+   ; LDR/STR  Rd,[TempReg,#Offset]
+   ;
+   BIC      R9,R9,#&F << Rn_Pos
+   ORR      R9,R9,R6,LSL #Rn_Pos
+   B        DT_LDR_STR_Offset
+
+.DT_LDR_STR_No_TempReg_Post
+   ; LDR/STR Rd,[Rn],#Offset
+   ; ADD     Rn,Rn,#Offset
+   ;
+   MOV      R0,R4,LSL #20
+   ORR      R9,R9,R0,LSR #20
+   BL       Write_Instruction
+
+.DT_LDR_STR_No_TempReg_Pre
+   ; ADD     Rn,Rn,#Offset
+   ; LDR/STR Rd,[Rn,#Offset]
+   ;
+   MOV      R0,#&12                    ; Asm_Warning #&12 = Auto-expansion (Load/Store)
+   STR      R0,AutoExpand_Number
+   AND      R0,R9,#&F << Rn_Pos
+   MOV      R6,R0,LSR #Rn_Pos
+
+.DT_LDR_STR_Offset
+   MOV      R7,R9
+   AND      R9,R9,#&F0000000           ; Get condition code
+   TST      R7,#Add_Bit
+   ;                I
+   ORRNE    R9,R9,#%10100 << 21        ; R9 = ADD Rd,Rn,#Immediate Value
+   ORREQ    R9,R9,#%10010 << 21        ;   or SUB Rd,Rn,#Immediate Value
+   LDR      R0,AutoExpand_Rn
+   ORR      R9,R9,R0                   ; Rn is the same
+   ORR      R9,R9,R6,LSL #Rd_Pos       ; Rd is Rn or TempReg
+   BIC      R0,R4,#&FFF                ; High offset
+   BL       Code_Immediate             ;_R0 = Immediate value
+   CMN      R14,#1                     ; Check if coded value is okay
+   BEQ      DT_LDR_STR_Not_Write_Instruction2
+   ORR      R9,R9,R0
+   BL       Write_Instruction          ; Write ADD or SUB instruction
+   B        DT_LDR_STR_Not_Write_Instruction_End2
+
+.DT_LDR_STR_Not_Write_Instruction2
+   BIC      R0,R4,#&FFF
+   BL       AutoExpand                 ; Immediate failed, 1 instruction is not enough!
+
+.DT_LDR_STR_Not_Write_Instruction_End2
+   CMP      R5,#0
+   BEQ      DT_LDR_STR_End
+
+   ; Now ADD or SUB is coded, store the original LDR/STR
+   ;
+   MOV      R0,R4,LSL #20              ; Low offset
+   ORR      R9,R7,R0,LSR #20           ; Restore LDR/STR instruction
+   BL       Write_Instruction
+   LDR      R0,AutoExpand_Make_MOV
+   CMP      R0,#0
+   BEQ      DT_LDR_STR_End
+   ; Make MOV Rn,TempReg
+   ;
+   AND      R9,R9,#&F0000000
+   ORR      R9,R9,#%1101 << 21
+   ORR      R9,R9,R0,LSR #4
+   AND      R0,R7,#&F << Rn_Pos
+   ORR      R9,R9,R0,LSR #Rn_Pos
+   BL       Write_Instruction
+   B        DT_LDR_STR_End
+
+.DT_LDR_STR_Reg                        ; R8 Might be "+" or "-" or "R/r"
+   ORR      R9,R9,#Add_Bit+Immediate_Bit
+   CMP      R8,#'+'
+   BEQ      DT_LDR_STR_Sign_Done
+   CMP      R8,#'-'
+   BICEQ    R9,R9,#Add_Bit
+   SUBNE    R10,R10,#1                 ; If not "+" or "-", step back to read register
+
+.DT_LDR_STR_Sign_Done
+   LDRB     R8,[R10],#1
+   BL       Decode_Register            ;_R0 = [Rm] = Index Register bits
+   ORR      R9,R9,R0
+   MOV      R7,R0
+   CMP      R0,#&F
+   MOVEQ    R0,#&34                    ; Asm_Warning #&34 = R15 should not be used as register offset (Rm)
+   BLEQ     Asm_Warning
+   AND      R0,R9,#&F << Rn_Pos
+   CMP      R7,R0,LSR #Rn_Pos
+   CMPEQ    R5,#0
+   MOVEQ    R0,#&35                    ; Asm_Warning #&35 = A post-indexed LDR or STR with Rm=Rn should be avoided (difficult in V-mem. systems)
+   BLEQ     Asm_Warning
+   ;------> Decode possible register shifts
+   BL       Decode_Shift               ;_R0 = Shift bits [8]
+   TST      R0,#1                      ; Only shifts with bit 0 clear is legal
+   MOVNE    R0,#&02                    ; Asm_Error #&02 = Index register shift error
+   BNE      Asm_Error
+   ORR      R9,R9,R0,LSL #4
+   CMP      R5,#1                      ; Is it pre-indexed?
+   BNE      DT_LDR_STR_Check_WriteBack
+   CMP      R8,#']'
+   MOVNE    R0,#&12                    ; Asm_Error #&12 = Missing "]"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   B        DT_LDR_STR_Check_WriteBack
+
+.DT_LDR_STR_Expr
+   CMP      R4,#1
+   MOVEQ    R0,#&10                    ; Asm_Error #&10 = Trans bit illegal on Pre-Index
+   BEQ      Asm_Error
+   ORR      R9,R9,#Preindexed_Bit
+   BL       Decode_Int_Expr            ; Memory address (LDR/STR)
+   CMN      R14,#2
+   BEQ      DT_Write_Instruction       ; Warning - Might be a forward reference...
+   MOV      R4,R0                      ; Save memory location
+   LDR      R0,RELATIVE_Register_Read
+   ORR      R9,R9,R0,LSL #Rn_Pos
+   CMP      R0,#15
+   MOVNE    R5,R4
+   BNE      DT_LDR_STR_Not_R15
+   LDR      R1,Object_Base
+   LDR      R2,Object_Size
+   ADD      R1,R1,R2                   ; R1 = PC (not pipelined)
+   ADD      R1,R1,#8                   ; R1 = PC (pipelined)
+   SUB      R5,R4,R1                   ; R5 = Offset from PC
+
+.DT_LDR_STR_Not_R15
+   CMP      R5,#0
+   RSBLT    R5,R5,#0                   ; NEG offset if negative, default is negative
+   ORRGE    R9,R9,#Add_Bit
+   BICS     R0,R5,#&FFF
+   BNE      DT_LDR_STRE_Not_Write_Instruction2
+   ORR      R9,R9,R5                   ; Insert Immediate constant offset
+   B        DT_Write_Instruction
+
+   ;------> EXTENDED MEMORY ADDRESSING!
+   ;        ===========================
+   ; R4 - Address to get to
+   ; R5 - Offset
+   ; R6 - TempReg
+   ;
+.DT_LDR_STRE_Not_Write_Instruction2
+   BL       Push_Temp_Info
+   TST      R9,#1 << 20                ; 0 = STR, 1 = LDR
+   BEQ      DT_LDR_STR_STR2
+   ; Instruction is LDR, so use Rd as temporary register
+   ;
+   AND      R0,R9,#&F << Rd_Pos
+   MOV      R6,R0,LSR #Rd_Pos
+   MOV      R0,#&12                    ; Asm_Warning #&12 = Auto-expansion (Load/Store)
+   STR      R0,AutoExpand_Number
+   B        DT_LDR_STR_End_TempReg2
+
+.DT_LDR_STR_STR2
+   ; Instruction is STR, so allocate a TempReg.
+   ;
+   MOV      R1,#1
+   AND      R2,R9,#&F << Rd_Pos        ; Get Rd
+   MOV      R2,R2,LSR #Rd_Pos
+   MOV      R0,R1,LSL R2               ; NEED Rd
+   STR      R0,TEMP_Needed             ; Save NEED register list
+   LDR      R7,TEMP_Stacked
+   BL       Get_Temp_Reg
+   MOV      R6,R0
+   LDR      R0,TEMP_Stacked
+   CMP      R0,R7
+   MOVEQ    R0,#&14                    ; Asm_Warning #&14 = Auto-expansion, using TEMP register (Load/Store)
+   MOVNE    R0,#&17                    ; Asm_Warning #&17 = Auto-expansion, using stacked register (Load/Store)
+   STR      R0,AutoExpand_Number
+   BL       Push_Temp_Reg
+   LDR      R3,RELATIVE_Register_Read
+   CMP      R3,#15
+   BNE      DT_LDR_STR_Not_R15_2
+   ;------> Recalculate offset, temp-register stack stuff might have skewed things
+   LDR      R1,Object_Base
+   LDR      R2,Object_Size
+   ADD      R1,R1,R2                   ; R1 = PC (not pipelined)
+   ADD      R1,R1,#8                   ; R1 = PC (pipelined)
+   SUB      R5,R4,R1                   ; R5 = Offset from PC
+
+.DT_LDR_STR_Not_R15_2
+   CMP      R5,#0
+   RSBLT    R5,R5,#0                   ; NEG offset if negative, default is negative
+   ORRGE    R9,R9,#Add_Bit
+
+.DT_LDR_STR_End_TempReg2
+   LDR      R3,RELATIVE_Register_Read
+   BIC      R0,R5,#&FFF                ; R0 = High remain
+   BIC      R9,R9,#&F << Rn_Pos
+   ORR      R9,R9,R6,LSL #Rn_Pos       ; Rn=TempReg
+   MOV      R7,R9                      ; Save LDR/STR instruction
+   AND      R9,R9,#&F0000000
+   ;------> Create ADR instruction to get inside LDR/STR range
+   TST      R7,#Add_Bit
+   ;                I
+   ORRNE    R9,R9,#%10100 << 21        ; R9 = ADD Rd,Rn,#Immediate Value
+   ORREQ    R9,R9,#%10010 << 21        ;   or SUB Rd,Rn,#Immediate Value
+   ORR      R9,R9,R6,LSL #Rd_Pos       ; Rd=TempReg
+   ORR      R9,R9,R3,LSL #Rn_Pos       ; Rn=Relative register
+   BL       Code_Immediate             ;_R0 = Immediate value
+   CMN      R14,#1                     ; Check if coded value is okay
+   BEQ      DT_LDR_STRE_Not_Write_Instruction3
+   ORR      R9,R9,R0
+   BL       Write_Instruction          ; Write ADR instruction
+   B        DT_LDR_STRE_Not_Write_Instruction_End3
+
+.DT_LDR_STRE_Not_Write_Instruction3
+   BIC      R0,R4,#&FFF
+   BL       AutoExpand                 ; Immediate failed, 1 instruction is not enough!
+
+.DT_LDR_STRE_Not_Write_Instruction_End3
+   MOV      R0,R5,LSL #20              ; R0 = Low offset
+   ORR      R9,R7,R0,LSR #20           ; Insert Immediate constant offset
+   BL       Write_Instruction
+
+.DT_LDR_STR_End
+   BL       Pop_Temp_Reg
+   BL       Pop_Temp_Info
+   LDR      R0,Options
+   TST      R0,#Option_AutoExpand
+   BEQ      DT_End
+   LDR      R0,AutoExpand_Pointer
+   SUB      R2,R11,R0
+   SUBS     R2,R2,#4
+   LDRNE    R0,AutoExpand_Number
+   BLNE     AutoExpand_Message
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_LDRD_STRD_LDRH_STRH_LDRSB_LDRSH
+   MOV      R4,R8
+   MOV      R5,#0
+   LDRB     R8,[R10],#1
+   CMP      R4,#'D'
+   BEQ      DT_LDRx_STRx_Not_Trans
+   CMP      R8,#'T'
+   CMPNE    R8,#'t'
+   MOVEQ    R5,#1
+   ORREQ    R9,R9,#Write_Back_Bit
+   LDREQB   R8,[R10],#1
+
+.DT_LDRx_STRx_Not_Trans
+   BL       Decode_Destination_Register
+   CMP      R4,#'D'
+   BNE      DT_Not_LDRD_STRD
+   TST      R0,#1
+   MOVNE    R0,#&A9                    ; Asm_Error #&A9 = First target register must be even and not R14
+   BNE      Asm_Error
+   CMP      R0,#14
+   MOVEQ    R0,#&A9                    ; Asm_Error #&A9 = First target register must be even and not R14
+   BEQ      Asm_Error
+   ADD      R4,R0,#1
+   BL       Ensure_Comma
+   BL       Decode_Register
+   CMP      R0,R4
+   MOVNE    R0,#&15                    ; Asm_Error #&15 = Target registers must be successive
+   BNE      Asm_Error
+
+.DT_Not_LDRD_STRD
+   BL       Ensure_Comma
+   BL       Ensure_Open_Bracket
+   BL       Decode_Rn_Register
+   BL       Skip_Blanks
+   CMP      R8,#']'
+   ORRNE    R9,R9,#Preindexed_Bit
+   LDREQB   R8,[R10],#1
+   BLEQ     Skip_Blanks
+   CMP      R8,#','
+   ORRNE    R9,R9,#Load_Store_Byte_Double_Immediate_Bit+Add_Bit
+   BNE      DT_Write_Instruction
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#'#'
+   BEQ      DT_LDRx_STRx_Immediate
+   CMP      R8,#'-'
+   ORRNE    R9,R9,#Add_Bit
+   CMPNE    R8,#'+'
+   LDREQB   R8,[R10],#1
+   BL       Decode_Rm_Register
+   B        DT_LDRx_STRx_End
+
+.DT_LDRx_STRx_Immediate
+   ORR      R9,R9,#Load_Store_Byte_Double_Immediate_Bit
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   CMP      R0,#0
+   RSBLT    R0,R0,#0
+   ORRGE    R9,R9,#Add_Bit
+   AND      R1,R0,#&F
+   ORR      R9,R9,R1
+   AND      R1,R0,#&F0
+   ORR      R9,R9,R1,LSL #4
+
+.DT_LDRx_STRx_End
+   TST      R9,#Preindexed_Bit
+   CMPNE    R5,#0
+   MOVNE    R0,#&10                    ; Asm_Error #&10 = Trans bit illegal on Pre-Index
+   BNE      Asm_Error
+   TST      R9,#Preindexed_Bit
+   BEQ      DT_Write_Instruction
+   BL       Ensure_Close_Bracket
+   BL       Skip_Blanks
+   CMP      R8,#'!'
+   ORREQ    R9,R9,#Write_Back_Bit
+   LDREQB   R8,[R10],#1
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_LDREXx_STREXx
+   BIC      R5,R8,#32
+   LDRB     R8,[R10],#1
+   BL       Decode_Destination_Register
+   CMP      R4,#Load_Bit
+   ORREQ    R9,R9,#%1111 << Rm_Pos
+   BLNE     Decode_Operand_Rm_Register
+   CMP      R5,#'D'
+   BNE      DT_Not_LDREXD_STREXD
+   TST      R0,#1
+   MOVNE    R0,#&A9                    ; Asm_Error #&A9 = First target register must be even and not R14
+   BNE      Asm_Error
+   CMP      R0,#14
+   MOVEQ    R0,#&A9                    ; Asm_Error #&A9 = First target register must be even and not R14
+   BEQ      Asm_Error
+   ADD      R4,R0,#1
+   BL       Ensure_Comma
+   BL       Decode_Register
+   CMP      R0,R4
+   MOVNE    R0,#&14                    ; Asm_Error #&14 = Target registers must be successive
+   BNE      Asm_Error
+
+.DT_Not_LDREXD_STREXD
+   BL       Ensure_Comma
+   BL       Ensure_Open_Bracket
+   BL       Decode_Rn_Register
+   BL       Ensure_Close_Bracket
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_LDM_STM
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DT_LDM_STM_No_Stat
+   ADR      R0,Code_Counters+20*4
+   TST      R9,#1 << 20
+   ADDNE    R0,R0,#4
+   LDR      R1,[R0]
+   ADD      R1,R1,#1
+   STR      R1,[R0]
+
+.DT_LDM_STM_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = CC or PU
+   BL       Decode_ConditionCode       ; R8 = PU (Pre/Post + Up/Down)
+   BL       Decode_Load_Store_Multiple_Addressing_Mode
+   BL       Ensure_Blank
+
+   BL       Decode_Rn_Register
+   CMP      R0,#&F
+   MOVEQ    R0,#&36                    ; Asm_Warning #&36 = R15 should not be used as base register in LDM or STM
+   BLEQ     Asm_Warning
+
+   BL       Skip_Blanks                ; R8 = "!" or ","
+   CMP      R8,#'!'
+   ORREQ    R9,R9,#Write_Back_Bit
+   LDREQB   R8,[R10],#1
+
+   BL       Ensure_Comma
+   ADRL     R0,Decode_Register
+   BL       Decode_Bracketed_Register_List
+   ORR      R9,R9,R0
+   BL       Skip_Blanks
+   CMP      R8,#'^'
+   ORREQ    R9,R9,#1 << 22             ; Set UserMode/PSR option
+   LDREQB   R8,[R10],#1
+
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.Decode_Load_Store_Multiple_Addressing_Mode ; _R8 = First char, ~R0 = Mode [%PU], ~R8 = Next char
+   MOV      R0,#0                      ; R0 = PU Bits [1:0]
+   ;------> Decode PU bits as if it was an STM (EOR later if it's LDM)
+   ;        _     _      _         _
+   ;        Full, Empty, Increase, Decrease
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   ORREQ    R0,R0,#2                   ; Set P
+   BEQ      DLSMAM_Stack
+   CMP      R8,#'E'
+   BEQ      DLSMAM_Stack               ; Clear P
+   CMP      R8,#'I'
+   ORREQ    R0,R0,#1                   ; Set U
+   BEQ      DLSMAM_Other
+   CMP      R8,#'D'
+   BEQ      DLSMAM_Other               ; Clear U
+
+   MOV      R0,#&13                    ; Asm_Error #&13 = Illegal LDM/STM PU-bits
+   B        Asm_Error
+
+.DLSMAM_Stack
+   LDRB     R8,[R10],#1                ; R8 = "A" or "D"
+   BIC      R8,R8,#32
+   ;        _          _
+   ;        Accending, Decending
+   CMP      R8,#'A'
+   ORREQ    R0,R0,#1                   ; Set U
+   BEQ      DLSMAM_Turn_Base
+   CMP      R8,#'D'
+   BEQ      DLSMAM_Turn_Base           ; Clear U
+
+   MOV      R0,#&13                    ; Asm_Error #&13 = Illegal LDM/STM PU-bits
+   B        Asm_Error
+
+.DLSMAM_Other
+   LDRB     R8,[R10],#1                ; R8 = "A" or "B"
+   BIC      R8,R8,#32
+   ;        _      _
+   ;        After, Before
+   CMP      R8,#'B'
+   ORREQ    R0,R0,#2                   ; Set P
+   BEQ      DLSMAM_Base
+   CMP      R8,#'A'
+   BEQ      DLSMAM_Base                ; Clear P
+
+   MOV      R0,#&13                    ; Asm_Error #&13 = Illegal LDM/STM PU-bits
+   B        Asm_Error
+
+.DLSMAM_Turn_Base
+   TST      R9,#1 << 20                ; Revert if LDM and STACK
+   EORNE    R0,R0,#3
+
+.DLSMAM_Base
+   ORR      R9,R9,R0,LSL #23
+   LDRB     R8,[R10],#1
+   MOV      R15,R14

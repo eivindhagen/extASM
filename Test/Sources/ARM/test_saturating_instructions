@@ -1,0 +1,24 @@
+
+#name <Tmp$Dir>.^.^.test_saturating_instructions
+
+#area test,code
+
+SSAT     R1,#1,R2
+SSATEQ   R1,#1,R2
+SSAT     R1,#32,R2,LSL #1
+SSAT     R1,#1,R2,ASR #1
+SSAT     R1,#1,R2,ASR #32
+
+SSAT16   R1,#1,R2
+SSAT16EQ R1,#16,R2
+
+USAT     R1,#0,R2
+USATEQ   R1,#0,R2
+USAT     R1,#31,R2,LSL #1
+USAT     R1,#0,R2,ASR #1
+USAT     R1,#0,R2,ASR #32
+
+USAT16   R1,#0,R2
+USAT16EQ R1,#15,R2
+
+#end

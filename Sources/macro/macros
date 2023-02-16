@@ -1,0 +1,574 @@
+
+; >-------------------------------------------------------------<
+
+.DT_MACRO                              ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      DT_Unknown
+   ;------> MACRO
+   ADRL     R0,MacroScan_Token
+   MOV      R1,#0
+   BL       Process_Macro
+   CMP      R8,#&00
+   LDMEQFD  R13!,{R4-R7,R15}
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.Process_Macro                         ;_R0-> Line routine, _R1 = 1 - Give errors
+   STMFD    R13!,{R4-R7,R9,R14}        ;_R8 = "O/o", ~R8 = Char following "}" (R14=0/-1), or
+   MOV      R4,R0                      ;                   zero, if end of file (R14=-1), or
+   MOV      R5,R1                      ;                   ":", if new macro start (R14=-1)
+   LDR      R0,Process_Macro_Level
+   CMP      R0,#0
+   BEQ      PM_No_Nesting
+   SUB      R10,R10,#5
+   MOV      R8,#&00
+   CMP      R5,#1
+   LDMNEFD  R13!,{R4-R7,R9,R15}
+   MOV      R0,#&22                    ; Asm_Error #&22 = Missing "}"
+   ADR      R1,Source_Context
+   LDMIA    R1,{R1-R3}
+   STMFD    R13!,{R1-R3}
+   MOV      R1,#0
+   BL       Asm_Error_Return
+   ADD      R13,R13,#12
+   LDMFD    R13!,{R4-R7,R9,R15}
+
+.PM_No_Nesting
+   LDRB     R8,[R10],#1
+   MOV      R0,#1
+   BL       Find_Brace_Start
+   CMN      R14,#1
+   MOVNE    R6,#0
+   MVNEQ    R6,#0
+   CMPEQ    R5,#1
+   MOVEQ    R0,#&21                    ; Asm_Error #&21 = Missing "{"
+   MVNEQ    R1,#0
+   BLEQ     Asm_Error_Return
+   ADR      R7,Source_Context
+   ADR      R0,Source_Filename
+   LDMIA    R0,{R1-R3}
+   STMIA    R7,{R1-R3}
+   LDR      R9,Enable_Brace_Return
+   ORR      R0,R9,#1
+   STR      R0,Enable_Brace_Return
+   STR      R0,Process_Macro_Level
+
+.PM_Line_Loop
+   ; Process next line
+   ;
+   LDRB     R8,[R10],#1                ; R8 = Source Char
+   LDR      R0,Options
+   TST      R0,#Option_NoPeriod
+   BLEQ     Skip_Blanks
+
+   CMP      R8,#&0A                    ; NewLine -> Quit scan
+   CMPNE    R8,#&00                    ; NULL -> Quit scan
+   MOVNE    R14,R15
+   MOVNE    R15,R4                     ; Call Process_Token or MacroScan_Token
+
+   LDR      R0,Poll_Timer
+   SUBS     R0,R0,#1
+   LDRLE    R0,Poll_Lines
+   STR      R0,Poll_Timer
+   BLLE     Wimp_Text_Window
+
+   CMP      R8,#&00                    ; NULL -> End of source
+   LDRNE    R0,Source_Line
+   ADDNE    R0,R0,#1
+   STRNE    R0,Source_Line
+   BNE      PM_Line_Loop
+
+   STR      R9,Enable_Brace_Return
+   STR      R8,Process_Macro_Level
+
+   LDRB     R0,[R10,#-1]
+   CMP      R0,#&00
+   BNE      PM_Brace_End
+   CMP      R5,#1
+   MVNNE    R14,#0
+   LDMNEFD  R13!,{R4-R7,R9,R15}
+   MOV      R0,#&22                    ; Asm_Error #&22 = Missing "}"
+   LDMIA    R7,{R1-R3}
+   STMFD    R13!,{R1-R3}
+   MOV      R1,#0
+   BL       Asm_Error_Return
+   ADD      R13,R13,#12
+   MVN      R14,#0
+   LDMFD    R13!,{R4-R7,R9,R15}
+
+.PM_Brace_End
+   CMP      R0,#'}'
+   LDREQB   R8,[R10],#1
+   MOVNE    R8,#':'
+   MVNNE    R6,#0
+   MOV      R14,R6
+   LDMFD    R13!,{R4-R7,R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Find_Macro                            ;_R0-> Macro name, ~R0-> Macro record
+   ; R4 - Macro name                   ;~R1 = Found (-1 = Macro not found), ~R14=-1 = Error
+   ; R5 - Macro array
+   ; R6 - Hash key
+   ; R7 - Maximum number of macros
+   ; R8 - Count
+   ; R9 - Array pointer
+   ;
+   STMFD    R13!,{R4-R9,R14}
+   MOV      R4,R0
+   MOV      R0,#Flex_Macro
+   BL       Flex_Adr
+   ADD      R5,R0,#20                  ; Array=Address+20 (skip to name)
+   ; Calculate hash key
+   ;
+   MOV      R1,R4
+   MOV      R6,#0                      ; Hash key=0
+   ADD      R3,R1,#44
+
+.FM_CharLoop
+   LDRB     R0,[R1],#1
+   ADD      R6,R6,R0                   ; Hash key=Hash key + Char
+   CMP      R0,#&00
+   CMPNE    R1,R3
+   BNE      FM_CharLoop
+   CMP      R0,#&00
+   BEQ      FM_No_Asm_Error_Return
+   MOV      R0,#&55                    ; Asm_Error #&55 = Maximum length of macro name is 43 characters
+   MVN      R1,#0
+   BL       Asm_Error_Return
+   MVN      R14,#0
+   LDMFD    R13!,{R4-R9,R15}
+
+.FM_No_Asm_Error_Return
+   MOV      R0,#&1D871                 ; Random constant
+   LDR      R2,Macro_Power2
+   MUL      R6,R0,R6
+   MOV      R0,R6,LSR R2
+   SUB      R6,R6,R0,LSL R2            ; Hash key=Hash key*Constant MOD Array size
+   ; Search for macro
+   ;
+   LDR      R7,Macro_MaxNum            ; Maximum number of macros (size of array)
+   MOV      R8,R7                      ; Count=Array size
+
+.FM_StrLoop
+   ADD      R9,R5,R6,LSL #6            ; Array pointer=Array + Hash key*64
+   LDRB     R0,[R9]
+   CMP      R0,#0                      ; Is the array entry empty?
+   MVNEQ    R1,#0
+   BEQ      FM_End                     ; Array entry was empty, so macro was not found
+   MOV      R0,R4
+   MOV      R1,R9
+   BL       StrCmp
+   CMP      R0,#0
+   MOVEQ    R1,#0
+   BEQ      FM_End                     ; Macro is found
+   ADD      R6,R6,#1                   ; Hash key=Hash key + 1, try next array entry
+   CMP      R6,R7                      ; Hash key>=Array size?
+   MOVGE    R6,#0                      ; Hash key=0
+   SUBS     R8,R8,#1                   ; Count=Count-1
+   BNE      FM_StrLoop                 ; Have the whole array been searched?
+   MOV      R0,#&06                    ; Messages_Error #&06 = Variable or macro array full
+   B        Messages_Error
+
+.FM_End
+   SUB      R0,R9,#20
+   MOV      R14,#0
+   LDMFD    R13!,{R4-R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Assemble_Macro                        ;_R0-> Macro record
+   MOV      R4,R0                      ;_R10-> Parameters in source
+   BL       Push_Temp_Info_Macro
+
+   LDR      R0,Prev_Variable_Offset
+   STR      R0,Macro_Parameter_Start
+
+   MOV      R0,#Flex_VarList
+   BL       Flex_Adr
+   LDR      R2,VarList_Size
+   SUB      R1,R2,#1
+   BIC      R0,R0,R1                   ; Data must lie on the size of each element boundary
+   ADD      R3,R0,R2                   ; for the sort to work
+   LDR      R0,Prev_Variable_Offset
+   ADD      R1,R3,R0
+   ADR      R3,Macro_Record
+   STR      R3,[R1]
+   ADD      R0,R0,R2
+   STR      R0,Prev_Variable_Offset
+   STR      R0,Prev_Real_Variable_Offset
+
+   ADR      R0,DTAM_Error
+   MVN      R1,#0
+   BL       Setup_Error_Context
+   ;------> PARSE macro parameterlist
+   LDR      R0,[R4]
+   BL       Parse_Macro_Parameters
+   MOV      R6,R10
+   MOV      R7,R8
+   SUB      R10,R0,#1                  ; Start assembly from macro definition
+   LDRB     R8,[R10],#1
+   MVN      R0,#0
+   BL       Restore_Error_Context
+
+   LDR      R0,[R4,#4]
+   STR      R0,Source_Filename
+   BL       Find_LeafName
+   STR      R0,Source_LeafName
+   LDR      R0,[R4,#8]
+   STR      R0,Source_Line
+   LDR      R0,[R4,#12]
+   ADD      R0,R0,#1
+   STR      R0,[R4,#12]
+
+   LDR      R0,Prev_Variable_Offset
+   STR      R0,Macro_Parameter_End
+
+   BL       Push_Temp_Reg
+   BL       Push_FP_Temp_Reg
+
+   ;------> Search for macro body
+   MOV      R0,#0
+   BL       Find_Brace_Start
+   LDR      R5,Enable_Brace_Return
+   ORR      R0,R5,#1
+   STR      R0,Enable_Brace_Return
+   LDR      R4,Options
+   TST      R4,#Option_CodeStatMacro
+   BICEQ    R0,R4,#Option_CodeStat
+   STREQ    R0,Options
+
+   ADR      R0,DTAM_Loop
+   MVN      R1,#0
+   BL       Setup_Error_Context
+
+.DTAM_Loop
+   BL       Asm_Line
+   CMP      R8,#&00                    ; "}" = NULL -> End of macro
+   BNE      DTAM_Loop
+
+   STR      R5,Enable_Brace_Return
+   STR      R4,Options
+   MVN      R0,#0
+   BL       Restore_Error_Context
+
+   BL       Pop_FP_Temp_Reg
+   BL       Pop_Temp_Reg
+
+   BL       Delete_Variables
+
+   BL       Pop_Temp_Info_Macro
+   MOV      R10,R6
+   MOV      R8,R7
+
+   B        DT_End
+
+.DTAM_Error
+   LDR      R0,Prev_Variable_Offset
+   STR      R0,Macro_Parameter_End
+   MVN      R0,#0
+   BL       Restore_Error_Context
+   BL       Delete_Variables
+   BL       Pop_Temp_Info_Macro
+   B        DT_LineEnd
+
+; >-------------------------------------------------------------<
+
+.Delete_Variables
+   STMFD    R13!,{R4-R7,R14}
+   MOV      R0,#Flex_VarList
+   BL       Flex_Adr
+   LDR      R7,VarList_Size
+   SUB      R1,R7,#1
+   BIC      R0,R0,R1                   ; Data must lie on the size of each element boundary
+   ADD      R6,R0,R7                   ; for the sort to work
+   LDR      R0,Prev_Variable_Offset
+   ADD      R1,R6,R0
+   ADR      R2,Macro_Record
+   STR      R2,[R1]
+   ADD      R0,R0,R7
+   STR      R0,Prev_Variable_Offset
+   STR      R0,Prev_Real_Variable_Offset
+   ; Delete parameter variables
+   ;
+   LDR      R4,Macro_Parameter_Start
+   LDR      R5,Macro_Parameter_End
+
+.DV_Loop
+   CMP      R4,R5
+   LDMEQFD  R13!,{R4-R7,R15}
+   LDR      R2,[R6,R4]
+   ADD      R4,R4,R7
+   CMP      R7,#16
+   BICEQ    R2,R2,#&FF000000
+   LDRB     R0,[R2,#16]!
+   CMP      R0,#'_'
+   BEQ      DV_Loop
+
+   MOV      R1,#1 << 9
+   BL       Set_Variable
+   B        DV_Loop
+
+.Macro_Record
+   DBD      4
+   DCB      "#MacroLimit",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Parse_Macro_Parameters                ;_R0-> After macro name in definition (possibly on
+   ;                                   ;      '$', if condition code)
+   ; R7 - Character (in definition)    ;_R10-> After macro name in source (possibly on
+   ; R8 - Character (in source)        ;       condition code)
+   ; R9 - Macro header pointer         ;~R0-> After macro header in definition
+   ;      (in definition)              ;~R10-> After macro header in source
+   ; R10 - Macro header pointer
+   ;       (in source)
+   ;
+   ; The roles of these registers swap some places in the source, i.e. R7 <-> R8 and
+   ; R9 <-> R10
+   ;
+   STMFD    R13!,{R4-R7,R9,R11,R14}
+   ADR      R4,Block
+   MOV      R9,R0
+   MOV      R11,#0                     ; Flags, bit 0 - End of parameters
+   LDRB     R8,[R10],#1                ;        bit 1 - Temp-regs found
+   LDRB     R7,[R9],#1                 ;        bit 2 - First parameter read
+   ; Read from source
+   ;
+   ; Check for Condition Code
+   ;
+   CMP      R7,#'$'
+   BNE      PMP_No_CC
+   MOV      R5,R9
+   MOV      R9,#0
+   BL       Decode_ConditionCode
+   MOV      R6,R9,LSR #28
+   MOV      R9,R5
+
+   EXG      R10,R9
+   EXG      R8,R7
+   ; Read from macro definition
+   ;
+   MOV      R0,R4
+   BL       StrCopySource
+   MOV      R0,R6
+   MOV      R1,#1 << 8
+   MOV      R2,R4
+   BL       Set_Variable
+   B        PMP_End_CC
+
+.PMP_No_CC
+.PMP_Parameter_Loop
+   EXG      R10,R9
+   EXG      R8,R7
+
+.PMP_End_CC
+   ; Read from macro definition
+   ;
+   BL       Skip_Blanks
+   CMP      R8,#';'
+   BLEQ     Flush_Line
+   CMP      R8,#&0A
+   BEQ      PMP_Swap_End
+   MOV      R0,R4
+   SUB      R10,R10,#1
+   BL       StrCopySource
+   CMP      R8,#':'
+   MOVNE    R0,#&53                    ; Asm_Error #&53 = Missing parameter type in macro header
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   BIC      R0,R8,#32
+   LDRB     R1,[R10]
+   CMP      R1,#' '
+   CMPNE    R1,#&09
+   CMPNE    R1,#','
+   CMPNE    R1,#';'
+   CMPNE    R1,#&0A
+   MOVEQ    R2,#1                      ; Set 'One character' flag
+   MOVNE    R2,#0
+   ADDNE    R10,R10,#1
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#','
+   ORRNE    R11,R11,#1                 ; Set 'End of parameters' flag
+   LDREQB   R8,[R10],#1
+   EXG      R10,R9
+   EXG      R8,R7
+
+   BIC      R1,R1,#32
+   CMP      R0,#'T'
+   CMPEQ    R1,#'R'
+   BEQ      PMP_Temp_Reg
+   CMP      R0,#'T'
+   CMPEQ    R1,#'F'
+   BEQ      PMP_FP_Temp_Reg
+
+   TST      R11,#2
+   MOVNE    R0,#&56                    ; Asm_Error #&56 = Temp-registers must be last on macro parameter list
+   BNE      Asm_Error
+   TST      R11,#4
+   STMFD    R13!,{R11} ; ***
+   SUBEQ    R10,R10,#1
+   ORREQ    R11,R11,#4
+   BLNE     Ensure_Comma
+   LDMFD    R13!,{R14} ; ***
+   TST      R14,#4 ; ***
+   SUBNE    R10,R10,#1 ; ***
+   CMP      R0,#'R'
+   CMPEQ    R2,#1
+   BEQ      PMP_Read_Register
+   CMP      R0,#'F'
+   CMPEQ    R2,#1
+   BEQ      PMP_Read_FP_Register
+   CMP      R0,#'I'
+   CMPEQ    R2,#1
+   BEQ      PMP_Read_Integer
+   CMP      R0,#'X'
+   CMPEQ    R2,#1
+   BEQ      PMP_Read_FP
+   CMP      R0,#'S'
+   CMPEQ    R2,#1
+   BEQ      PMP_Read_String
+   MOV      R0,#&52                    ; Asm_Error #&52 = Unknown data type in macro header (R, F, I, X, S, TR, TF only)
+   B        Asm_Error
+
+.PMP_Read_Register
+   ; Read from source
+   ;
+   LDRB     R8,[R10],#1
+   BL       Decode_Register
+   LDR      R1,TEMP_Needed_Macro
+   MOV      R2,#1
+   ORR      R1,R1,R2,LSL R0
+   STR      R1,TEMP_Needed_Macro
+   MOV      R1,#1 << 8
+   CMN      R14,#2
+   ORREQ    R1,R1,#1 << 2
+   MOV      R2,R4
+   BL       Set_Variable
+   CMP      R5,#1
+   BNE      PMP_Parameter_Loop
+   B        PMP_End
+
+.PMP_Read_FP_Register
+   BL       Decode_FP_Register
+   LDR      R1,FPTEMP_Needed_Macro
+   MOV      R2,#1
+   ORR      R1,R1,R2,LSL R0
+   STR      R1,FPTEMP_Needed_Macro
+   MOV      R1,#1 << 8
+   CMN      R14,#2
+   ORREQ    R1,R1,#1 << 2
+   MOV      R2,R4
+   BL       Set_Variable
+   TST      R11,#1
+   BEQ      PMP_Parameter_Loop
+   B        PMP_End
+
+.PMP_Read_Integer
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   MOV      R1,#1 << 8
+   CMN      R14,#2
+   ORREQ    R1,R1,#1 << 2
+   MOV      R2,R4
+   BL       Set_Variable
+   TST      R11,#1
+   BEQ      PMP_Parameter_Loop
+   B        PMP_End
+
+.PMP_Read_FP
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   MOV      R1,#%100000001
+   CMN      R14,#2
+   ORREQ    R1,R1,#1 << 2
+   MOV      R2,R4
+   BL       Set_Variable
+   TST      R11,#1
+   BEQ      PMP_Parameter_Loop
+   B        PMP_End
+
+.PMP_Read_String
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMN      R14,#2
+   ADREQ    R0,Empty_Str
+   CMPNE    R1,#2
+   BNE      Mismatch_Str
+   MOV      R1,#%100000010
+   CMN      R14,#2
+   ORREQ    R1,R1,#1 << 2
+   MOV      R2,R4
+   BL       Set_Variable
+   TST      R11,#1
+   BEQ      PMP_Parameter_Loop
+   B        PMP_End
+
+.PMP_Temp_Reg
+   LDR      R6,TEMP_Stacked
+   BL       Get_Temp_Reg
+   LDR      R1,TEMP_Stacked
+   CMP      R1,R6
+   MOV      R6,R0
+   MOVEQ    R0,#&15                    ; Asm_Warning #&15 = Auto-expansion, using TEMP register (macro TR)
+   MOVNE    R0,#&18                    ; Asm_Warning #&18 = Auto-expansion, using stacked register (macro TR)
+   LDR      R1,Options
+   TST      R1,#Option_AutoExpand
+   MOVNE    R2,#0
+   BLNE     AutoExpand_Message
+   MOV      R0,R6
+   MOV      R1,#1 << 8
+   MOV      R2,R4
+   BL       Set_Variable
+   ORR      R11,R11,#2
+   TST      R11,#1
+   BEQ      PMP_Parameter_Loop
+   B        PMP_End
+
+.PMP_FP_Temp_Reg
+   LDR      R6,FPTEMP_Stacked
+   BL       Get_FP_Temp_Reg
+   LDR      R1,FPTEMP_Stacked
+   CMP      R1,R6
+   MOV      R6,R0
+   MOVEQ    R0,#&22                    ; Asm_Warning #&22 = FP Auto-expansion, using FPTEMP register (macro TF)
+   MOVNE    R0,#&24                    ; Asm_Warning #&24 = FP Auto-expansion, using stacked register (macro TF)
+   LDR      R1,Options
+   TST      R1,#Option_AutoExpand
+   MOVNE    R2,#0
+   BLNE     AutoExpand_Message
+   MOV      R0,R6
+   MOV      R1,#1 << 8
+   MOV      R2,R4
+   BL       Set_Variable
+   ORR      R11,R11,#2
+   TST      R11,#1
+   BEQ      PMP_Parameter_Loop
+
+.PMP_End
+   CMP      R8,#';'
+   BLEQ     Flush_Line
+   MOV      R0,R9
+   LDMFD    R13!,{R4-R7,R9,R11,R15}
+
+.PMP_Swap_End
+   EXG      R10,R9
+   EXG      R8,R7
+   MOV      R0,R9
+   LDMFD    R13!,{R4-R7,R9,R11,R15}

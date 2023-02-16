@@ -1,0 +1,677 @@
+
+; >-------------------------------------------------------------<
+
+.DT_ALIGN                              ;_R8 = "L"
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'G'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   ;------> ALIGN
+   BL       Skip_Blanks
+   MOV      R4,#4
+   MOV      R5,#0
+   CMP      R8,#&0A
+   CMPNE    R8,#':'
+   CMPNE    R8,#';'
+   BEQ      ALIGN_End
+   BL       Decode_Int_Expr
+   CMP      R0,#0
+   MOVEQ    R0,#&36                    ; Asm_Error #&36 = Bad constant
+   BEQ      Asm_Error
+   MOV      R4,R0
+   CMP      R8,#','
+   BNE      ALIGN_End
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   MOV      R5,R0
+
+.ALIGN_End
+   CMP      R4,#4
+   CMPEQ    R5,#0
+   BNE      ALIGN_Not_Align_PC
+   BL       Align_PC
+   B        DT_End
+
+.ALIGN_Not_Align_PC
+   CMP      R5,R4
+   BLT      ALIGN_Not_Div
+   mdiv     R0,R5,R4
+
+.ALIGN_Not_Div
+   LDR      R6,Object_Base
+   LDR      R7,Object_Size
+   ADD      R0,R6,R7
+   ADD      R0,R0,R5
+   mdiv     R1,R0,R4
+   CMP      R0,#0
+   BEQ      DT_End
+   SUB      R0,R4,R0
+   ADD      R7,R7,R0
+   STR      R7,Object_Size
+   LDR      R1,Virtual_Flag
+   CMP      R1,#0
+   ADDEQ    R11,R11,R0
+   BL       Check_WorkSpace
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_ADR
+   LDR      R5,Options
+   TST      R5,#Option_CodeStat
+   LDRNE    R0,Code_Counters+71*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+71*4
+   MOV      R6,#0
+   LDRB     R8,[R10],#1                ; R8 = "L", CC or Blank
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   BNE      DTADR_Not_Long
+   ; Maybe long ADR
+   ;
+   LDRB     R0,[R10]
+   CMP      R0,#' '
+   CMPNE    R0,#&09
+   BEQ      DTADR_Long
+   LDRB     R0,[R10,#1]
+   CMP      R0,#' '
+   CMPNE    R0,#&09
+   BEQ      DTADR_Not_Long
+
+.DTADR_Long
+   MOV      R6,#1
+   LDRB     R8,[R10],#1
+
+.DTADR_Not_Long
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   ADD      R4,R11,#4
+   BL       Decode_Rd_Register
+   BL       Ensure_Comma
+   ORR      R9,R9,#Immediate_Bit
+   BL       Decode_Int_Expr            ; ADR target address
+   MOV      R7,R14
+   CMN      R14,#2
+   BNE      DTADR_Not_Write_Instruction
+   BL       Write_Instruction          ; Warning, write dummy instructions, retry next time
+   B        DTADR_End
+
+.DTADR_Not_Write_Instruction
+   LDR      R3,RELATIVE_Register_Read
+   ORR      R9,R9,R3,LSL #Rn_Pos       ; Insert Operand-One bits (relative register)
+   CMP      R3,#15
+   BNE      DTADR_Not_R15
+   LDR      R1,Object_Base
+   LDR      R2,Object_Size
+   ADD      R1,R1,R2                   ; R1 = PC (not pipelined)
+   ADD      R1,R1,#8                   ; R1 = PC (pipelined)
+   SUB      R0,R0,R1                   ; R0 = Offset from PC
+
+.DTADR_Not_R15
+   CMP      R0,#0
+   RSBLT    R0,R0,#0                       ; R0 = Positive offset from relative register
+   ORRGE    R9,R9,#%0100 << ALU_Opcode_Pos ; ADD for POSITIVE
+   ORRLT    R9,R9,#%0010 << ALU_Opcode_Pos ; SUB for NEGATIVE
+   BL       AutoExpand
+   CMP      R11,R4
+   MOVNE    R9,#&19
+   BNE      DTADR_No_NOP
+
+.DTADR_End
+   TST      R5,#Option_Fast
+   CMPEQ    R6,#0
+   MOVEQ    R9,#&19
+   BEQ      DTADR_No_NOP
+   MOV      R9,#&E1A00000
+   BL       Write_Instruction
+   LDR      R0,Num_Fast_NOPs
+   ADD      R0,R0,#1
+   STR      R0,Num_Fast_NOPs
+   MOV      R9,#&1A
+
+.DTADR_No_NOP
+   TST      R5,#Option_AutoExpand
+   CMNNE    R7,#2
+   BEQ      DT_End
+   CMP      R6,#0
+   MOVEQ    R9,#&11
+   SUBS     R2,R11,R4
+   MOVNE    R0,R9
+   BLNE     AutoExpand_Message
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_DIV                                ;_R8 = "I"
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+72*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+72*4
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'V'
+   BNE      DT_Unknown
+   ;------> Make a NOT-CC branch
+   ;             Cond   L[        Offset        ]
+   MOV      R9,#%00001010000000000000000000000000
+   LDRB     R8,[R10],#1                ; R8 = CC or Blank
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   SUB      R10,R10,#1
+   STMFD    R13!,{R10}
+   LDRB     R8,[R10],#1
+   BL       Decode_Register            ;_R0 = [Rd] = Dest Register bits
+   MOV      R4,R0
+   CMP      R0,#15
+   MOVEQ    R0,#&03                    ; Asm_Error #&03 = MUL/DIV Rd=PC
+   BEQ      Asm_Error
+
+   BL       Decode_Operand_Register    ;_R0 = [Rm] = Operand 1 bits
+   MOV      R5,R0
+
+   BL       Decode_Operand_Register    ;_R0 = [Rs] = Operand 2 bits
+   CMP      R0,R4
+   CMPNE    R0,R5
+   CMPNE    R4,R5
+   MOVEQ    R0,#&04                    ; Asm_Error #&04 = MUL/DIV Rd=Rm or DIV Rd=Rs or DIV Rm=Rs
+   BEQ      Asm_Error
+
+   MOV      R1,#1
+   MOV      R2,#0
+   ORR      R2,R2,R1,LSL R0
+   ORR      R2,R2,R1,LSL R4
+   ORR      R2,R2,R1,LSL R5
+   STR      R2,TEMP_Needed
+   ADR      R4,TEMP_Stacked
+   LDMIA    R4,{R5,R6}
+   BL       Get_Temp_Reg
+   LDR      R0,TEMP_Stacked
+   CMP      R0,R5
+   ADDEQ    R9,R9,#29
+   ADDNE    R9,R9,#31
+   STMIA    R4,{R5,R6}
+
+   EOR      R9,R9,#1 << 28             ; ANTI-ConditionCode
+   AND      R0,R9,#&F << 28
+   CMP      R0,#&F << 28               ; No branch if NEVER
+   BLNE     Write_Instruction
+
+   LDMFD    R13!,{R10}
+   ADR      R0,Macro_DIV_Record
+   B        Assemble_Macro
+
+.Macro_DIV_Record
+   DCD      Macro_DIV_Start
+   DCD      DIV_Macro_Name
+   DCD      1
+   DCD      0
+
+; Maybe implement as macro.
+
+.DIV_Macro_Name DCB "IDivision",0
+.Macro_DIV_Start
+   DCB   "_R:r,_A:r,_B:r,_T:tr    ",10 ; Result = A DIV B, A = A MOD B, T Thrashed
+   DCB   "{                       ",10
+   DCB   "   TST      R13,#3      ",10
+   DCB   "   MOVNE    R15,#0      ",10 ; Error if bit 0 and 1 of R13 is not zero!
+   DCB   "   CMP      _A,#0       ",10
+   DCB   "   RSBLT    _A,_A,#0    ",10
+   DCB   "   EORLT    R13,R13,#1  ",10 ; Bit 0 - A was negative (gives negative modulo)
+   DCB   "   CMP      _B,#0       ",10
+   DCB   "   MOVEQ    R15,#0      ",10 ; No division by zero!
+   DCB   "   RSBLT    _B,_B,#0    ",10
+   DCB   "   EORLT    R13,R13,#2  ",10 ; Bit 1 - B was negative (gives negative result if bit 0=0)
+   DCB   "   MOV      _T,#1       ",10
+   DCB   "._Div1                  ",10
+   DCB   "   CMP      _B,#1 |<|< 31 ",10
+   DCB   "   CMPCC    _B,_A       ",10
+   DCB   "   MOVCC    _B,_B,LSL #1",10
+   DCB   "   MOVCC    _T,_T,LSL #1",10
+   DCB   "   BCC      _Div1       ",10
+   DCB   "   MOV      _R,#0       ",10
+   DCB   "._Div2                  ",10
+   DCB   "   CMP      _A,_B       ",10
+   DCB   "   SUBCS    _A,_A,_B    ",10
+   DCB   "   ADDCS    _R,_R,_T    ",10
+   DCB   "   MOVS     _T,_T,LSR #1",10
+   DCB   "   MOVNE    _B,_B,LSR #1",10
+   DCB   "   BNE      _Div2       ",10
+   DCB   "   TST      R13,#2      ",10 ; Bit1 - Gives sign of divisor
+   DCB   "   RSBNE    _B,_B,#0    ",10 ;        Negate divisor
+   DCB   "   TST      R13,#1      ",10 ; Bit0 - Gives sign of modulo (Dividend was neagtive)
+   DCB   "   RSBNE    _A,_A,#0    ",10 ;        Negate modulo
+   DCB   "   EORNE    R13,R13,#2  ",10 ;        Toggle sign of result (Dividend EOR Divisor)
+   DCB   "   TST      R13,#2      ",10 ; Bit1 - Gives sign of result
+   DCB   "   RSBNE    _R,_R,#0    ",10 ;        Negate result
+   DCB   "   BIC      R13,R13,#3  ",10 ; Restore bit 0 and 1 of R13
+   DCB   "}                       ",10
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.DT_EXG
+   ;------> EXG
+   ;
+   ; EOR   Rd,Rd,Rn
+   ; EOR   Rn,Rd,Rn
+   ; EOR   Rd,Rd,Rn
+   ;
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+73*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+73*4
+
+   MOV      R9,#%0001 << ALU_Opcode_Pos
+   LDRB     R8,[R10],#1                ; R8 = CC or Blank
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+
+   BL       Decode_Register            ;_R0 = [Rd] = Dest Register bits
+   CMN      R14,#1
+   BEQ      DTEXG_Store_Dummy
+
+   MOV      R4,R0
+   ORR      R9,R9,R0,LSL #Rd_Pos       ; Insert Destination Register bits (Rd)
+   ORR      R9,R9,R0,LSL #Rn_Pos       ; Insert Op1 Register bits
+
+   BL       Decode_Operand_Register    ;_R0 = Operand 2 bits
+   CMN      R14,#1
+   BEQ      DTEXG_Store_Dummy
+   MOV      R5,R0
+   CMP      R4,R5
+   MOVEQ    R0,#&08                    ; Asm_Error #&08 = EXG Rd=Rn
+   BEQ      Asm_Error
+   ORR      R9,R9,R0                   ; Insert Operand-Two bits
+   BL       Write_Instruction
+
+   BIC      R9,R9,#&F << Rd_Pos        ; Clear Rd field
+   ORR      R9,R9,R5,LSL #Rd_Pos       ; Insert Destination Register bits (Rn)
+   BL       Write_Instruction
+
+   BIC      R9,R9,#&F << Rd_Pos        ; Clear Rd field
+   ORR      R9,R9,R4,LSL #Rd_Pos       ; Insert Destination Register bits (Rd)
+   B        DT_Write_Instruction
+
+.DTEXG_Store_Dummy
+   BL       Write_Instruction
+   BL       Write_Instruction
+   BL       Write_Instruction
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_INCLUDE                            ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   BL       Skip_Blanks
+   CMP      R8,#'"'
+   MOVNE    R0,#&28                    ; Asm_Error #&28 = Missing """
+   BNE      Asm_Error
+   MOV      R6,R10
+   LDRB     R8,[R10],#1
+   BL       Find_Quote
+   SUB      R7,R10,#1
+   MOV      R0,#&00
+   STRB     R0,[R7]
+
+   MOV      R0,#17
+   MOV      R1,R6
+   SWI      OS_File                    ; R4 = Size, (R11-> Memory area)
+   CMP      R0,#1
+   MOVNE    R0,#&2B                    ; Asm_Error #&2B = File '%s' not found
+   MOVNE    R2,R6
+   BNE      Asm_Error
+   MOV      R0,#'"'
+   STRB     R0,[R7]
+
+   LDR      R0,Object_Size
+   ADD      R0,R0,R4
+   STR      R0,Object_Size
+
+   LDR      R0,Virtual_Flag
+   CMP      R0,#1
+   LDREQB   R8,[R10],#1
+   BEQ      DT_End
+
+   MOV      R0,#Flex_Binaries
+   BL       Flex_Size
+   LDR      R5,IncBin_Num
+   ADD      R2,R5,#1
+   STR      R2,IncBin_Num
+   CMP      R1,R2,LSL #3
+   MOVLT    R0,#Flex_Binaries
+   MOVLT    R1,#Binaries_Step
+   BLLT     Flex_Adjust
+   ADD      R0,R0,R5,LSL #3            ; R0-> This inc-file record [8 bytes]
+   ; Inc-file records
+   ;
+   ; +0 = Filename pointer (in source)
+   ; +4 = Address to put file
+   ;
+   STR      R6,[R0]                    ; +0 = Filename pointer
+   STR      R11,[R0,#4]                ; +4 = Address
+   ADD      R11,R11,R4
+   BL       Check_WorkSpace
+   LDRB     R8,[R10],#1
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_OUTPUT                             ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'U'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   ;------> OUTPUT
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   ADR      R4,Block
+
+.DTO_Main_Loop
+   BL       Skip_Blanks
+   SUB      R10,R10,#1
+   MOV      R5,R10
+   MOV      R0,#1
+   BL       Next_Token
+   SUB      R10,R10,#2
+
+.DTO_Loop
+   LDRB     R0,[R10],#-1
+   CMP      R0,#' '
+   CMPNE    R0,#&09
+   BEQ      DTO_Loop
+   LDRB     R6,[R10,#2]
+   MOV      R0,#&00
+   STRB     R0,[R10,#2]
+   MOV      R0,R5
+   MOV      R1,R4
+   BL       StrCopy
+   STRB     R6,[R10,#2]
+   MOV      R10,R5
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   ADR      R5,StrBuffer2
+   CMP      R1,#FP_Value
+   BEQ      DTO_FP
+   BGT      DTO_String
+   ; Integer
+   ;
+   STMFD    R13!,{R0}
+   MOV      R2,R4
+   MOV      R3,R0
+   ADR      R0,DTO_Text_Integer
+   MOV      R1,R5
+   BL       Print_String
+   ADD      R13,R13,#4
+   B        DTO_End
+
+.DTO_FP
+   SFMFD    F0,1,[R13]!
+   ADR      R0,DTO_Text_FP
+   MOV      R1,R5
+   MOV      R2,R4
+   MOV      R3,R13
+   BL       Print_String
+   ADD      R13,R13,#12
+   B        DTO_End
+
+.DTO_String
+   ADR      R7,Block2
+   MOV      R1,R7
+   BL       Filter_String
+   ADR      R0,DTO_Text_String
+   MOV      R1,R5
+   MOV      R2,R4
+   MOV      R3,R7
+   BL       Print_String
+
+.DTO_End
+   ADR      R0,DTO_WTLine
+   MOV      R1,#TextColour_Info
+   LDR      R2,Source_LeafName
+   LDR      R3,Source_Line
+   STMFD    R13!,{R5}
+   BL       Wimp_Text_AddColourLine
+   ADD      R13,R13,#4
+   LDR      R0,Options
+   TST      R0,#Option_Throwback
+   BEQ      DTO_No_Throwback
+   MOV      R0,R5
+   MOV      R1,#0
+   MOV      R2,#0
+   BL       Send_Throwback
+
+.DTO_No_Throwback
+   CMP      R8,#','
+   LDREQB   R8,[R10],#1
+   BEQ      DTO_Main_Loop
+   B        DT_End
+
+.DTO_WTLine        DCB   "(%10s) - Line %6d|| %s",0
+.DTO_Text_Integer  DCB   "OUTPUT: %s = (integer) [&%0.8x] %d",0
+.DTO_Text_FP       DCB   "OUTPUT: %s = (FP) %f",0
+.DTO_Text_String   DCB   "OUTPUT: %s = (string) %s",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Filter_String                         ;_R0-> String, _R1-> New string
+   STMFD    R13!,{R2,R3,R14}
+
+.FS_Loop
+   LDRB     R2,[R0],#1
+   CMP      R2,#127
+   CMPNE    R2,#31
+   STRGTB   R2,[R1],#1
+   BGT      FS_Loop
+   CMP      R2,#0
+   STREQB   R2,[R1]
+   LDMEQFD  R13!,{R2,R3,R15}
+   MOV      R3,#'['
+   STRB     R3,[R1],#1
+   MOV      R3,R2,LSR #4
+   CMP      R3,#10
+   ADDGE    R3,R3,#'A'-10
+   ADDLT    R3,R3,#'0'
+   STRB     R3,[R1],#1
+   AND      R2,R2,#&F
+   CMP      R2,#10
+   ADDGE    R2,R2,#'A'-10
+   ADDLT    R2,R2,#'0'
+   STRB     R2,[R1],#1
+   MOV      R3,#']'
+   STRB     R3,[R1],#1
+   B        FS_Loop
+
+; >-------------------------------------------------------------<
+
+.DT_RELATIVE                           ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'V'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BNE      DT_Unknown
+   ; relative <Register> [,#<Offset>] [,virtual]
+   ;
+   ; Read relative header
+   ;
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank_Or_Newline
+   MOV      R4,#0
+   LDR      R7,Virtual_Flag
+   ADR      R0,DTRELATIVE_Error
+   MVN      R1,#0
+   BL       Setup_Error_Context
+   LDR      R0,RELATIVE_Register_Set
+   CMP      R0,#15
+   MOVNE    R0,#&58                    ; Asm_Error #&58 = 'relative's can not be nested
+   MVNNE    R1,#0
+   BLNE     Asm_Error_Return
+   LDRB     R8,[R10],#1
+   BL       Decode_Register
+   STR      R0,RELATIVE_Register_Set
+   BL       Skip_Blanks
+   CMP      R8,#','
+   MOVNE    R0,#0
+   BNE      DTRELATIVE_End_Header
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#'#'
+   BNE      DTRELATIVE_No_Offset
+   LDRB     R8,[R10],#1
+   BL       Decode_Int_Expr
+   MOV      R4,R0
+   CMP      R8,#','
+   MOVNE    R0,#0
+   BNE      DTRELATIVE_End_Header
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+
+.DTRELATIVE_No_Offset
+   MOV      R0,#0
+   BIC      R8,R8,#32
+   CMP      R8,#'V'
+   BNE      DTRELATIVE_End_Header
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'I'
+   BNE      DTRELATIVE_End_Header
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DTRELATIVE_End_Header
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DTRELATIVE_End_Header
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'U'
+   BNE      DTRELATIVE_End_Header
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DTRELATIVE_End_Header
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DTRELATIVE_End_Header
+   LDRB     R8,[R10],#1
+   ORR      R1,R7,#1
+   STR      R1,Virtual_Flag
+   B        DTRELATIVE_End_Header
+
+.DTRELATIVE_Error
+   MOV      R0,#1
+
+.DTRELATIVE_End_Header
+   BL       Find_Brace_Start
+   CMN      R14,#1
+   MOVEQ    R0,#&21                    ; Asm_Error #&21 = Missing "{"
+   MVNEQ    R1,#0
+   BLEQ     Asm_Error_Return
+
+   MVN      R0,#0
+   BL       Restore_Error_Context
+
+   LDR      R5,Object_Base
+   LDR      R6,Object_Size
+   SUB      R0,R4,R6
+   STR      R0,Object_Base
+
+   ADR      R9,Source_Context
+   ADR      R0,Source_Filename
+   LDMIA    R0,{R1-R3}
+   STMIA    R9,{R1-R3}
+   LDR      R4,Enable_Brace_Return
+   ORR      R0,R4,#1
+   STR      R0,Enable_Brace_Return
+
+.DTRELATIVE_Loop
+   BL       Asm_Line
+   CMP      R8,#&00
+   BNE      DTRELATIVE_Loop
+
+   STR      R4,Enable_Brace_Return
+   STR      R5,Object_Base
+   LDR      R0,Virtual_Flag
+   CMP      R0,#1
+   STREQ    R6,Object_Size
+   STR      R7,Virtual_Flag
+
+   MOV      R0,#15
+   STR      R0,RELATIVE_Register_Set
+   LDR      R0,Source_Line
+   SUB      R0,R0,#1
+   STR      R0,Source_Line
+
+   LDRB     R0,[R10,#-1]
+   CMP      R0,#&00
+   LDRNEB   R8,[R10],#1
+   BNE      DT_End
+   ADR      R4,Source_Context
+   MOV      R0,#&22                    ; Asm_Error #&22 = Missing "}"
+   LDMIA    R4,{R1-R3}
+   STMFD    R13!,{R1-R3}
+   MOV      R1,#0
+   BL       Asm_Error_Return
+   ADD      R13,R13,#12
+   MVN      R14,#0
+   LDMFD    R13!,{R4-R7,R15}

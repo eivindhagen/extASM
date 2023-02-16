@@ -1,0 +1,82 @@
+
+; >-------------------------------------------------------------<
+
+.DT_xSAT                               ;_R8 = "T"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'1'
+   ;                                      sh
+   ;------> xSAT    Cond       [imm][Rd]shift   [Rn]
+   ORRNE    R9,R9,#%00000000000000000000000000010000
+   BNE      DT_xSAT_Common
+   LDRB     R8,[R10],#1
+   CMP      R8,#'6'
+   BNE      DT_Unknown
+   ;------> xSAT16  Cond        imm [Rd]        [Rn]
+   ORR      R9,R9,#%00000000000000000000111100110000
+   LDRB     R8,[R10],#1
+
+; >-------------------------------------------------------------<
+
+.DT_xSAT_Common
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Immediate
+   TST      R9,#1 << 22                ; USATxx?
+   SUBEQ    R0,R0,#1
+   CMP      R0,#31
+   MOVHI    R0,#&C0                    ; Asm_Error #&C0 = Bad saturation bit position
+   BHI      Asm_Error
+   ORR      R9,R9,R0,LSL #16
+   BL       Decode_Operand_Two_Register
+
+   TST      R9,#1 << 5                 ; xSAT16?
+   BNE      DT_Write_Instruction
+
+   BL       Skip_Blanks
+   CMP      R8,#','
+   BNE      DT_Write_Instruction
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   CMP      R8,#'L'
+   BEQ      DT_xSAT_LSL
+   CMP      R8,#'A'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   BL       Decode_Immediate
+   MOV      R1,#32
+   CMP      R0,#1
+   CMPGE    R1,R0
+   MOVLT    R0,#&01                    ; Asm_Error #&01 = Illegal shift
+   BLT      Asm_Error
+   AND      R0,R0,#&1F
+   ORR      R9,R9,R0,LSL #7
+   ORR      R9,R9,#1 << 6
+   B        DT_Write_Instruction
+
+.DT_xSAT_LSL
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   BL       Decode_Immediate
+   CMP      R0,#&1F
+   MOVHI    R0,#&01                    ; Asm_Error #&01 = Illegal shift
+   BHI      Asm_Error
+   ORR      R9,R9,R0,LSL #7
+   B        DT_Write_Instruction

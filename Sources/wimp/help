@@ -1,0 +1,151 @@
+
+; >-------------------------------------------------------------<
+
+.HelpRequest
+   LDR      R4,[R11,#32]
+   LDR      R5,[R11,#36]
+   LDR      R6,Handle_BARICON
+   ADR      R7,Block2
+   CMN      R4,#2                      ; Window=-2?
+   CMPEQ    R5,R6
+   BNE      HR_Not_Iconbar
+   ADR      R0,HR_Iconbar
+   MOV      R1,R0
+   B        Send_Help
+
+.HR_Not_Iconbar
+   LDR      R6,Handle_INFO
+   CMP      R4,R6
+   BNE      HR_Not_Info
+   ADR      R0,HR_Info
+   MOV      R1,R0
+   B        Send_Help
+
+.HR_Not_Info
+   LDR      R6,Handle_SAVE
+   CMP      R4,R6
+   BNE      HR_Not_Save
+   ADR      R0,HR_Save_Num
+   MOV      R1,R7
+   MOVS     R2,R5
+   ADRLT    R7,HR_Save
+   BLGE     Print_String
+   MOV      R0,R7
+   ADR      R1,HR_Save
+   B        Send_Help
+
+.HR_Not_Save
+   LDR      R6,Handle_OPTIONS
+   CMP      R4,R6
+   BNE      HR_Not_Options
+   ADR      R0,HR_Options_Num
+   MOV      R1,R7
+   MOVS     R2,R5
+   ADRLT    R7,HR_Options
+   BLGE     Print_String
+   MOV      R0,R7
+   ADR      R1,HR_Options
+   B        Send_Help
+
+.HR_Not_Options
+   LDR      R6,Handle_PROCESS
+   CMP      R4,R6
+   BNE      HR_Not_Process
+   ADR      R0,HR_Process_Num
+   MOV      R1,R7
+   MOVS     R2,R5
+   ADRLT    R7,HR_Process
+   BLGE     Print_String
+   MOV      R0,R7
+   ADR      R1,HR_Process
+   B        Send_Help
+
+.HR_Not_Process
+   LDR      R6,Handle_STATUS
+   CMP      R4,R6
+   BNE      HR_Not_Status
+   CMN      R5,#1
+   ADR      R0,HR_Status
+   MOV      R1,R0
+   B        Send_Help
+
+.HR_Not_Status
+   LDR      R0,RO3_Flag
+   CMP      R0,#1
+   BNE      Wimp_Poll_Loop
+   MOV      R1,R7
+   MOV      R2,R4
+   MOV      R3,R5
+   SWI      Wimp_GetMenuState
+   LDMIA    R7,{R2-R5}
+   CMN      R5,#1
+   ADRNE    R0,HR_Four_Menus
+   ADREQ    R0,HR_Three_Menus
+   CMN      R4,#1
+   ADREQ    R0,HR_Two_Menus
+   CMN      R3,#1
+   ADREQ    R0,HR_One_Menu
+   CMN      R2,#1
+   BEQ      Wimp_Poll_Loop
+   MOV      R1,R7
+   STMFD    R13!,{R4}
+   BL       Print_String
+   ADD      R13,R13,#4
+   MOV      R0,R7
+   ADR      R1,Empty_Str
+   B        Send_Help
+
+.HR_Iconbar      DCB   "IBX",0
+.HR_Info         DCB   "IX",0
+.HR_Save_Num     DCB   "S%d",0
+.HR_Save         DCB   "SX",0
+.HR_Options_Num  DCB   "O%d",0
+.HR_Options      DCB   "OX",0
+.HR_Process_Num  DCB   "P%d",0
+.HR_Process      DCB   "PX",0
+.HR_Status       DCB   "WX",0
+.HR_Four_Menus   DCB   "M%d%dXX",0
+.HR_Three_Menus  DCB   "M%d%d%d",0
+.HR_Two_Menus    DCB   "M%d%d",0
+.HR_One_Menu     DCB   "M%d",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Send_Help                             ;_R0-> Token string, _R1-> Token string to use if the
+   MOV      R4,R1                      ; resulting string is empty
+   ADR      R5,StrBuffer
+   MOV      R1,R5
+   BL       Message
+   MOV      R0,R5
+   BL       StrLen
+   CMP      R0,#0
+   BGT      SH_Not_Empty
+   MOV      R0,R4
+   MOV      R1,R5
+   BL       Message
+   MOV      R0,R5
+   BL       StrLen
+
+.SH_Not_Empty
+   CMP      R0,#235
+   MOVGT    R1,#0
+   STRGTB   R1,[R5,#235]
+   MOVGT    R0,#235
+   ADD      R0,R0,#21
+   TST      R0,#3
+   BICNE    R0,R0,#3
+   ADDNE    R0,R0,#4
+   STR      R0,[R11]
+   LDR      R0,[R11,#8]
+   STR      R0,[R11,#12]
+   MOV      R0,#&503
+   STR      R0,[R11,#16]
+   MOV      R0,R5
+   ADD      R1,R11,#20
+   BL       StrCopy
+   MOV      R0,#17
+   MOV      R1,R11
+   LDR      R2,[R1,#4]
+   SWI      Wimp_SendMessage
+   B        Wimp_Poll_Loop

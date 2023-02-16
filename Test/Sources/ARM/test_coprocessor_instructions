@@ -1,0 +1,113 @@
+
+#name <Tmp$Dir>.^.^.test_coprocessor_instructions
+
+#area test,code
+
+; LDC
+
+LDC    P15,C1,[R2]
+LDCL   P15,C1,[R2]
+LDCEQ  P15,C1,[R2]
+LDCLEQ P15,C1,[R2]
+LDC    P15,C1,[R2,#&100]
+LDC    P15,C1,[R2,#&100]!
+LDC    P15,C1,[R2,#-&100]
+LDC    P15,C1,[R2],#&100
+LDC    P15,C1,[R2],{123}
+LDC    P15,C1,ldc_address
+
+; LDC2
+
+LDC2   P15,C1,[R2]
+LDC2L  P15,C1,[R2]
+LDC2   P15,C1,[R2,#&100]
+LDC2   P15,C1,[R2,#&100]!
+LDC2   P15,C1,[R2,#-&100]
+LDC2   P15,C1,[R2],#&100
+LDC2   P15,C1,[R2],{123}
+LDC2   P15,C1,ldc_address
+
+.ldc_address
+
+; STC
+
+STC    P15,C1,[R2]
+STCL   P15,C1,[R2]
+STCEQ  P15,C1,[R2]
+STCLEQ P15,C1,[R2]
+STC    P15,C1,[R2,#&100]
+STC    P15,C1,[R2,#&100]!
+STC    P15,C1,[R2,#-&100]
+STC    P15,C1,[R2],#&100
+STC    P15,C1,[R2],{123}
+STC    P15,C1,stc_address
+
+; STC2
+
+STC2   P15,C1,[R2]
+STC2L  P15,C1,[R2]
+STC2   P15,C1,[R2,#&100]
+STC2   P15,C1,[R2,#&100]!
+STC2   P15,C1,[R2,#-&100]
+STC2   P15,C1,[R2],#&100
+STC2   P15,C1,[R2],{123}
+STC2   P15,C1,stc_address
+
+.stc_address
+
+; CDP
+
+CDP    P15,1,C2,C3,C4,5
+CDPEQ  P15,1,C2,C3,C4,5
+CDP    P15,#1,C2,C3,C4,#5
+
+; CDP2
+
+CDP2   P15,1,C2,C3,C4,5
+CDP2   P15,#1,C2,C3,C4,#5
+
+; MCR
+
+MCR    P15,1,R2,C3,C4
+MCREQ  P15,1,R2,C3,C4
+MCR    P15,1,R2,C3,C4,5
+MCR    P15,#1,R2,C3,C4,#5
+
+; MCR2
+
+MCR2   P15,1,R2,C3,C4
+MCR2   P15,1,R2,C3,C4,5
+MCR2   P15,#1,R2,C3,C4,#5
+
+; MRC
+
+MRC    P15,1,R2,C3,C4
+MRCEQ  P15,1,R2,C3,C4
+MRC    P15,1,R2,C3,C4,5
+MRC    P15,#1,R2,C3,C4,#5
+
+; MRC2
+
+MRC2   P15,1,R2,C3,C4
+MRC2   P15,1,R2,C3,C4,5
+MRC2   P15,#1,R2,C3,C4,#5
+
+; MCRR
+
+MCRR   P15,1,R2,R3,C4
+MCRREQ P15,1,R2,R3,C4
+
+; MCRR2
+
+MCRR2  P15,1,R2,R3,C4
+
+; MRRC
+
+MRRC   P15,1,R2,R3,C4
+MRRCEQ P15,1,R2,R3,C4
+
+; MRRC2
+
+MRRC2  P15,1,R2,R3,C4
+
+#end

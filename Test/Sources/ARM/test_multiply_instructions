@@ -1,0 +1,127 @@
+
+#name <Tmp$Dir>.^.^.test_multiply_instructions
+
+#area test,code
+
+; 32 x 32 => 32 (signed, bottom 32 bit result)
+
+MUL     R1,R2,R3      ; 32 x 32 => 32 (signed)
+MLA     R1,R2,R3,R4   ; 32 x 32 + 32 => 32 (signed)
+MLS     R1,R2,R3,R4   ; 32 x 32 - 32 => 32 (signed)
+
+; 32 x 32 => 64 (signed and unsigned)
+
+SMULL     R1,R2,R3,R4 ; 32 x 32 => 64 (signed)
+SMULLS    R1,R2,R3,R4
+SMULLEQ   R1,R2,R3,R4
+SMULLEQS  R1,R2,R3,R4
+
+SMLAL     R1,R2,R3,R4 ; 32 x 32 + 64 => 64 (signed)
+SMLALS    R1,R2,R3,R4
+SMLALEQ   R1,R2,R3,R4
+SMLALEQS  R1,R2,R3,R4
+
+UMULL     R1,R2,R3,R4 ; 32 x 32 => 64 (unsigned)
+UMULLS    R1,R2,R3,R4
+UMULLEQ   R1,R2,R3,R4
+UMULLEQS  R1,R2,R3,R4
+
+UMLAL     R1,R2,R3,R4 ; 32 x 32 + 64 => 64 (unsigned)
+UMLALS    R1,R2,R3,R4
+UMLALEQ   R1,R2,R3,R4
+UMLALEQS  R1,R2,R3,R4
+
+UMAAL     R1,R2,R3,R4 ; 32 x 32 + 32 + 32 => 64 (unsigned)
+UMAALEQ   R1,R2,R3,R4
+
+; 32 x 16 => 32 (signed, top 32 bit result)
+
+SMULWB    R1,R2,R3    ; 32 x 16 => 32 (signed)
+SMULWBEQ  R1,R2,R3
+SMULWT    R1,R2,R3
+SMULWTEQ  R1,R2,R3
+
+SMLAWB    R1,R2,R3,R4 ; 32 x 16 + 32 => 32 (signed)
+SMLAWBEQ  R1,R2,R3,R4
+SMLAWT    R1,R2,R3,R4
+SMLAWTEQ  R1,R2,R3,R4
+
+; 16 x 16 => 32 or 64 (signed)
+
+SMULBB    R1,R2,R3    ; 16 x 16 => 32 (signed)
+SMULBBEQ  R1,R2,R3
+SMULBT    R1,R2,R3
+SMULBTEQ  R1,R2,R3
+SMULTB    R1,R2,R3
+SMULTBEQ  R1,R2,R3
+SMULTT    R1,R2,R3
+SMULTTEQ  R1,R2,R3
+
+SMLABB    R1,R2,R3,R4 ; 16 x 16 + 32 => 32 (signed)
+SMLABBEQ  R1,R2,R3,R4
+SMLABT    R1,R2,R3,R4
+SMLABTEQ  R1,R2,R3,R4
+SMLATB    R1,R2,R3,R4
+SMLATBEQ  R1,R2,R3,R4
+SMLATT    R1,R2,R3,R4
+SMLATTEQ  R1,R2,R3,R4
+
+SMLALBB   R1,R2,R3,R4 ; 16 x 16 + 64 => 64 (signed)
+SMLALBBEQ R1,R2,R3,R4
+SMLALBT   R1,R2,R3,R4
+SMLALBTEQ R1,R2,R3,R4
+SMLALTB   R1,R2,R3,R4
+SMLALTBEQ R1,R2,R3,R4
+SMLALTT   R1,R2,R3,R4
+SMLALTTEQ R1,R2,R3,R4
+
+; 16 x 16 + 16 x 16 => 32 (signed)
+
+SMUAD     R1,R2,R3 ; 16 x 16 + 16 x 16 => 32 (signed)
+SMUADEQ   R1,R2,R3
+SMUADX    R1,R2,R3
+SMUADXEQ  R1,R2,R3
+
+SMUSD     R1,R2,R3 ; 16 x 16 - 16 x 16 => 32 (signed)
+SMUSDEQ   R1,R2,R3
+SMUSDX    R1,R2,R3
+SMUSDXEQ  R1,R2,R3
+
+SMLAD     R1,R2,R3,R4 ; 16 x 16 + 16 x 16 + 32 => 32 (signed)
+SMLADEQ   R1,R2,R3,R4
+SMLADX    R1,R2,R3,R4
+SMLADXEQ  R1,R2,R3,R4
+
+SMLSD     R1,R2,R3,R4 ; 16 x 16 - 16 x 16 + 32 => 32 (signed)
+SMLSDEQ   R1,R2,R3,R4
+SMLSDX    R1,R2,R3,R4
+SMLSDXEQ  R1,R2,R3,R4
+
+SMLALD    R1,R2,R3,R4 ; 16 x 16 + 16 x 16 + 64 => 64 (signed)
+SMLALDEQ  R1,R2,R3,R4
+SMLALDX   R1,R2,R3,R4
+SMLALDXEQ R1,R2,R3,R4
+
+SMLSLD    R1,R2,R3,R4 ; 16 x 16 - 16 x 16 + 64 => 64 (signed)
+SMLSLDEQ  R1,R2,R3,R4
+SMLSLDX   R1,R2,R3,R4
+SMLSLDXEQ R1,R2,R3,R4
+
+; 32 x 32 => 32 (signed, top 32 bit result)
+
+SMMUL     R1,R2,R3    ; 32 x 32 => 32 (signed)
+SMMULEQ   R1,R2,R3
+SMMULR    R1,R2,R3
+SMMULREQ  R1,R2,R3
+
+SMMLA     R1,R2,R3,R4 ; 32 x 32 + 32 => 32 (signed)
+SMMLAEQ   R1,R2,R3,R4
+SMMLAR    R1,R2,R3,R4
+SMMLAREQ  R1,R2,R3,R4
+
+SMMLS     R1,R2,R3,R4 ; 32 - 32 x 32 => 32 (signed)
+SMMLSEQ   R1,R2,R3,R4
+SMMLSR    R1,R2,R3,R4
+SMMLSREQ  R1,R2,R3,R4
+
+#end

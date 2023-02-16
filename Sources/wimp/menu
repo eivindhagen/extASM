@@ -1,0 +1,306 @@
+
+; >-------------------------------------------------------------<
+
+   ; Format for menu definition in Messages file
+   ; -------------------------------------------
+   ; {} - Zero or more, [] - ASCII code, group, <> - Use appropriate data
+   ;
+   ; <Menu name>:<Menu title>
+   ; #[09]<Menu item>{ [09]{[09]} > <Submenu name> | >> <Menu array number> }
+   ; etc.
+   ;
+   ; <Menu item>   = {<Menu option>}; <Menu item text>
+   ;
+   ; Menu options
+   ; ------------
+   ; $D                      - Dotted line following item
+   ; $M                      - Give MenuWarning message
+   ; $W<Size>{,<Menu width>} - Writable icon
+   ; $F<Hex colour>          - Set foreground colour
+   ; $B<Hex colour>          - Set background colour
+   ;
+   ; R4  - Menu start
+   ; R5  - String pointer
+   ; R6  - String pointer 2
+   ; R7  - Last item
+   ; R8  - Submenu
+   ; R9  - Entry string
+   ; R10 - Menu width
+   ; R11 - Menu pointer
+   ;
+.Create_Menu                           ;_R0-> Menu name, ~R0-> Menu structure
+   STMFD    R13!,{R4-R11,R14}
+   MOV      R1,R0
+   ADR      R0,Ctrl_Block
+   MOV      R2,#0
+   MOV      R3,#0
+   SWI      MessageTrans_Lookup
+   LDR      R11,Max_Menu_Pointer       ; menupointer=Max_Menu_Point
+   MOV      R4,R11                     ; menustart=menupointer
+   MOV      R3,#0                      ; count=0
+   MOV      R5,R2                      ; stringpointer=stringadr
+
+   ; Find number of entries in menu
+   ;
+.CM_Str_Loop
+   LDRB     R0,[R5],#1
+   CMP      R0,#10
+   BNE      CM_Str_Loop
+   LDRB     R0,[R5]
+   CMP      R0,#10                     ; *stringpointer=10 and *(stringpointer+1)=10?
+   ADDNE    R3,R3,#1                   ; count=count+1
+   BNE      CM_Str_Loop
+   ADD      R3,R3,R3,LSL #1
+   MOV      R3,R3,LSL #3
+   ADD      R3,R3,#28                  ; menusize=28+24*count
+   ADD      R0,R11,R3                  ; maxmenupointer=maxmenupointer+menusize
+   STR      R0,Max_Menu_Pointer
+   ADR      R1,Menu_Block+Menu_Size
+   CMP      R0,R1                      ; maxmenupointer>menublock+menusize?
+   MOVGT    R0,#&03                    ; Messages_Error #&03 = Menu area full
+   BGT      Messages_Error
+   MOV      R5,R2
+
+.CM_Str_Loop2
+   LDRB     R0,[R5],#1
+   CMP      R0,#10
+   BNE      CM_Str_Loop2
+   MOV      R0,R2
+   MOV      R1,R11
+   BL       StrCopyCtrl                ; Copy menu title
+   SUB      R10,R1,R11
+   SUB      R10,R10,#1                 ; Set menu width
+   MOV      R0,#7
+   STRB     R0,[R11,#12]               ; Menu title foreground colour
+   MOV      R1,#2
+   STRB     R1,[R11,#13]               ; Menu title background colour
+   STRB     R0,[R11,#14]               ; Menu work area foreground colour
+   MOV      R0,#0
+   STRB     R0,[R11,#15]               ; Menu work area background colour
+   MOV      R1,#44
+   STR      R1,[R11,#20]               ; Height of following menu items
+   STR      R0,[R11,#24]               ; Vertical gap between items
+   ADD      R11,R11,#28                ; Menupointer=menupointer+28
+   MOV      R7,#0                      ; last=0
+
+.CM_Menu_Loop
+   ADD      R6,R5,#2                   ; stringpointer2=stringpointer+2
+
+   ; Find end of menu entry
+   ;
+.CM_Str_Loop3
+   LDRB     R0,[R6],#1
+   CMP      R0,#10                     ; stringpointer2=10?
+   BNE      CM_Str_Loop3
+   LDRB     R0,[R6]
+   CMP      R0,#10                     ; *(stringpointer2+1)=10?
+   MOVEQ    R7,#1                      ; last=1
+   MOV      R0,#0
+   STRB     R0,[R6,#-1]!               ; Zero-terminate menu entry
+   ADD      R9,R5,#2                   ; entrystring=stringpointer+2
+   MOV      R0,R9
+   MOV      R1,#'>'
+   BL       StrChr
+   CMP      R0,#0
+   MVNEQ    R0,#0                      ; submenu pointer=-1
+   STREQ    R0,[R11,#4]                ; Store submenu pointer
+   BEQ      CM_End_SubMenu
+   MOV      R8,R0
+   LDRB     R0,[R8,#1]                 ; Read char
+   CMP      R0,#'>'                    ; char=">"?
+   BNE      CM_Not_Window
+   ; Submenu pointer is a menu or window, stored in menu array
+   ;
+   ADR      R1,Menu_Array
+   LDRB     R0,[R8,#2]
+   SUB      R0,R0,#48
+   LDR      R0,[R1,R0,LSL #2]          ; Read from menu table
+   STR      R0,[R11,#4]                ; Store submenu pointer
+   B        CM_End_SubMenu
+
+.CM_Not_Window
+   ; Submenu pointer is a menu
+   ;
+   ADD      R0,R8,#1
+   BL       Create_Menu
+   STR      R0,[R11,#4]                ; Store submenu pointer
+
+.CM_End_SubMenu
+   MOV      R8,#0                      ; menuflag=0
+   MOV      R0,R9
+   ADR      R1,CM_Dotted_Str
+   BL       StrStr
+   CMP      R0,#0                      ; If StrStr(entrystr,"$D")<>0 then
+   ORRNE    R8,R8,#2                   ; menuflag=menuflag OR 2
+
+   MOV      R0,R9
+   ADR      R1,CM_MenuWarning_Str
+   BL       StrStr
+   CMP      R0,#0                      ; if strstr(entrystr,"$M")<>0 then
+   ORRNE    R8,R8,#8                   ; menuflag=menuflag OR 8
+
+   MOV      R0,R9
+   ADR      R1,CM_Foreground_Str
+   BL       StrStr
+   CMP      R0,#0
+   MOVEQ    R0,#7
+   BEQ      CM_No_Foreground
+   LDRB     R0,[R0,#2]
+   CMP      R0,#'A'
+   SUBGE    R0,R0,#'A'-10
+   SUBLT    R0,R0,#'0'
+
+.CM_No_Foreground
+   ORR      R8,R8,R0,LSL #24
+
+   MOV      R0,R9
+   ADR      R1,CM_Background_Str
+   BL       StrStr
+   CMP      R0,#0
+   MOVEQ    R0,#0
+   BEQ      CM_No_Background
+   LDRB     R0,[R0,#2]
+   CMP      R0,#'A'
+   SUBGE    R0,R0,#'A'-10
+   SUBLT    R0,R0,#'0'
+
+.CM_No_Background
+   ORR      R8,R8,R0,LSL #28
+
+   MOV      R0,R9
+   ADR      R1,CM_Writable_Str
+   BL       StrStr
+   CMP      R0,#0                      ; pos=StrStr(entrystr,"$W")
+   BEQ      CM_Not_Writable
+   ; The menu item is writable
+   ;
+   MOV      R5,R0
+   MOV      R0,#10
+   ADD      R1,R5,#2
+   SWI      OS_ReadUnsigned
+   ADD      R2,R2,#1                   ; size=size+1
+   ; Put in menu data
+   ;
+   AND      R0,R8,#&FF000000
+   BIC      R8,R8,#&FF000000
+   ORR      R8,R8,#4                   ; menuflag=menuflag OR 4
+   STR      R8,[R11]                   ; Store menuflag
+   ORR      R0,R0,#&101
+   STR      R0,[R11,#8]                ; Store iconflag
+   LDR      R0,Ind_Pointer
+   MVN      R1,#0
+   ADD      R3,R11,#12                 ; Store buffer address, validation string and
+   STMIA    R3,{R0-R2}                 ; buffer size
+   MOV      R1,#13
+   STRB     R1,[R0]                    ; Store CR in buffer
+   MOV      R0,R2
+   BL       Inc_Ind_Pointer
+   ADD      R0,R5,#2
+   MOV      R1,#','
+   BL       StrChr
+   CMP      R0,#0                      ; pos=0?
+   BEQ      CM_End_MenuItem
+   ADD      R1,R0,#1
+   MOV      R0,#10
+   SWI      OS_ReadUnsigned
+   MOV      R10,R2                     ; menuwidth=size
+   B        CM_End_MenuItem
+
+   ; The menu item is not writable
+   ;
+.CM_Not_Writable
+   MOV      R0,R9
+   MOV      R1,#';'
+   BL       StrChr
+   CMP      R0,#0                      ; pos<>0?
+   ADDNE    R9,R0,#1
+   MOV      R0,R9
+
+.CM_Str_Loop5
+   LDRB     R1,[R0],#1
+   CMP      R1,#32
+   BGE      CM_Str_Loop5
+   SUB      R0,R0,R9
+   SUB      R0,R0,#1
+   CMP      R0,R10                     ; entrystringlen>menuwidth?
+   MOVGT    R10,R0                     ; menuwidth=entrystringlen
+   CMP      R0,#12                     ; entrystringlen>12?
+   BLE      CM_Not_Indirected
+   ; The menu item is indirected
+   ;
+   ADD      R2,R0,#1
+   AND      R0,R8,#&FF000000
+   BIC      R8,R8,#&FF000000
+   STR      R8,[R11]                   ; Store menuflag
+   ORR      R0,R0,#&101
+   STR      R0,[R11,#8]                ; Store iconflag
+   LDR      R0,Ind_Pointer
+   MVN      R1,#0
+   ADD      R3,R11,#12                 ; Store buffer address, validation string and
+   STMIA    R3,{R0-R2}                 ; buffer size
+   MOV      R1,R0
+   MOV      R0,R9
+   BL       StrCopyCtrl
+   SUB      R0,R0,R9
+   BL       Inc_Ind_Pointer
+   B        CM_End_MenuItem
+
+   ; The menu item is not indirected
+   ;
+.CM_Not_Indirected
+   AND      R0,R8,#&FF000000
+   BIC      R8,R8,#&FF000000
+   STR      R8,[R11]                   ; Store menuflag
+   ORR      R0,R0,#1
+   STR      R0,[R11,#8]                ; Store iconflag
+   MOV      R0,R9
+   ADD      R1,R11,#12
+   BL       StrCopyCtrl
+
+.CM_End_MenuItem
+   ADD      R11,R11,#24                ; menupointer=menupointer+24
+   MOV      R0,#10
+   STRB     R0,[R6],#1
+   MOV      R5,R6                      ; stringpointer=stringpointer2
+   CMP      R7,#1                      ; Is it the last?
+   BNE      CM_Menu_Loop
+   LDR      R0,[R11,#-24]
+   ORR      R0,R0,#&80
+   STR      R0,[R11,#-24]              ; *(menupointer-24)=*(menupointer-24) OR &80
+   ADD      R10,R10,#1
+   MOV      R10,R10,LSL #4
+   STR      R10,[R4,#16]               ; *(menustart+16)=(menuwidth+1)*16
+   ADR      R1,Menu_Array
+   LDR      R0,Menu_Count
+   STR      R4,[R1,R0,LSL #2]
+   ADD      R0,R0,#1                   ; menucount=menucount+1
+   STR      R0,Menu_Count
+   CMP      R0,#Max_Menu_Entries
+   MOVGT    R0,#&04                    ; Messages_Error #&04 = Too many menus
+   BGT      Messages_Error
+   MOV      R0,R4
+   LDMFD    R13!,{R4-R11,R15}
+
+; >-------------------------------------------------------------<
+
+.Shade_Menu_Item                       ;_R0-> Menu block, _R1 = Menu item, _R2 = Shade flag
+   ADD      R1,R1,R1,LSL #1            ; (1 = Shade, 0 = Unshade)
+   ADD      R0,R0,R1,LSL #3
+   LDR      R1,[R0,#36]                ; Address=Menu+36+Item*24
+   CMP      R2,#1
+   ORREQ    R1,R1,#1 << 22
+   BICNE    R1,R1,#1 << 22
+   STR      R1,[R0,#36]
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Tick_Menu_Item                        ;_R0-> Menu block, _R1 = Menu item, _R2 = Tick flag
+   ADD      R1,R1,R1,LSL #1            ; (1 = Tick, 0 = No tick)
+   ADD      R0,R0,R1,LSL #3
+   LDR      R1,[R0,#28]
+   CMP      R2,#1
+   ORREQ    R1,R1,#1
+   BICNE    R1,R1,#1
+   STR      R1,[R0,#28]
+   MOV      R15,R14

@@ -1,0 +1,25 @@
+
+#name <Tmp$Dir>.^.^.test_shift_instructions
+
+#area test,code
+
+LSL    R1,R2,#1
+LSR    R1,R2,#1
+ASR    R1,R2,#1
+ROR    R1,R2,#1
+RRX    R1,R2
+
+LSL    R1,R2,R3
+LSR    R1,R2,R3
+ASR    R1,R2,R3
+ROR    R1,R2,R3
+
+LSL    R1,R2,#0
+LSR    R1,R2,#0
+ASR    R1,R2,#0
+ROR    R1,R2,#0
+
+LSR    R1,R2,#32
+ASR    R1,R2,#32
+
+#end

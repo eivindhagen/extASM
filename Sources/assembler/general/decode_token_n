@@ -1,0 +1,13 @@
+
+; >-------------------------------------------------------------<
+
+.DT_N                                  ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'E'
+   BEQ      DT_NEG
+   CMP      R8,#'O'
+   BEQ      DT_NOP
+   CMP      R8,#'R'
+   BEQ      DT_NRM
+   BNE      DT_Unknown

@@ -1,0 +1,13 @@
+
+#name <Tmp$Dir>.^.^.test_branch_instructions
+
+#area test,code
+
+B       address
+BEQ     address
+BL      address
+BLEQ    address
+
+.address
+
+#end

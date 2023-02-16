@@ -1,0 +1,104 @@
+
+; >-------------------------------------------------------------<
+
+.DT_xXT                                ;_R8 = "X"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_xXTA
+   CMP      R8,#'B'
+   BEQ      DT_xXTB
+   CMP      R8,#'H'
+   ;------> xXTH    Cond            [Rd]rot     [Rm]
+   ORREQ    R9,R9,#%00000110101111110000000001110000
+   BEQ      DT_xXTx
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_xXTA                               ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BEQ      DT_xXTAB
+   CMP      R8,#'H'
+   ;------> xXTAH   Cond        [Rn][Rd]rot     [Rm]
+   ORREQ    R9,R9,#%00000110101100000000000001110000
+   BEQ      DT_xXTx
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_xXTAB                              ;_R8 = "B"
+   LDRB     R8,[R10]
+   CMP      R8,#'1'
+   ;------> xXTAB   Cond        [Rn][Rd]rot     [Rm]
+   ORRNE    R9,R9,#%00000110101000000000000001110000
+   BNE      DT_xXTx
+   ADD      R10,R10,#1
+   LDRB     R8,[R10],#1
+   CMP      R8,#'6'
+   ;------> xXTAB16 Cond        [Rn][Rd]rot     [Rm]
+   ORREQ    R9,R9,#%00000110100000000000000001110000
+   BEQ      DT_xXTx
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_xXTB                               ;_R8 = "B"
+   LDRB     R8,[R10]
+   CMP      R8,#'1'
+   ;------> xXTB    Cond            [Rd]rot     [Rm]
+   ORRNE    R9,R9,#%00000110101011110000000001110000
+   BNE      DT_xXTx
+   ADD      R10,R10,#1
+   LDRB     R8,[R10],#1
+   CMP      R8,#'6'
+   ;------> xXTB16  Cond            [Rd]rot     [Rm]
+   ORREQ    R9,R9,#%00000110100011110000000001110000
+   BEQ      DT_xXTx
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_xXTx
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   AND      R0,R9,#&F << Rn_Pos
+   CMP      R0,#&F << Rn_Pos
+   BEQ      DT_SXTx_No_Operand_One
+   BL       Decode_Operand_Rn_Register
+
+.DT_SXTx_No_Operand_One
+   BL       Decode_Operand_Two_Register
+   BL       Skip_Blanks
+   CMP      R8,#','
+   BNE      DT_Write_Instruction
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'O'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BL       Decode_Immediate
+   CMP      R0,#%00000
+   CMPNE    R0,#%01000
+   CMPNE    R0,#%10000
+   CMPNE    R0,#%11000
+   MOVNE    R0,#&01                    ; Asm_Error #&01 = Illegal shift
+   BNE      Asm_Error
+   ORR      R9,R9,R0,LSL #7
+   B        DT_Write_Instruction

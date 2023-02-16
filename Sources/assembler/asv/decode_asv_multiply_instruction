@@ -1,0 +1,340 @@
+
+; >-------------------------------------------------------------<
+
+.DT_VMLA_VMLS                          ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_VMLA
+   CMP      R8,#'S'
+   BEQ      DT_VMLS
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VMLA                               ;_R8 = "A"
+   LDRB     R8,[R10]
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   ADDEQ    R10,R10,#1
+   BEQ      DT_VMLAL
+   ; VMLA.I<8|16|32> Qd, Qn, Qm
+   ; VMLA.I<8|16|32> Dd, Dn, Dm
+   ;
+   ;------> VMLA          Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R0,#%00000010000000000000100100000000
+   ; VMLA.F32 Qd, Qn, Qm
+   ; VMLA.F32 Dd, Dn, Dm
+   ;
+   ;------> VMLA          D S[Vn][Vd]    NQM [Vm]
+   MOV      R1,#%00000010000000000000110100010000
+   ; VMLA<cond>.F64 Dd, Dn, Dm
+   ; VMLA<cond>.F32 Sd, Sn, Sm
+   ;
+   ;------> VMLA Cond     D  [Vn][Vd]   SN M [Vm]
+   MOV      R2,#%00001110000000000000101000000000
+   ; VMLA.I<16|32><F32> Qd, Qn, Dm[x]
+   ; VMLA.I<16|32><F32> Dd, Dn, Dm[x]
+   ;
+   ;------> VMLA        Q Dsz[Vn][Vd]   FN M [Vm]
+   MOV      R3,#%00000010100000000000000001000000
+   MOV      R14,#0
+   B        DT_SIMD_I_P_8_16_32_Xd_Xn_Xm_Or_VFP_Or_Scalar
+
+; >-------------------------------------------------------------<
+
+.DT_VMLAL                              ;_R8 = "L"
+   ; VMLAL.<S|U><8|16|32> Qd, Dn, Dm
+   ;
+   ;------> VMLAL       U Dsz[Vn][Vd]    N M [Vm]
+   MOV      R0,#%11110010100000000000100000000000
+   ; VMLAL.<S|U><16|32> Qd, Dn, Dm[x]
+   ;
+   ;------> VMLAL       U Dsz[Vn][Vd]    N M [Vm]
+   MOV      R1,#%11110010100000000000001001000000
+   MOV      R2,#0
+   B        DT_SIMD_SU_8_16_32_Qd_Dn_Dm_Or_Scalar
+
+; >-------------------------------------------------------------<
+
+.DT_VMLS                               ;_R8 = "S"
+   LDRB     R8,[R10]
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   ADDEQ    R10,R10,#1
+   BEQ      DT_VMLSL
+   ; VMLS.I<8|16|32> Qd, Qn, Qm
+   ; VMLS.I<8|16|32> Dd, Dn, Dm
+   ;
+   ;------> VMLS          Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R0,#%00000011000000000000100100000000
+   ; VMLS.F32 Qd, Qn, Qm
+   ; VMLS.F32 Dd, Dn, Dm
+   ;
+   ;------> VMLS          D S[Vn][Vd]    NQM [Vm]
+   MOV      R1,#%00000010001000000000110100010000
+   ; VMLS<cond>.F64 Dd, Dn, Dm
+   ; VMLS<cond>.F32 Sd, Sn, Sm
+   ;
+   ;------> VMLS Cond     D  [Vn][Vd]   SN M [Vm]
+   MOV      R2,#%00001110000000000000101001000000
+   ; VMLS.I<16|32><F32> Qd, Qn, Dm[x]
+   ; VMLS.I<16|32><F32> Dd, Dn, Dm[x]
+   ;
+   ;------> VMLS        Q Dsz[Vn][Vd]   FN M [Vm]
+   MOV      R3,#%00000010100000000000010001000000
+   MOV      R14,#0
+   B        DT_SIMD_I_P_8_16_32_Xd_Xn_Xm_Or_VFP_Or_Scalar
+
+; >-------------------------------------------------------------<
+
+.DT_VMLSL                              ;_R8 = "L"
+   ; VMLSL.<S|U><8|16|32> Qd, Dn, Dm
+   ;
+   ;------> VMLSL       U Dsz[Vn][Vd]    N M [Vm]
+   MOV      R0,#%11110010100000000000101000000000
+   ; VMLSL.<S|U><16|32> Qd, Dn, Dm[x]
+   ;
+   ;------> VMLSL       U Dsz[Vn][Vd]    N M [Vm]
+   MOV      R1,#%11110010100000000000011001000000
+   MOV      R2,#0
+   B        DT_SIMD_SU_8_16_32_Qd_Dn_Dm_Or_Scalar
+
+; >-------------------------------------------------------------<
+
+.DT_VMUL                               ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   LDRB     R8,[R10]
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   ADDEQ    R10,R10,#1
+   BEQ      DT_VMULL
+   ; VMUL<I|P><8|16|32> Qd, Qn, Qm
+   ; VMUL<I|P><8|16|32> Dd, Dn, Dm
+   ;
+   ;------> VMUL        O Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R0,#%00000010000000000000100100010000
+   ; VMUL.F32 Qd, Qn, Qm
+   ; VMUL.F32 Dd, Dn, Dm
+   ;
+   ;------> VMUL          D S[Vn][Vd]    NQM [Vm]
+   MOV      R1,#%00000011000000000000110100010000
+   ; VMUL<cond>.F64 Dd, Dn, Dm
+   ; VMUL<cond>.F32 Sd, Sn, Sm
+   ;
+   ;------> VMUL Cond     D  [Vn][Vd]   SN M [Vm]
+   MOV      R2,#%00001110001000000000101000000000
+   ; VMUL.I<16|32><F32> Qd, Qn, Dm[x]
+   ; VMUL.I<16|32><F32> Dd, Dn, Dm[x]
+   ;
+   ;------> VMUL        Q Dsz[Vn][Vd]   FN M [Vm]
+   MOV      R3,#%00000010100000000000100001000000
+   MOV      R14,#1
+   B        DT_SIMD_I_P_8_16_32_Xd_Xn_Xm_Or_VFP_Or_Scalar
+
+; >-------------------------------------------------------------<
+
+.DT_VMULL                              ;_R8 = "L"
+   ; VMULL.<S|U|P><8|16|32> Qd, Dn, Dm
+   ;
+   ;------> VMULL       U Dsz[Vn][Vd]  O N M [Vm]
+   MOV      R0,#%11110010100000000000110000000000
+   ; VMULL.<S|U><16|32> Qd, Dn, Dm[x]
+   ;
+   ;------> VMULL       U Dsz[Vn][Vd]    N M [Vm]
+   MOV      R1,#%11110010100000000000101001000000
+   MOV      R2,#1
+   B        DT_SIMD_SU_8_16_32_Qd_Dn_Dm_Or_Scalar
+
+; >-------------------------------------------------------------<
+
+.DT_VNMLA_VNMLS_VNMUL                  ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BEQ      DT_VNMLA_VNMLS
+   CMP      R8,#'U'
+   BEQ      DT_VNMUL
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VNMLA_VNMLS                        ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_VNMLA
+   CMP      R8,#'S'
+   BEQ      DT_VNMLS
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VNMLA                              ;_R8 = "A"
+   ; VNMLA<cond>.F64 Dd, Dn, Dm
+   ; VNMLA<cond>.F32 Sd, Sn, Sm
+   ;
+   ;------> VNMLA Cond     D  [Vn][Vd]   sN M [Vm]
+   MOV      R9,# %00001110000100000000101001000000
+   B        DT_VFP_Fd_Fn_Fm
+
+; >-------------------------------------------------------------<
+
+.DT_VNMLS                              ;_R8 = "S"
+   ; VNMLS<cond>.F64 Dd, Dn, Dm
+   ; VNMLS<cond>.F32 Sd, Sn, Sm
+   ;
+   ;------> VNMLS Cond     D  [Vn][Vd]   sN M [Vm]
+   MOV      R9,# %00001110000100000000101000000000
+   B        DT_VFP_Fd_Fn_Fm
+
+; >-------------------------------------------------------------<
+
+.DT_VNMUL                              ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   ; VNMUL<cond>.F64 Dd, Dn, Dm
+   ; VNMUL<cond>.F32 Sd, Sn, Sm
+   ;
+   ;------> VNMUL Cond     D  [Vn][Vd]   SN M [Vm]
+   MOV      R9,# %00001110001000000000101001000000
+   B        DT_VFP_Fd_Fn_Fm
+
+; >-------------------------------------------------------------<
+
+.DT_VQDMLA_VQDMLS_VQDMUL               ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BEQ      DT_VQDMLAL_VQDMLSL
+   CMP      R8,#'U'
+   BEQ      DT_VQDMULH_VQDMULL
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VQDMLAL_VQDMLSL                    ;_R8 = "L"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_VQDMLAL
+   CMP      R8,#'S'
+   BEQ      DT_VQDMLSL
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VQDMLAL                            ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   ; VQDMLAL.S<16|32> Qd, Dn, Dm
+   ;
+   ;------> VQDMLAL       Dsz[Vn][Vd]    N M [Vm]
+   MOV      R0,#%11110010100000000000100100000000
+   ; VQDMLAL.S<16|32> Qd, Dn, Dm[x]
+   ;
+   ;------> VQDMLAL       Dsz[Vn][Vd]    N M [Vm]
+   MOV      R1,#%11110010100000000000001101000000
+   B        DT_SIMD_S_16_32_Qd_Dn_Dm_Or_Scalar
+
+; >-------------------------------------------------------------<
+
+.DT_VQDMLSL                            ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   ; VQDMLSL.S<16|32> Qd, Dn, Dm
+   ;
+   ;------> VQDMLSL       Dsz[Vn][Vd]    N M [Vm]
+   MOV      R0,#%11110010100000000000101100000000
+   ; VQDMLSL.S<16|32> Qd, Dn, Dm[x]
+   ;
+   ;------> VQDMLSL       Dsz[Vn][Vd]    N M [Vm]
+   MOV      R1,#%11110010100000000000011101000000
+   B        DT_SIMD_S_16_32_Qd_Dn_Dm_Or_Scalar
+
+; >-------------------------------------------------------------<
+
+.DT_VQDMULH_VQDMULL                    ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BEQ      DT_VQDMULH
+   CMP      R8,#'L'
+   BEQ      DT_VQDMULL
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VQDMULH                            ;_R8 = "H"
+   ; VQDMULH.S<16|32> Qd, Qn, Qm
+   ; VQDMULH.S<16|32> Dd, Dn, Dm
+   ;
+   ;------> VQDMULH       Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R0,#%11110010000000000000101100000000
+   ; VQDMULH.S<16|32> Qd, Qn, Qm[x]
+   ; VQDMULH.S<16|32> Dd, Dn, Dm[x]
+   ;
+   ;------> VQDMULH     Q Dsz[Vn][Vd]    N M [Vm]
+   MOV      R1,#%11110010100000000000110001000000
+   B        DT_SIMD_S_16_32_Xd_Xn_Xm_Or_Scalar
+
+; >-------------------------------------------------------------<
+
+.DT_VQDMULL                            ;_R8 = "L"
+   ; VQDMULL.S<16|32> Qd, Dn, Dm
+   ;
+   ;------> VQDMULL       Dsz[Vn][Vd]    N M [Vm]
+   MOV      R0,#%11110010100000000000110100000000
+   ; VQDMULL.S<16|32> Qd, Dn, Dm[x]
+   ;
+   ;------> VQDMULL       Dsz[Vn][Vd]    N M [Vm]
+   MOV      R1,#%11110010100000000000101101000000
+   B        DT_SIMD_S_16_32_Qd_Dn_Dm_Or_Scalar
+
+; >-------------------------------------------------------------<
+
+.DT_VQRDMULH                           ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'U'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BNE      DT_Unknown
+   ; VQRDMULH.S<16|32> Qd, Qn, Qm
+   ; VQRDMULH.S<16|32> Dd, Dn, Dm
+   ;
+   ;------> VQRDMULH      Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R0,#%11110011000000000000101100000000
+   ; VQRDMULH.S<16|32> Qd, Qn, Qm[x]
+   ; VQRDMULH.S<16|32> Dd, Dn, Dm[x]
+   ;
+   ;------> VQRDMULH    Q Dsz[Vn][Vd]    N M [Vm]
+   MOV      R1,#%11110010100000000000110101000000
+   B        DT_SIMD_S_16_32_Xd_Xn_Xm_Or_Scalar

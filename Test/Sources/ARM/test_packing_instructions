@@ -1,0 +1,18 @@
+
+#name <Tmp$Dir>.^.^.test_packing_instructions
+
+#area test,code
+
+; PKHxx
+
+PKHBT     R1,R2,R3
+PKHBTEQ   R1,R2,R3
+PKHBT     R1,R2,R3,LSL #1
+PKHBT     R1,R2,R3,LSL #0
+
+PKHTB     R1,R2,R3
+PKHTBEQ   R1,R2,R3
+PKHTB     R1,R2,R3,ASR #1
+PKHTB     R1,R2,R3,ASR #32
+
+#end

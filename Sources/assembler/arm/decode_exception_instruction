@@ -1,0 +1,96 @@
+
+; >-------------------------------------------------------------<
+
+.DT_BKPT                               ;_R8 = "K/k"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'P'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   BNE      DT_Unknown
+   ;------> BKPT             [  imm12   ]    imm4
+   MOV      R9,#%11100001001000000000000001110000
+   LDRB     R8,[R10],#1
+   BL       Ensure_Blank
+   BL       Decode_Immediate_Optional_Pound
+   CMP      R0,#&FFFF
+   MOVHI    R0,#&2A                    ; Asm_Error #&2A = Value exceeds 16 bit
+   BHI      Asm_Error
+   MOV      R1,R0,LSR #4
+   AND      R2,R0,#&F
+   ORR      R9,R9,R1,LSL #8
+   ORR      R9,R9,R2
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_SVC                                ;_R8 = "V"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   BNE      DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SWI                                ;_R8 = "C"/"I"
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   LDRNE    R0,Code_Counters+24*4
+   ADDNE    R0,R0,#1
+   STRNE    R0,Code_Counters+24*4
+   ;------> SWI  Cond    [        Imm24         ]
+   MOV      R9,#%00001111000000000000000000000000
+   LDRB     R8,[R10],#1                ; R8 = CC or Blank
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Skip_Blanks
+   SUB      R10,R10,#1                 ; R10-> SWI Name
+   MOV      R4,R10
+   MOV      R5,#0
+
+._Loop
+   LDRB     R8,[R10],#1
+   CMP      R8,#'A'
+   RSBGES   R0,R8,#'Z'                 ; A-Z
+   BGE      _Loop
+   CMP      R8,#'a'
+   RSBGES   R0,R8,#'z'                 ; a-z
+   BGE      _Loop
+   CMP      R8,#'0'
+   RSBGES   R0,R8,#'9'                 ; 0-9
+   CMPLT    R8,#128                    ; 128-255
+   BGE      _Loop
+   CMP      R8,#'_'
+   BEQ      _Loop
+   MOV      R0,#0
+   STRB     R0,[R10,#-1]               ; Terminate SWI name
+   MOV      R1,R4
+   SWI      XOS_SWINumberFromString    ; R0 = SWI Number
+   STRB     R8,[R10,#-1]               ; Restore character
+   MOVVS    R10,R4
+   BVS      DTSWI_Expr
+
+   MOV      R5,R0
+   BL       Skip_Blanks
+   CMPNE    R8,#':'
+   CMPNE    R8,#';'
+   CMPNE    R8,#&0A
+   BEQ      DTSWI_Found
+   CMP      R8,#'+'
+   MOVNE    R0,#&23                    ; Asm_Error #&23 = Syntax error
+   BNE      Asm_Error
+
+.DTSWI_Expr
+   LDRB     R8,[R10],#1
+   BL       Optional_Pound
+   BL       Decode_Int_Expr
+   ADD      R5,R5,R0
+   TST      R5,#&FF000000
+   MOVNE    R0,#&36                     ; Asm_Error #&36 = Bad constant
+   BNE      Asm_Error
+
+.DTSWI_Found
+   ORR      R9,R9,R5
+   B        DT_Write_Instruction

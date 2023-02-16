@@ -1,0 +1,30 @@
+
+#name <Tmp$Dir>.^.^.test_vfp_load_store_instructions
+
+#area test,code
+
+FLDS   S1,[R1]
+FLDSEQ S1,[R1]
+FLDS   S1,[R1,#&100]
+FLDS   S1,fld_address
+
+FLDD   D1,[R1]
+FLDDEQ D1,[R1]
+FLDD   D1,[R1,#+&100]
+FLDD   D1,fld_address
+
+.fld_address
+
+FSTS   S1,[R1]
+FSTSEQ S1,[R1]
+FSTS   S1,[R1,#-&100]
+FSTS   S1,fst_address
+
+FSTD   D1,[R1]
+FSTDEQ D1,[R1]
+FSTD   D1,[R1,#0]
+FSTD   D1,fst_address
+
+.fst_address
+
+#end

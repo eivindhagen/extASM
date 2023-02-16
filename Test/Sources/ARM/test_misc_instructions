@@ -1,0 +1,110 @@
+
+#name <Tmp$Dir>.^.^.test_misc_instructions
+
+#area test,code
+
+; CLREX                    ; Clear exclusive access
+
+CLREX
+
+; DBG
+
+DBG     #1                 ; Debug
+DBGEQ   #1
+
+; DMB
+
+DMB     SY                 ; Data Memory Barrier
+DMB     ST
+
+DMB     ISH
+DMB     ISHST
+
+DMB     NSH
+DMB     NSHST
+
+DMB     OSH
+DMB     OSHST
+
+; DSB
+
+DSB     SY                 ; Data Synchronisation Barrier
+DSB     ST
+
+DSB     ISH
+DSB     ISHST
+
+DSB     NSH
+DSB     NSHST
+
+DSB     OSH
+DSB     OSHST
+
+; ISB
+
+ISB     SY                 ; Instruction Synchronisation Barrier
+
+; NOP
+
+NOP                        ; No operation
+NOPEQ
+
+; PLD
+
+PLD     [R1,R2]            ; Preload data read
+PLDW    [R1,R2]            ; Preload data write
+PLD     [R1,+R2]
+PLD     [R1,-R2]
+PLD     [R1,R2,LSL #1]
+PLD     [R1,#&123]
+PLD     [R1,#-&123]
+;PLD     pld_address
+
+.pld_address
+
+; PLI
+
+PLI     [R1,R2]            ; Preload instruction
+PLI     [R1,+R2]
+PLI     [R1,-R2]
+PLI     [R1,R2,LSL #1]
+PLI     [R1,#&123]
+PLI     [R1,#-&123]
+;PLI     pli_address
+
+.pli_address
+
+; SETEND
+
+SETEND  BE                 ; Set endianness
+SETEND  LE
+
+; SEV
+
+SEV                        ; Send event
+SEVEQ
+
+; YIELD
+
+YIELD                      ; Yield
+YIELDEQ
+
+; WFE
+
+WFE                        ; Wait for event
+WFEEQ
+
+; WFI
+
+WFI                        ; Wait for interrupt
+WFIEQ
+
+; SWP
+
+SWP     R1,R2,[R3]         ; Swap
+SWPEQ   R1,R2,[R3]
+
+SWPB    R1,R2,[R3]
+SWPEQB  R1,R2,[R3]
+
+#end

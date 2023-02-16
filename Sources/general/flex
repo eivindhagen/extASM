@@ -1,0 +1,333 @@
+
+; >-------------------------------------------------------------<
+
+.Flex_Adr                              ;_R0 = Block number, ~R0-> Block
+   LDR      R1,Flex_Blocks
+   CMP      R0,R1
+   MOVHS    R0,#&08                    ; Messages_Error #&08 = No such Flex block
+   BHS      Messages_Error
+
+   ADR      R1,Flex_Array
+   LDR      R0,[R1,R0,LSL #2]
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Flex_Size                             ;_R0 = Block number, ~R0-> Block, ~R1 = Size of block
+   LDR      R1,Flex_Blocks
+   CMP      R0,R1
+   MOVHS    R0,#&08                    ; Messages_Error #&08 = No such Flex block
+   BHS      Messages_Error
+
+   ADR      R2,Flex_Array
+   LDR      R0,[R2,R0,LSL #2]!
+   LDR      R1,[R2,#4]
+   SUB      R1,R1,R0
+   MOV      R15,R14
+
+.Flex_Create                           ;_R0 = Size of new block
+   ; R4 -  Size
+   ; R5 -> Flex array
+   ; R6 -  Flex blocks
+   ; R7 -> Block
+   ; R8 -> Block+1
+   ;
+   STMFD    R13!,{R4-R8,R14}
+   TST      R0,#3                      ; Ensure block is word sized
+   BICNE    R0,R0,#3
+   ADDNE    R0,R0,#4
+
+   MOV      R4,R0
+   ADR      R5,Flex_Array
+   LDR      R6,Flex_Blocks
+   MOV      R3,R5
+   LDR      R7,[R3,R6,LSL #2]!
+   LDR      R0,MemTop
+   ADD      R8,R7,R4
+   CMP      R8,R0
+   BLT      FC_No_SlotSize
+   ; Set WimpSlot
+   ;
+   SUB      R0,R8,#&8000
+   MVN      R1,#0
+   SWI      Wimp_SlotSize
+   ADD      R0,R0,#&8000
+   CMP      R0,R8
+   MOVLT    R0,#&05                    ; Messages_Error #&05 = Not enough memory to create Flex block
+   BLT      Messages_Error
+   STR      R0,MemTop
+
+.FC_No_SlotSize
+   ; Update Flex array
+   ;
+   STR      R8,[R3,#4]
+   ADD      R6,R6,#1
+   STR      R6,Flex_Blocks
+   ; Clear memory
+   ;
+   MOV      R0,R7
+   MOV      R1,R8
+   BL       Clear_Memory
+   LDMFD    R13!,{R4-R8,R15}
+
+; >-------------------------------------------------------------<
+
+.Flex_Adjust                           ;_R0 = Block number, _R1 = Amount to change by
+   STMFD    R13!,{R14}                 ;~R0-> Block
+   LDR      R2,Flex_Blocks
+   CMP      R0,R2
+   MOVHS    R0,#&08                    ; Messages_Error #&08 = No such Flex block
+   BHS      Messages_Error
+
+   ADR      R2,Flex_Array
+   LDR      R3,[R2,R0,LSL #2]!
+   LDR      R2,[R2,#4]
+   SUB      R2,R2,R3
+   ADD      R1,R1,R2
+   BL       Flex_Resize
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Flex_Resize                           ;_R0 = Block number, _R1 = New size, ~R0-> Block
+   ; R4 -  Block
+   ; R5 -  New size
+   ; R6 -> Flex array
+   ; R7 -> Block
+   ; R8 -> Block+1
+   ; R9 -> End of blocks
+   ;
+   STMFD    R13!,{R4-R9,R14}
+   LDR      R6,Flex_Blocks
+   CMP      R0,R6
+   MOVHS    R0,#&08                    ; Messages_Error #&08 = No such Flex block
+   BHS      Messages_Error
+
+   TST      R1,#3                      ; Ensure block is word sized
+   BICNE    R1,R1,#3
+   ADDNE    R1,R1,#4
+
+   MOV      R4,R0
+   MOV      R5,R1
+   ADR      R6,Flex_Array
+   MOV      R0,R6
+   LDR      R7,[R0,R4,LSL #2]!
+   LDR      R8,[R0,#4]
+   SUB      R0,R8,R7
+   CMP      R5,R0
+   BGT      FR_Bigger
+   BLT      FR_Smaller
+   MOV      R0,R7
+   LDMFD    R13!,{R4-R9,R15}
+
+.FR_Bigger
+   LDR      R9,Flex_Blocks
+   LDR      R9,[R6,R9,LSL #2]
+   ; Check wimp slot
+   ;
+   LDR      R0,MemTop
+   SUB      R3,R8,R7
+   SUB      R3,R5,R3
+   ADD      R3,R3,R9
+   CMP      R3,R0
+   BLT      FR_No_SlotSize
+   ; Set SlotSize
+   ;
+   SUB      R0,R3,#&8000
+   MVN      R1,#0
+   SWI      Wimp_SlotSize
+   ADD      R0,R0,#&8000
+   CMP      R0,R3
+   MOVLT    R0,#&09                    ; Messages_Error #&09 = Not enough memory
+   BLT      Messages_Error
+   STR      R0,MemTop
+
+.FR_No_SlotSize
+   ; Move memory
+   ;
+   MOV      R0,R8
+   MOV      R1,R9
+   ADD      R2,R7,R5
+   BL       Move_Memory_Up
+   ; Clear memory
+   ;
+   MOV      R0,R8
+   ADD      R1,R7,R5
+   BL       Clear_Memory
+   MOV      R0,R4
+   MOV      R1,R5
+   BL       Update_Flex_Array
+   MOV      R0,R7
+   LDMFD    R13!,{R4-R9,R15}
+
+.FR_Smaller
+   ; Move memory
+   ;
+   LDR      R9,Flex_Blocks
+   LDR      R9,[R6,R9,LSL #2]
+   MOV      R0,R8
+   MOV      R1,R9
+   ADD      R2,R7,R5
+   BL       Move_Memory_Down
+   ; Set wimp slot
+   ;
+   SUB      R0,R8,R7
+   SUB      R0,R0,R5
+   SUB      R0,R9,R0
+   SUB      R0,R0,#&8000
+   MVN      R1,#0
+   SWI      Wimp_SlotSize
+   ADD      R0,R0,#&8000
+   STR      R0,MemTop
+   MOV      R0,R4
+   MOV      R1,R5
+   BL       Update_Flex_Array
+   MOV      R0,R7
+   LDMFD    R13!,{R4-R9,R15}
+
+; >-------------------------------------------------------------<
+
+.Flex_Delete                           ; R0 = Block number to delete
+   STMFD    R13!,{R4-R6,R14}
+   LDR      R6,Flex_Blocks
+   CMP      R0,R6
+   MOVHS    R0,#&08                    ; Messages_Error #&08 = No such Flex block
+   BHS      Messages_Error
+
+   MOV      R4,R0
+   MOV      R1,#0
+   BL       Flex_Resize
+   ADR      R5,Flex_Array
+   ; Delete block from Flex array
+   ;
+   ADD      R2,R5,R4,LSL #2
+   ADD      R0,R2,#4
+   ADD      R1,R5,R6,LSL #2
+   ADD      R1,R1,#4
+   BL       Move_Memory_Down
+   SUB      R6,R6,#1
+   STR      R6,Flex_Blocks
+   LDMFD    R13!,{R4-R6,R15}
+
+; >-------------------------------------------------------------<
+
+.Move_Memory_Up                         ;_R0-> Start, _R1-> End, _R2-> Destination
+   STMFD    R13!,{R4-R11,R14}
+   ; Read from end, write to destination+size
+   ;
+   SUBS     R0,R1,R0
+   LDMLEFD  R13!,{R4-R11,R15}
+   ADD      R2,R2,R0
+   MOVS     R3,R0,LSR #5
+   BEQ      MMU_Small_Loop
+   SUB      R0,R0,R3,LSL #5
+
+.MMU_Big_Loop
+   LDMDB    R1!,{R4-R11}
+   STMDB    R2!,{R4-R11}
+   SUBS     R3,R3,#1
+   BGT      MMU_Big_Loop
+   CMP      R0,#0
+   LDMLEFD  R13!,{R4-R11,R15}
+
+.MMU_Small_Loop
+   LDR      R4,[R1,#-4]!
+   STR      R4,[R2,#-4]!
+   SUBS     R0,R0,#4
+   BGT      MMU_Small_Loop
+   LDMFD    R13!,{R4-R11,R15}
+
+; >-------------------------------------------------------------<
+
+.Move_Memory_Down                       ;_R0-> Start, _R1-> End, _R2-> Destination
+   STMFD    R13!,{R4-R11,R14}
+   ; Read from start, write to destination
+   ;
+   SUBS     R1,R1,R0
+   LDMLEFD  R13!,{R4-R11,R15}
+   MOVS     R3,R1,LSR #5
+   BEQ      MMD_Small_Loop
+   SUB      R1,R1,R3,LSL #5
+
+.MMD_Big_Loop
+   LDMIA    R0!,{R4-R11}
+   STMIA    R2!,{R4-R11}
+   SUBS     R3,R3,#1
+   BGT      MMD_Big_Loop
+   CMP      R1,#0
+   LDMLEFD  R13!,{R4-R11,R15}
+
+.MMD_Small_Loop
+   LDR      R4,[R0],#4
+   STR      R4,[R2],#4
+   SUBS     R1,R1,#4
+   BGT      MMD_Small_Loop
+   LDMFD    R13!,{R4-R11,R15}
+
+; >-------------------------------------------------------------<
+
+.Move_Memory_Up_Byte                    ;_R0-> Start, _R1-> End, _R2-> Destination
+   STMFD    R13!,{R4-R11,R14}
+   ; Read from end, write to destination+size
+   ;
+   SUBS     R0,R1,R0
+   LDMLEFD  R13!,{R4-R11,R15}
+   ADD      R2,R2,R0
+
+.MMUB_Loop
+   LDRB     R4,[R1,#-1]!
+   STRB     R4,[R2,#-1]!
+   SUBS     R0,R0,#1
+   BGT      MMUB_Loop
+   LDMFD    R13!,{R4-R11,R15}
+
+; >-------------------------------------------------------------<
+
+.Clear_Memory                           ;_R0-> Start, _R1-> End
+   STMFD    R13!,{R4-R11,R14}
+   SUB      R2,R1,R0
+   MOV      R4,#0
+   MOVS     R3,R2,LSR #5
+   BEQ      CM_Small_Loop
+   SUB      R2,R2,R3,LSL #5
+   MOV      R5,#0
+   MOV      R6,#0
+   MOV      R7,#0
+   MOV      R8,#0
+   MOV      R9,#0
+   MOV      R10,#0
+   MOV      R11,#0
+
+.CM_Big_Loop
+   STMIA    R0!,{R4-R11}
+   SUBS     R3,R3,#1
+   BGT      CM_Big_Loop
+   CMP      R2,#0
+   LDMLEFD  R13!,{R4-R11,R15}
+
+.CM_Small_Loop
+   STR      R4,[R0],#4
+   SUBS     R2,R2,#4
+   BGT      CM_Small_Loop
+   LDMFD    R13!,{R4-R11,R15}
+
+; >-------------------------------------------------------------<
+
+.Update_Flex_Array                      ;_R0 = Block, _R1 = Size
+   STMFD    R13!,{R14}
+   ADR      R2,Flex_Array
+   MOV      R14,R2
+   LDR      R0,[R2,R0,LSL #2]!
+   LDR      R3,[R2,#4]!
+   SUB      R0,R3,R0
+   SUB      R1,R1,R0
+   LDR      R3,Flex_Blocks
+   ADD      R3,R14,R3,LSL #2
+
+.UFA_Loop
+   LDR      R0,[R2]
+   ADD      R0,R0,R1
+   STR      R0,[R2],#4
+   CMP      R2,R3
+   BLE      UFA_Loop
+   LDMFD    R13!,{R15}

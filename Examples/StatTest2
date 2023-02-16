@@ -1,0 +1,112 @@
+   ; Try making pie charts with this source.
+   ; It contains all instructions for ARM and FPA.
+   ;
+   ; ARM
+   ; ---
+   ; Unary
+   ;
+   MOV      R1,R2
+   MVN      R1,R2
+   ; Dyadic
+   ;
+   ADD      R1,R2,R3
+   SUB      R1,R2,R3
+   RSB      R1,R2,R3
+   ADC      R1,R2,R3
+   SBC      R1,R2,R3
+   RSC      R1,R2,R3
+   MUL      R1,R2,R3
+   MLA      R1,R2,R3,R4
+   AND      R1,R2,R3
+   ORR      R1,R2,R3
+   EOR      R1,R2,R3
+   BIC      R1,R2,R3
+   ; Compare
+   ;
+   CMP      R1,R2
+   CMN      R1,R2
+   TST      R1,R2
+   TEQ      R1,R2
+   ; Load/store
+   ;
+   LDR      R1,[R2]
+   STR      R1,[R2]
+   LDMIA    R1,{R2}
+   STMIA    R1,{R2}
+   ; Branch
+   ;
+   B        &1234
+   BL       &1234
+   ; PSR transfer
+   ;
+   MRS      R1,CPSR
+   MSR      CPSR,R1
+   ; SWI
+   ;
+   SWI      OS_WriteS
+   ; SWP
+   ;
+   SWP      R1,R2,[R3]
+   ; Extra
+   ;
+   ADR      R1,&8000
+   ;TEMP     R10
+   ;DIV      R1,R2,R3
+   ;LOCK     R10
+   ;EXG      R1,R2
+   ; FPA
+   ; ---
+   ;
+   ; Unary operators
+   ;
+   MNFS     F1,F2
+   MVFS     F1,F2
+   ABSS     F1,F2
+   SQTS     F1,F2
+   LOGS     F1,F2
+   LGNS     F1,F2
+   EXPS     F1,F2
+   SINS     F1,F2
+   COSS     F1,F2
+   TANS     F1,F2
+   ASNS     F1,F2
+   ACSS     F1,F2
+   ATNS     F1,F2
+   RNDS     F1,F2
+   URDS     F1,F2
+   NRMS     F1,F2
+   ; Dyadic operators
+   ;
+   ADFS     F1,F2,F3
+   SUFS     F1,F2,F3
+   RSFS     F1,F2,F3
+   MUFS     F1,F2,F3
+   DVFS     F1,F2,F3
+   RDFS     F1,F2,F3
+   RMFS     F1,F2,F3
+   FMLS     F1,F2,F3
+   FDVS     F1,F2,F3
+   FRDS     F1,F2,F3
+   POWS     F1,F2,F3
+   RPWS     F1,F2,F3
+   POLS     F1,F2,F3
+   ; Compare
+   ;
+   CMF      F1,F2
+   CNF      F1,F2
+   CMFE     F1,F2
+   CNFE     F1,F2
+   ; Register transfer
+   ;
+   FIX      R1,F2
+   FLTS     F1,R2
+   RFS      R1
+   WFS      R1
+   RFC      R1
+   WFC      R1
+   ; Load/store
+   ;
+   LDFS     F1,[R2]
+   STFS     F1,[R2]
+   LFM      F1,1,[R2]
+   SFM      F1,1,[R2]

@@ -1,0 +1,91 @@
+
+; >-------------------------------------------------------------<
+
+.DT_PKHBT_PKHTB                        ;_R8 = "K"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BEQ      DT_PKHBT
+   CMP      R8,#'T'
+   BEQ      DT_PKHTB
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_PKHBT                              ;_R8 = "B"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ;------> PKHBT Cond        [Rn][Rd]shift   [Rm]
+   MOVEQ    R9,# %00000110100000000000000000010000
+   BEQ      DT_PKH
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_PKHTB                              ;_R8 = "T"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   ;------> PKHTB Cond        [Rn][Rd]shift   [Rm]
+   MOVEQ    R9,# %00000110100000000000000001010000
+   BEQ      DT_PKH
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_PKH                                ;_R8 = "B"/"T"
+   MOV      R4,R8
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Rn_Register
+   BL       Decode_Operand_Rm_Register
+   BL       Skip_Blanks
+   CMP      R8,#','
+   BICNE    R9,R9,#1 << 6
+   BNE      DT_Write_Instruction
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   BIC      R8,R8,#32
+   CMP      R4,#'T'
+   BEQ      DT_PKH_LSL
+   CMP      R8,#'A'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   BNE      DT_Unknown
+   B        DT_PKH_Shift
+
+.DT_PKH_LSL
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'S'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+
+.DT_PKH_Shift
+   LDRB     R8,[R10],#1
+   BL       Decode_Immediate
+   CMP      R4,#'B'
+   CMPEQ    R0,#32
+   MOVEQ    R0,#0
+   CMP      R0,#31
+   MOVHI    R0,#&01                    ; Asm_Error #&01 = Illegal shift
+   BHI      Asm_Error
+   ORR      R9,R9,R0,LSL #7
+   B        DT_Write_Instruction

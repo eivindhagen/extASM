@@ -1,0 +1,110 @@
+
+   #name <extASM$Dir>.Resources.DDEUtilsEm
+   #type &FFA
+
+   ; This module implements two SWIs, DDEUtils_ThrowbackRegister (&42585) and
+   ; DDEUtils_ThrowbackUnRegister (&42586). The argument for these is the task handle of the
+   ; task wishing to receive Throwback information. This module then stores the task handle,
+   ; and it can be read with DDEUtils_ReadTaskHandle (&4258A) (new SWI).
+   ;
+.Module_Start
+   DCD      0                          ; Start
+   DCD      0                          ; Initialisation
+   DCD      0                          ; Finalisation
+   DCD      0                          ; Service call handler
+   DCD      Title-Module_Start         ; Title string
+   DCD      Help-Module_Start          ; Help string
+   DCD      0                          ; Help and command keyword table
+   DCD      &42580                     ; SWI chunk base number
+   DCD      SWI_Code-Module_Start      ; SWI handler code
+   DCD      SWI_Table-Module_Start     ; SWI decoding table
+   DCD      0                          ; SWI decoding code
+   DCD      0                          ; Messages file
+   DCD      Module_flag-Module_Start   ; Module flags word
+
+.Title
+   DCB      "DDEUtilsEm",0
+   ALIGN
+
+.Help
+   DCB      "DDEUtils emulator",9,"1.00 (16 Aug 1995) © Terje Slettebø",0
+   ALIGN
+
+.Module_flag
+   DCD      1
+
+.SWI_Table
+   DCB      "DDEUtils",0
+   DCB      "Prefix",0                 ; &42580 - Performs nothing here
+   DCB      "SetCLSize",0              ; &42581 - Performs nothing here
+   DCB      "SetCL",0                  ; &42582 - Performs nothing here
+   DCB      "GetCLSize",0              ; &42583 - Performs nothing here
+   DCB      "GetCL",0                  ; &42584 - Performs nothing here
+   DCB      "ThrowbackRegister",0      ; &42585
+   DCB      "ThrowbackUnRegister",0    ; &42586
+   DCB      "ThrowbackStart",0         ; &42587 - Performs nothing here
+   DCB      "ThrowbackSend",0          ; &42588 - Performs nothing here
+   DCB      "ThrowbackEnd",0           ; &42589 - Performs nothing here
+   DCB      "ReadTaskHandle",0,0       ; &4258A - Returns registered Throwback task handle
+   ALIGN                               ;          or null in R0.
+
+.SWI_Code
+   ; R0  =  Task handle of task wishing to receive Throwback information, usually an editor
+   ;        (for code 5 and 6)
+   ; R11 =  SWI number modulo 64 (i.e. 0-63)
+   ; R12 -> Currently preferred instantiation (workspace pointer)
+   ; R13 =  Supervisor stack
+   ; R14 =  The flags of the SWI caller, and return address
+   ;
+   ; R10-R12 may be corrupted
+   ;
+   ; Interrupts are disabled on entry. They should be enabled if the routine takes more
+   ; than say 20 us.
+   ;
+   ; Processor is in SVC mode
+   ;
+   CMP      R11,#5
+   BNE      SWI_Not_Register
+   LDR      R10,Throwback_Task_Handle
+   CMP      R10,#0                     ; Is Throwback previously registered?
+   BEQ      ok1
+   ADR      R0,TR_Error
+   TEQ      R15,R15
+   MOVEQ    R15,R14
+   ORRNE    R15,R14,#1 << 28
+.ok1
+   STR      R0,Throwback_Task_Handle   ; Store task handle
+   MOV      R15,R14
+
+.SWI_Not_Register
+   CMP      R11,#6
+   BNE      SWI_Not_UnRegister
+   LDR      R10,Throwback_Task_Handle
+   CMP      R0,R10                     ; Is it the same task that registered Throwback?
+   BEQ      ok2
+   ADR      R0,TU_Error
+   TEQ      R15,R15
+   MOVEQ    R15,R14
+   ORRNE    R15,R14,#1 << 28
+.ok2
+   MOV      R10,#0
+   STR      R10,Throwback_Task_Handle
+   MOV      R15,R14
+
+.SWI_Not_UnRegister
+   CMP      R11,#&A
+   LDREQ    R0,Throwback_Task_Handle
+   MOV      R15,R14
+
+.Throwback_Task_Handle
+   DCD      0
+.TR_Error
+   DCD      &20604
+   DCB      "Another task is registered for throwback",0
+   ALIGN
+.TU_Error
+   DCD      &20605
+   DCB      "Task not registered for throwback",0
+   ALIGN
+
+.Module_End

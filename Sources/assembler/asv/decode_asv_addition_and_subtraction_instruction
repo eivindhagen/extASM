@@ -1,0 +1,329 @@
+
+; >-------------------------------------------------------------<
+
+.DT_VADD                               ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   LDRB     R8,[R10]
+   CMP      R8,#'H'
+   CMPNE    R8,#'h'
+   ADDEQ    R10,R10,#1
+   BEQ      DT_VADDHN
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   ; VADDL.<S|U><8|16|32> Qd, Dn, Dm (SIMD)
+   ;
+   ;------> VADDL       U Dsz[Vn][Vd]    N M [Vm]
+   MOVEQ    R9,#%11110010100000000000000000000000
+   ADDEQ    R10,R10,#1
+   BEQ      DT_SIMD_SU_8_16_32_Qd_Dn_Dm
+   CMP      R8,#'W'
+   CMPNE    R8,#'w'
+   ; VADDW.<S|U><8|16|32> Qd, Qn, Dm (SIMD)
+   ;
+   ;------> VADDW       U Dsz[Vn][Vd]    N M [Vm]
+   MOVEQ    R9,#%11110010100000000000000100000000
+   ADDEQ    R10,R10,#1
+   BEQ      DT_SIMD_SU_8_16_32_Qd_Qn_Dm
+   ; VADD.I<8|16|32|64> Qd, Qn, Qm (SIMD)
+   ; VADD.I<8|16|32|64> Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VADD          Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R0,#%00000010000000000000100000000000
+   ; VADD.F32 Qd, Qn, Qm (SIMD)
+   ; VADD.F32 Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VADD          D S[Vn][Vd]    NQM [Vm]
+   MOV      R1,#%00000010000000000000110100000000
+   ; VADD<cond>.F64 Dd, Dn, Dm (VFP)
+   ; VADD<cond>.F32 Sd, Sn, Sm (VFP)
+   ;
+   ;------> VADD Cond     D  [Vn][Vd]   SN M [Vm]
+   MOV      R2,#%00001110001100000000101000000000
+   B        DT_SIMD_I_8_16_32_64_F32_Xd_Xn_Xm_Or_VFP
+
+; >-------------------------------------------------------------<
+
+.DT_VADDHN                             ;_R8 = "H"/"h"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DT_Unknown
+   ; VADDHN.I<16|32|64> Dd, Qn, Qm (SIMD)
+   ;
+   ;------> VADDHN        Dsz[Vn][Vd]    N M [Vm]
+   MOV      R9,#%11110010100000000000010000000000
+   B        DT_SIMD_I_16_32_64_Dd_Qn_Qm
+
+; >-------------------------------------------------------------<
+
+.DT_VHADD_VHSUB                        ;_R8 = "H"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_VHADD
+   CMP      R8,#'S'
+   BEQ      DT_VHSUB
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VHADD                              ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   ; VHADD.<S|U><8|16|32> Qd, Qn, Qm (SIMD)
+   ; VHADD.<S|U><8|16|32> Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VHADD       U Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R9,#%11110010000000000000000000000000
+   B        DT_SIMD_SU_8_16_32_Xd_Xn_Xm
+
+; >-------------------------------------------------------------<
+
+.DT_VHSUB                              ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'U'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BNE      DT_Unknown
+   ; VHSUB.<S|U><8|16|32> Qd, Qn, Qm (SIMD)
+   ; VHSUB.<S|U><8|16|32> Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VHSUB       U Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R9,#%11110010000000000000001000000000
+   B        DT_SIMD_SU_8_16_32_Xd_Xn_Xm
+
+; >-------------------------------------------------------------<
+
+.DT_VPAD                               ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BEQ      DT_VPADAL
+   CMP      R8,#'D'
+   BEQ      DT_VPADD
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_VPADAL                             ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'L'
+   BNE      DT_Unknown
+   ; VPADAL.<S|U><8|16|32> Qd, Qm (SIMD)
+   ; VPADAL.<S|U><8|16|32> Dd, Dm (SIMD)
+   ;
+   ;------> VPADAL        D  sz  [Vd]    OQM [Vm]
+   MOV      R9,#%11110011101100000000011000000000
+   B        DT_SIMD_SU_8_16_32_Xd_Xm
+
+; >-------------------------------------------------------------<
+
+.DT_VPADD                              ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   BEQ      DT_VPADDL
+   BL       Decode_VFP_Operand_Type
+   CMP      R1,#VFP_Operand_Int
+   BEQ      DT_VPADD_Int
+   CMP      R1,#VFP_Operand_FP
+   BEQ      DT_VPADD_FP
+   B        DT_Illegal_Operand_Type
+
+.DT_VPADD_Int
+   ; VPADD.I<8|16|32> Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VPADD         Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R9,#%11110010000000000000101100010000
+   ORR      R9,R9,R0,LSL #SIMD_Size_Pos_DNM
+   B        DT_SIMD_Dd_Dn_Dm
+
+.DT_VPADD_FP
+   ; VPADD.F32 Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VPADD         D S[Vn][Vd]    NQM [Vm]
+   CMP      R0,#VFP_Operand_32
+   BNE      DT_Illegal_Operand_Type
+   MOV      R9,#%11110011000000000000110100000000
+   B        DT_SIMD_Dd_Dn_Dm
+
+; >-------------------------------------------------------------<
+
+.DT_VPADDL                             ;_R8 = "L"
+   ; VPADDL.<S|U><8|16|32> Qd, Qm (SIMD)
+   ; VPADDL.<S|U><8|16|32> Dd, Dm (SIMD)
+   ;
+   ;------> VPADDL        D  sz  [Vd]    OQM [Vm]
+   MOV      R9,#%11110011101100000000001000000000
+   B        DT_SIMD_SU_8_16_32_Xd_Xm
+
+; >-------------------------------------------------------------<
+
+.DT_VQADD                              ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   ; VQADD<S|U><8|16|32|64> Qd, Qn, Qm (SIMD)
+   ; VQADD<S|U><8|16|32|64> Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VQADD       U Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R9,#%11110010000000000000000000010000
+   B        DT_SIMD_SU_8_16_32_64_Xd_Xn_Xm
+
+; >-------------------------------------------------------------<
+
+.DT_VQSUB                              ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BNE      DT_Unknown
+   ; VQSUB<S|U><8|16|32|64> Qd, Qn, Qm (SIMD)
+   ; VQSUB<S|U><8|16|32|64> Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VQSUB       U Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R9,#%11110010000000000000001000010000
+   B        DT_SIMD_SU_8_16_32_64_Xd_Xn_Xm
+
+; >-------------------------------------------------------------<
+
+.DT_VRADDHN                            ;_R8 = "A"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DT_Unknown
+   ; VRADDHN.I<16|32|64> Dd, Qn, Qm (SIMD)
+   ;
+   ;------> VRADDHN       Dsz[Vn][Vd]    N M [Vm]
+   MOV      R9,#%11110011100000000000010000000000
+   B        DT_SIMD_I_16_32_64_Dd_Qn_Qm
+
+; >-------------------------------------------------------------<
+
+.DT_VRHADD                             ;_R8 = "H"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'A'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   BNE      DT_Unknown
+   ; VRHADD.<S|U><8|16|32> Qd, Qn, Qm (SIMD)
+   ; VRHADD.<S|U><8|16|32> Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VRHADD      U Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R9,#%11110010000000000000000100000000
+   B        DT_SIMD_SU_8_16_32_Xd_Xn_Xm
+
+; >-------------------------------------------------------------<
+
+.DT_VRSUBHN                            ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'H'
+   BNE      DT_Unknown
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DT_Unknown
+   ; VRSUBHN.I<16|32|64> Dd, Qn, Qm (SIMD)
+   ;
+   ;------> VRSUBHN       Dsz[Vn][Vd]    N M [Vm]
+   MOV      R9,#%11110011100000000000011000000000
+   B        DT_SIMD_I_16_32_64_Dd_Qn_Qm
+
+; >-------------------------------------------------------------<
+
+.DT_VSUB                               ;_R8 = "U"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   BNE      DT_Unknown
+   LDRB     R8,[R10]
+   CMP      R8,#'H'
+   CMPNE    R8,#'h'
+   ADDEQ    R10,R10,#1
+   BEQ      DT_VSUBHN
+   CMP      R8,#'L'
+   CMPNE    R8,#'l'
+   ; VSUBL.<S|U><8|16|32> Qd, Dn, Dm (SIMD)
+   ;
+   ;------> VSUBL       U Dsz[Vn][Vd]    N M [Vm]
+   MOVEQ    R9,#%11110010100000000000001000000000
+   ADDEQ    R10,R10,#1
+   BEQ      DT_SIMD_SU_8_16_32_Qd_Dn_Dm
+   CMP      R8,#'W'
+   CMPNE    R8,#'w'
+   ; VSUBW.<S|U><8|16|32> Qd, Qn, Dm (SIMD)
+   ;
+   ;------> VSUBW       U Dsz[Vn][Vd]    N M [Vm]
+   MOVEQ    R9,#%11110010100000000000001100000000
+   ADDEQ    R10,R10,#1
+   BEQ      DT_SIMD_SU_8_16_32_Qd_Qn_Dm
+   ; VSUB.I<8|16|32|64> Qd, Qn, Qm (SIMD)
+   ; VSUB.I<8|16|32|64> Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VSUB          Dsz[Vn][Vd]    NQM [Vm]
+   MOV      R0,#%00000011000000000000100000000000
+   ; VSUB.F32 Qd, Qn, Qm (SIMD)
+   ; VSUB.F32 Dd, Dn, Dm (SIMD)
+   ;
+   ;------> VSUB          D S[Vn][Vd]    NQM [Vm]
+   MOV      R1,#%00000010001000000000110100000000
+   ; VSUB<cond>.F64 Dd, Dn, Dm (VFP)
+   ; VSUB<cond>.F32 Sd, Sn, Sm (VFP)
+   ;
+   ;------> VSUB Cond     D  [Vn][Vd]   SN M [Vm]
+   MOV      R2,#%00001110001100000000101001000000
+   B        DT_SIMD_I_8_16_32_64_F32_Xd_Xn_Xm_Or_VFP
+
+; >-------------------------------------------------------------<
+
+.DT_VSUBHN                             ;_R8 = "H"/"h"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   BNE      DT_Unknown
+   ; VSUBHN.I<16|32|64> Dd, Qn, Qm (SIMD)
+   ;
+   ;------> VSUBHN        Dsz[Vn][Vd]    N M [Vm]
+   MOV      R9,#%11110010100000000000011000000000
+   B        DT_SIMD_I_16_32_64_Dd_Qn_Qm

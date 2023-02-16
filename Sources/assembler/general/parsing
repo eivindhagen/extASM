@@ -1,0 +1,168 @@
+
+; >-------------------------------------------------------------<
+
+.Skip_Blanks                           ;_R8 = Blank or non-Blank, ~R8 = Non-blank char
+._Loop
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   LDREQB   R8,[R10],#1
+   BEQ      _Loop
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Ensure_Blank                          ;_R8 = Blank, ~R8 = Next char
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   MOVNE    R0,#&2C                    ; Asm_Error #&2C = Missing " "
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Ensure_Blank_Or_Newline               ;_R8 = Blank, newline, ":" or ";"
+   CMP      R8,#' '
+   CMPNE    R8,#&09
+   CMPNE    R8,#&0A
+   CMPNE    R8,#':'                    ; Colon act as newline
+   CMPNE    R8,#';'
+   BNE      DT_Unknown
+   MOV      R15,R14
+
+; >-------------------------------------------------------------<
+
+.Ensure_Comma                          ;_R8 = "," or Blank, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   CMP      R8,#','
+   MOVNE    R0,#&20                    ; Asm_Error #&20 = Missing ","
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Ensure_Pound                          ;_R8 = "#" or Blank, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   CMP      R8,#'#'
+   MOVNE    R0,#&27                    ; Asm_Error #&27 = Missing "#"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Ensure_Open_Bracket                   ;_R8 = "[" or Blank, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   CMP      R8,#'['
+   MOVNE    R0,#&11                    ; Asm_Error #&11 = Missing "["
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Ensure_Close_Bracket                  ;_R8 = "]" or Blank, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   CMP      R8,#']'
+   MOVNE    R0,#&12                    ; Asm_Error #&12 = Missing "]"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Ensure_Open_Brace                     ;_R8 = "{" or Blank, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   CMP      R8,#'{'
+   MOVNE    R0,#&21                    ; Asm_Error #&21 = Missing "{"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Ensure_Close_Brace                    ;_R8 = "}" or Blank, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   CMP      R8,#'}'
+   MOVNE    R0,#&22                    ; Asm_Error #&22 = Missing "}"
+   BNE      Asm_Error
+   LDRB     R8,[R10],#1
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Optional_Pound                        ;_R8 = "#" or any char, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Skip_Blanks
+   CMP      R8,#'#'
+   LDREQB   R8,[R10],#1
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Find_Quote                            ;_R8 = """ or other char, ~R8 = """
+._Loop
+   CMP      R8,#'"'
+   MOVEQ    R15,R14
+   CMP      R8,#&0A
+   LDRNEB   R8,[R10],#1
+   BNE      _Loop
+   MOV      R0,#&28                    ; Asm_Error #&28 = Missing """
+   B        Asm_Error
+
+; >-------------------------------------------------------------<
+
+.Find_Brace_Start                      ;_R0 - 1 = Skip header
+   ;------> Find first "{"             ;_R8 = ":", ";", Blank, EOL or "{"
+   STMFD    R13!,{R4,R14}              ;~R8 = "{" or char before first char
+   LDR      R4,Source_Line             ;~R14 = -1, Error, no "{"
+
+.FBS_Loop
+   CMP      R8,#';'
+   BLEQ     Flush_Line
+   CMP      R8,#&0A
+   BNE      FBS_Not_Newline
+   MOV      R0,#0
+   ADD      R4,R4,#1
+   LDRB     R8,[R10],#1
+   BL       Skip_Blanks
+   B        FBS_Loop
+
+.FBS_Not_Newline
+   CMP      R8,#':'
+   BEQ      FBS_Not_Brace
+   CMP      R8,#'{'
+   STREQ    R4,Source_Line
+   MOVEQ    R14,#0
+   LDMEQFD  R13!,{R4,R15}
+
+.FBS_Not_Brace
+   CMP      R0,#1
+   LDREQB   R8,[R10],#1
+   BEQ      FBS_Loop
+   SUB      R10,R10,#2
+   LDRB     R8,[R10],#1
+   STR      R4,Source_Line
+   MVN      R14,#0
+   LDMFD    R13!,{R4,R15}
+
+; >-------------------------------------------------------------<
+
+.Flush_Line                            ;_R8 = Any character, ~R8 = EOL
+._Loop
+   #rept 8
+   CMP      R8,#&0A                    ; The loop is unrolled, to make it a bit faster
+   MOVEQ    R15,R14
+   LDRB     R8,[R10],#1
+   #endr
+   CMP      R8,#&0A
+   LDRNEB   R8,[R10],#1
+   BNE      _Loop
+   MOV      R15,R14

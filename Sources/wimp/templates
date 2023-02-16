@@ -1,0 +1,114 @@
+
+; >-------------------------------------------------------------<
+
+.Read_Templates
+   STMFD    R13!,{R4-R7,R14}
+
+   ADR      R1,Template_File
+   SWI      Wimp_OpenTemplate
+   ; Load Info template
+   ;
+   ADR      R7,Menu_Array
+   ADR      R1,Block
+   LDR      R2,Ind_Pointer
+   ADR      R3,Ind_Block+Ind_Size
+   MVN      R4,#0
+   ADRL     R5,Template_INFO
+   MOV      R6,#0
+   SWI      Wimp_LoadTemplate
+   CMP      R6,#0
+   MOVEQ    R0,#&02                    ; Messages_Error #&02 = Template '<Template>' not found
+   ADRLEQ   R1,Template_INFO
+   BEQ      Messages_Error1
+   SWI      Wimp_CreateWindow
+   STR      R0,Handle_INFO
+   STR      R0,[R7,#20]
+   ; Load Save template
+   ;
+   ADR      R5,Template_SAVE
+   MOV      R6,#0
+   SWI      Wimp_LoadTemplate
+   CMP      R6,#0
+   MOVEQ    R0,#&02                    ; Messages_Error #&02 = Template '<Template>' not found
+   ADREQ    R1,Template_SAVE
+   BEQ      Messages_Error1
+   SWI      Wimp_CreateWindow
+   STR      R0,Handle_SAVE
+   STR      R0,[R7,#28]
+   ; Load Options template
+   ;
+   ADR      R5,Template_OPTIONS
+   MOV      R6,#0
+   SWI      Wimp_LoadTemplate
+   CMP      R6,#0
+   MOVEQ    R0,#&02                    ; Messages_Error #&02 = Template '<Template>' not found
+   ADREQ    R1,Template_OPTIONS
+   BEQ      Messages_Error1
+   SWI      Wimp_CreateWindow
+   STR      R0,Handle_OPTIONS
+   STR      R0,[R7,#24]
+   ; Load Process template
+   ;
+   ADR      R5,Template_PROCESS
+   MOV      R6,#0
+   SWI      Wimp_LoadTemplate
+   CMP      R6,#0
+   MOVEQ    R0,#&02                    ; Messages_Error #&02 = Template '<Template>' not found
+   ADREQ    R1,Template_PROCESS
+   BEQ      Messages_Error1
+   SWI      Wimp_CreateWindow
+   STR      R0,Handle_PROCESS
+   ; Load Status template
+   ;
+   ADR      R5,Template_STATUS
+   MOV      R6,#0
+   SWI      Wimp_LoadTemplate
+   CMP      R6,#0
+   MOVEQ    R0,#&02                    ; Messages_Error #&02 = Template '<Template>' not found
+   ADREQ    R1,Template_STATUS
+   BEQ      Messages_Error1
+   MOV      R0,#&FF
+   STRB     R0,[R1,#35]                ; Patch, to set so Wimp doesn't clear window
+   SWI      Wimp_CreateWindow
+   STR      R0,Handle_STATUS
+   ; Load ARM Statistics template
+   ;
+   ADR      R5,Template_STAT_ARM
+   MOV      R6,#0
+   SWI      Wimp_LoadTemplate
+   CMP      R6,#0
+   MOVEQ    R0,#&02                    ; Messages_Error #&02 = Template '<Template>' not found
+   ADREQ    R1,Template_STAT_ARM
+   BEQ      Messages_Error1
+   BL       Init_Stat_Window
+   SWI      Wimp_CreateWindow
+   STR      R0,Handle_STAT_ARM
+   STR      R0,[R7,#32]
+   ; Load FPA Statistics window
+   ;
+   ADR      R5,Template_STAT_FPA
+   MOV      R6,#0
+   SWI      Wimp_LoadTemplate
+   CMP      R6,#0
+   MOVEQ    R0,#&02                    ; Messages_Error #&02 = Template '<Template>' not found
+   ADREQ    R1,Template_STAT_FPA
+   BEQ      Messages_Error1
+   BL       Init_Stat_Window
+   SWI      Wimp_CreateWindow
+   STR      R0,Handle_STAT_FPA
+   STR      R0,[R7,#36]
+
+   STR      R2,Ind_Pointer
+   SWI      Wimp_CloseTemplate
+
+   LDMFD    R13!,{R4-R7,R15}
+
+.Template_File DCB   "|<extASM$Dir>.Templates",0
+.Template_INFO       DCB   "INFO",0
+.Template_SAVE       DCB   "SAVE",0
+.Template_OPTIONS    DCB   "OPTIONS",0
+.Template_PROCESS    DCB   "PROCESS",0
+.Template_STATUS     DCB   "STATUS",0
+.Template_STAT_ARM   DCB   "STAT_ARM",0
+.Template_STAT_FPA   DCB   "STAT_FPA",0
+   ALIGN

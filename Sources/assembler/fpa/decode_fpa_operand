@@ -1,0 +1,121 @@
+
+; >-------------------------------------------------------------<
+
+.Decode_FP_Destination_Register        ;_R8 = Blank, ~R0 = Register, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Ensure_Blank
+   BL       Decode_FP_Register
+   ORR      R9,R9,R0,LSL #Rd_Pos
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Decode_Operand_Register_Fd            ;_R8 = "," or Blank, ~R0 = Register, ~R8 = Next char
+   Decode_FP_Operand_Register Rd_Pos
+
+; >-------------------------------------------------------------<
+
+.Decode_Operand_Register_Fn            ;_R8 = "," or Blank, ~R0 = Register, ~R8 = Next char
+   Decode_FP_Operand_Register Rn_Pos
+
+; >-------------------------------------------------------------<
+
+.Decode_Operand_Register_Fm            ;_R8 = "," or Blank, ~R0 = Register, ~R8 = Next char
+   Decode_FP_Operand_Register Rm_Pos
+
+; >-------------------------------------------------------------<
+
+.Decode_FP_Operand_Two                 ;_R8 = "," or Blank, ~R8 = Next char
+   STMFD    R13!,{R14}
+   BL       Decode_FP_Operand_Two_Value
+   CMN      R14,#1
+   BEQ      DFOT_Not_Write_Instruction
+   ORR      R9,R9,R0
+   BL       Write_Instruction
+   LDMFD    R13!,{R15}
+
+.DFOT_Not_Write_Instruction
+   MOV      R0,#1
+   BL       Code_FP_Instruction
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Decode_FP_Operand_Two_Value           ;_R8 = "," or Blank, ~R0 = Operand two, ~R8 = Next char
+   STMFD    R13!,{R4,R14}              ;~R14 = Signal error, -1 indicate multiple
+                                       ; instructions needed, value in F0
+   BL       Ensure_Comma
+   BL       Skip_Blanks
+
+   ;------> Check if it's a register or an immediate constant
+   CMP      R8,#'#'                    ; Immediate constant ?
+   BEQ      DFPOT_Immediate            ; If not, must be a FPRegister (or faulty)
+
+   BL       Decode_FP_Register         ; R0 = op2 FPReg
+   MOV      R14,#0
+   LDMFD    R13!,{R4,R15}
+
+.DFPOT_Immediate                       ;_R8 = "#"
+   ORR      R9,R9,#1 << 3              ; Immediate bit must be set here
+
+   MOV      R4,R10
+   LDRB     R8,[R10],#1
+   BL       Decode_FP_Immediate        ;_R0 = Immediate constant
+   CMN      R14,#1                     ; Check if coded value is okay
+   LDMNEFD  R13!,{R4,R15}
+   MOV      R10,R4
+   LDRB     R8,[R10],#1
+   BL       Decode_Expr
+   CMP      R1,#FP_Value
+   FLTLTEZ  F0,R0
+   BGT      Mismatch_Num
+   MVN      R14,#0
+   LDMFD    R13!,{R4,R15}
+
+; >-------------------------------------------------------------<
+
+.Decode_FP_Immediate                   ;_R8 = First char or Blank
+   STMFD    R13!,{R14}                 ;~R0 = Immediate value bits, ~R14 = Signal error,
+   BL       Skip_Blanks                ; -1 = Error, can not be coded in one instruction
+   MVN      R14,#0                     ;~R8 = Next char
+   CMP      R8,#'0'
+   RSBGES   R1,R8,#'5'                 ; char>="0" and char<="5"?
+   SUBGE    R0,R8,#'0'                 ; code=char-48
+   LDMLTFD  R13!,{R15}
+   LDRB     R8,[R10],#1
+   CMP      R8,#'0'
+   CMPEQ    R0,#1                      ; number=10?
+   MOVEQ    R0,#7                      ; code=7
+   LDREQB   R8,[R10],#1
+   CMP      R8,#'0'
+   RSBGES   R1,R8,#'9'
+   LDMGEFD  R13!,{R15}
+   CMP      R8,#'.'                    ; char="."?
+   BNE      DFPI_Ok
+   LDRB     R8,[R10],#1
+   CMP      R8,#'5'
+   CMPEQ    R0,#0                      ; number=0.5?
+   MOVEQ    R0,#6                      ; code=6
+   CMPNE    R8,#'0'                    ; number=xx.0?
+   LDMNEFD  R13!,{R15}
+   LDRB     R8,[R10],#1
+
+.DFPI_Ok
+   BL       Skip_Blanks
+   CMP      R8,#':'
+   CMPNE    R8,#';'
+   CMPNE    R8,#&0A
+   MOVEQ    R14,#0
+   MVNNE    R14,#0
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+macro Decode_FP_Operand_Register Shift:i
+{
+   STMFD    R13!,{R14}
+   BL       Ensure_Comma
+   BL       Decode_FP_Register
+   ORR      R9,R9,R0,LSL #Shift
+   LDMFD    R13!,{R15}
+}

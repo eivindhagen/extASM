@@ -1,0 +1,130 @@
+
+; >-------------------------------------------------------------<
+
+.Load_Source                           ;_R0-> Source filename (ctrl-terminated)
+   STMFD    R13!,{R4-R7,R14}
+   MOV      R6,R0
+   BL       Init_Flex_Blocks
+
+   MOV      R0,#17
+   MOV      R1,R6
+   SWI      OS_File                    ; Read size
+   CMP      R0,#1
+   MOVNE    R0,#&14                    ; Messages_Error #&14 = File '<Filename>' not found
+   MOVNE    R1,R6
+   BNE      Messages_Error1
+   STR      R4,Source_Size
+   MOV      R0,R2,LSL #12
+   MOV      R0,R0,LSR #20
+   STR      R0,Source_Filetype
+   MOV      R0,#Flex_Source
+   ADD      R1,R4,#5                   ; Space for source info
+   BL       Flex_Resize
+   MOV      R7,R0
+   MOV      R1,#&01
+   STRB     R1,[R0]
+
+   MOV      R0,#16
+   MOV      R1,R6
+   ADD      R2,R7,#1
+   MOV      R3,#0
+   SWI      OS_File                    ; Load file
+   ADD      R0,R7,R4
+   LDRB     R1,[R0],#1
+   CMP      R1,#&0A
+   MOVNE    R1,#&0A
+   STRNEB   R1,[R0],#1
+   MOV      R1,#&02
+   STRB     R1,[R0],#1
+   MOV      R1,#&0A
+   STRB     R1,[R0],#1
+   MOV      R1,#&00
+   STRB     R1,[R0],#1
+   SUB      R0,R0,R7
+   STR      R0,Source_Size_Data
+
+   MOV      R0,R6
+   BL       Add_Source_Name
+
+   LDMFD    R13!,{R4-R7,R15}
+
+.Load_WTLine_1   DCB   "Source length : %d",0
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+.Save_Object                           ;_R0-> Filename (ctrl-terminated)
+   STMFD    R13!,{R4,R5,R14}
+   MOV      R5,R0
+   MOV      R0,#Flex_Object
+   BL       Flex_Adr                   ;_R0-> Object block
+   MOV      R4,R0
+
+   LDR      R2,Object_Filetype
+   CMP      R2,#0
+   MOVNE    R0,#10                     ; Save with filetype
+   MOVEQ    R0,#0                      ; If no filetype, go for load/exec
+   LDREQ    R2,Object_Load
+   LDREQ    R3,Object_Exec
+   MOV      R1,R5
+   LDR      R5,Object_Size
+   ADD      R5,R5,R4
+   SWI      OS_File
+
+   LDMFD    R13!,{R4,R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Save_WimpText                         ;_R0-> Filename (ctrl-terminated)
+   STMFD    R13!,{R4,R5,R14}
+   MOV      R4,R0
+   MOV      R0,#Flex_WimpText
+   BL       Flex_Adr
+   MOV      R1,R4
+   MOV      R4,R0
+   LDR      R5,Wimp_Text_Size
+   ADD      R5,R5,R4
+   MOV      R0,#10
+   MOV      R2,#&FFF
+   SWI      OS_File
+   MVN      R1,#0
+   SWI      Wimp_CreateMenu
+   LDMFD    R13!,{R4,R5,R15}
+
+; >-------------------------------------------------------------<
+
+.Find_LeafName                         ;_R0-> Filename (ctrl-terminated), ~R0-> Leafname
+   STMFD    R13!,{R14}
+   MOV      R1,#0
+
+._Loop
+   LDRB     R2,[R0,R1]
+   CMP      R2,#' '
+   ADDGE    R1,R1,#1
+   BGE      _Loop                      ; End of pathname.leafname
+
+._Loop2
+   SUB      R1,R1,#1
+   LDRB     R2,[R0,R1]
+   CMP      R1,#0
+   CMPNE    R2,#'.'
+   CMPNE    R2,#':'
+   BNE      _Loop2                     ; End of pathname
+   CMP      R1,#0
+   MVNEQ    R14,#0
+   MOVNE    R14,#0
+   ADDNE    R1,R1,#1
+   ADD      R0,R0,R1
+   LDMFD    R13!,{R15}
+
+; >-------------------------------------------------------------<
+
+.Inc_Ind_Pointer                       ;_R0 = Size to increase indirect data pointer
+   LDR      R1,Ind_Pointer
+   ADD      R1,R1,R0
+   STR      R1,Ind_Pointer
+   ADR      R0,Ind_Block+Ind_Size
+   CMP      R1,R0
+   MOVGT    R0,#&01                    ; Messages_Error #&01 = No more room for indirected data
+   BGT      Messages_Error
+   MOV      R15,R14

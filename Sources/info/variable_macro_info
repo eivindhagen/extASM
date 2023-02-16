@@ -1,0 +1,254 @@
+
+; >-------------------------------------------------------------<
+
+.Asm_Check_Unused
+   STMFD    R13!,{R4,R14}
+   MOV      R0,#4
+   STR      R0,extASM_Doing
+   MOV      R0,#Flex_VarList
+   BL       Flex_Adr
+   LDR      R4,VarList_Size
+   SUB      R1,R4,#1
+   BIC      R0,R0,R1                   ; Data must lie on the size of each element boundary
+   ADD      R1,R0,R4                   ; for the sort to work
+   LDR      R3,Prev_Variable_Offset
+   CMP      R3,#0
+   LDMEQFD  R13!,{R4,R15}
+   ADD      R3,R3,R1
+
+.ACU_Loop
+   LDR      R0,[R1],R4
+   CMP      R4,#16
+   BICEQ    R0,R0,#&FF000000
+   LDRB     R2,[R0,#16]
+   CMP      R2,#'$'
+   CMPNE    R2,#'_'
+   CMPNE    R2,#'#'
+   BEQ      ACU_End
+   LDR      R2,[R0,#12]
+   CMP      R2,#0
+   ADDEQ    R2,R0,#16
+   MOVEQ    R0,#&05                    ; Asm_Warning #&05 = Variable '<Name>' defined but not used
+   BLEQ     Asm_Warning
+
+.ACU_End
+   CMP      R1,R3
+   BLT      ACU_Loop
+   LDMFD    R13!,{R4,R15}
+
+; >-------------------------------------------------------------<
+
+.Asm_List_Variables
+   STMFD    R13!,{R4-R9,R14}
+   LDR      R5,Prev_Variable_Offset
+   CMP      R5,#0
+   BEQ      ALV_Macros
+   ADR      R0,ALV_Text_Start
+   ADR      R4,ALV_Text_End
+
+._Loop
+   MOV      R1,#TextColour_Info
+   BL       Wimp_Text_AddColourLine
+   CMP      R0,R4
+   BNE      _Loop
+
+   MOV      R0,#Flex_VarList
+   BL       Flex_Adr
+   LDR      R9,VarList_Size
+   SUB      R1,R9,#1
+   BIC      R0,R0,R1                   ; Data must lie on the size of each element boundary
+   ADD      R4,R0,R9                   ; for the sort to work
+   ADD      R5,R5,R4
+   LDR      R1,Options
+   TST      R1,#Option_VarListSort
+   MOVNE    R0,R4
+   MOVNE    R1,R5
+   MOVNE    R2,R9
+   BLNE     Sort_Variables
+   MOV      R6,#0
+   MOV      R7,#0
+   MOV      R8,#0
+
+.ALV_Loop
+   LDR      R0,[R4],R9
+   CMP      R9,#16
+   BICEQ    R0,R0,#&FF000000
+   LDRB     R1,[R0,#16]
+   CMP      R1,#'_'
+   ADDEQ    R7,R7,#1
+   CMPNE    R1,#'$'
+   CMPNE    R1,#'#'
+   BEQ      ALV_End
+   ADD      R6,R6,#1
+
+   LDRB     R1,[R0,#63]
+   AND      R1,R1,#3
+   CMP      R1,#1
+   MOVLT    R2,#'I'
+   MOVEQ    R2,#'F'
+   MOVGT    R2,#'S'
+   LDR      R3,[R0,#12]
+   ADD      R8,R8,R3
+   ADD      R14,R0,#16
+   STMFD    R13!,{R14}
+   ADR      R0,ALV_WTLine_1
+   MOV      R1,#TextColour_Info
+   BL       Wimp_Text_AddColourLine
+   ADD      R13,R13,#4
+
+.ALV_End
+   CMP      R4,R5
+   BLT      ALV_Loop
+
+   BL       Wimp_Text_AddBlankLine
+   ADR      R0,ALV_WTLine_2
+   MOV      R1,#TextColour_Info
+   MOV      R2,R6
+   BL       Wimp_Text_AddColourLine
+   MOV      R1,#TextColour_Info
+   MOV      R2,R7
+   BL       Wimp_Text_AddColourLine
+   MOV      R1,#TextColour_Info
+   ADD      R2,R6,R7
+   BL       Wimp_Text_AddColourLine
+   MOV      R1,#TextColour_Info
+   MOV      R2,R8
+   BL       Wimp_Text_AddColourLine
+
+   ; List macros
+   ;
+.ALV_Macros
+   LDR      R4,First_Macro
+   CMP      R4,#0
+   LDMEQFD  R13!,{R4-R9,R15}
+   ADR      R0,ALV_Macro_Text_Start
+   ADR      R5,ALV_Macro_Text_End
+
+._Loop
+   MOV      R1,#TextColour_Info
+   BL       Wimp_Text_AddColourLine
+   CMP      R0,R5
+   BNE      _Loop
+   MOV      R5,#0
+
+.ALV_Loop2
+   ADR      R0,ALV_WTLine_6
+   MOV      R1,#TextColour_Info
+   LDR      R2,[R4,#12]
+   ADD      R3,R4,#20
+   ADD      R5,R5,R2
+   BL       Wimp_Text_AddColourLine
+   LDR      R4,[R4,#16]
+   CMP      R4,#0
+   BNE      ALV_Loop2
+   BL       Wimp_Text_AddBlankLine
+   ADR      R0,ALV_WTLine_7
+   MOV      R1,#TextColour_Info
+   LDR      R2,Macro_Num
+   BL       Wimp_Text_AddColourLine
+   MOV      R1,#TextColour_Info
+   MOV      R2,R5
+   BL       Wimp_Text_AddColourLine
+   BL       Wimp_Text_AddBlankLine
+   LDMFD    R13!,{R4-R9,R15}
+
+.ALV_WTLine_1 DCB   "%c     %6d %s",0
+.ALV_WTLine_2 DCB   "Number of variables           : %d",0
+.ALV_WTLine_3 DCB   "Number of local variables     : %d",0
+.ALV_WTLine_4 DCB   "Total number of variables     : %d",0
+.ALV_WTLine_5 DCB   "Number of variable references : %d",0
+.ALV_WTLine_6 DCB   "%6d %s",0
+.ALV_WTLine_7 DCB   "Number of macros           : %d",0
+.ALV_WTLine_8 DCB   "Number of macro references : %d",0
+   ALIGN
+.ALV_Text_Start
+   DCB   0
+   DCB   "Variable list",0
+   DCB   "-------------",0
+   DCB   "Type  Refs   Name",0
+   DCB   "-----------------   ",0
+.ALV_Text_End
+.ALV_Macro_Text_Start
+   DCB   0
+   DCB   "Macro list",0
+   DCB   "----------",0
+   DCB   "Refs   Name",0
+   DCB   "----------- ",0
+.ALV_Macro_Text_End
+   ALIGN
+
+; >-------------------------------------------------------------<
+
+   ; R4 - Element 1
+   ; R5 - Element 2
+   ; R6 - Pointer 1
+   ; R7 - Pointer 2
+   ; R8 - Start pointer
+   ; R9 - End pointer
+   ; R10 - Middle element
+   ;
+   ; This sort uses the Quicksort algorithm
+   ;
+.Sort_Variables                        ;_R0-> Variable linked list, _R1-> End of list
+   STMFD    R13!,{R4-R11,R14}          ;_R2 = Size of records (16 or 32)
+   MOV      R8,R0
+   SUB      R9,R1,R2
+   MOV      R11,R2
+   BL       Sort_Procedure
+   LDMFD    R13!,{R4-R11,R15}
+
+.Sort_Procedure
+   STMFD    R13!,{R14}
+   MOV      R6,R8                      ; Pointer1=Start pointer
+   MOV      R7,R9                      ; Pointer2=End pointer
+   ADD      R10,R6,R7
+   MOV      R10,R10,LSR #1
+   SUB      R0,R11,#1
+   BIC      R10,R10,R0
+   LDR      R10,[R10]                  ; Middle element=(Pointer1+Pointer2)/2
+
+.Sort_Loop
+._Loop
+   LDR      R4,[R6],R11                ; Read Element1
+   ADD      R0,R4,#16
+   ADD      R1,R10,#16
+   CMP      R11,#16
+   BICEQ    R0,R0,#&FF000000
+   BICEQ    R1,R1,#&FF000000
+   BL       StrCmpNC
+   CMP      R0,#0                      ; Element1<Middle element?
+   BLT      _Loop
+   SUB      R6,R6,R11
+
+._Loop2
+   LDR      R5,[R7],-R11               ; Read Element2
+   ADD      R0,R5,#16
+   ADD      R1,R10,#16
+   CMP      R11,#16
+   BICEQ    R0,R0,#&FF000000
+   BICEQ    R1,R1,#&FF000000
+   BL       StrCmpNC
+   CMP      R0,#0                      ; Element2>Middle element?
+   BGT      _Loop2
+   ADD      R7,R7,R11
+   CMP      R6,R7                      ; Pointer1<=Pointer2?
+   STRLE    R4,[R7]                    ; Swap Element1 and Element2
+   STRLE    R5,[R6]
+   ADDLE    R6,R6,R11                  ; Pointer1=Pointer1+Size
+   SUBLE    R7,R7,R11                  ; Pointer2=Pointer2-Size
+   CMP      R6,R7                      ; Pointer1>=Pointer2?
+   BLT      Sort_Loop
+   CMP      R7,R8                      ; Pointer2<=Start pointer?
+   BLE      Sort_Finished
+   STMFD    R13!,{R6-R10}
+   MOV      R9,R7                      ; End pointer=Pointer2
+   BL       Sort_Procedure
+   LDMFD    R13!,{R6-R10}
+
+.Sort_Finished
+   CMP      R6,R9                      ; Pointer1>=End pointer?
+   LDMGEFD  R13!,{R15}
+   STMFD    R13!,{R6-R10}
+   MOV      R8,R6                      ; Start pointer=Pointer1
+   BL       Sort_Procedure
+   LDMFD    R13!,{R6-R10,R15}

@@ -1,0 +1,417 @@
+
+; >-------------------------------------------------------------<
+
+.DT_ADC_ADD_ADF_ADR                    ;_R8 = "D"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   ;------> ADC  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000000101000000000000000000000
+   BEQ      DT_ALU_D12
+   CMP      R8,#'D'
+   ;------> ADD  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000000100000000000000000000000
+   BEQ      DT_ALU_D12
+   CMP      R8,#'F'
+   ;------> ADF  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110000000000000000100000000
+   BEQ      DT_FPU_D12
+   CMP      R8,#'R'
+   ;------> ADR
+   MOVEQ    R9,#0
+   BEQ      DT_ADR
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_AND                                ;_R8 = "N"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'D'
+   ;------> AND  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000000000000000000000000000000
+   BEQ      DT_ALU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_BIC                                ;_R8 = "I"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'C'
+   ;------> BIC  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000001110000000000000000000000
+   BEQ      DT_ALU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_CMF_CMFE_CMN_CMP                   ;_R8 = "M"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'F'
+   ;------> CMF  Cond    abc eFn         fgh iFm
+   MOVEQ    R9,#%00001110100100001111000100010000
+   BEQ      DT_FPU_CMP
+   CMP      R8,#'N'
+   ;------> CMN  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000001011000000000000000000000
+   BEQ      DT_ALU_12
+   CMP      R8,#'P'
+   ;------> CMP  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000001010000000000000000000000
+   BEQ      DT_ALU_12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_EOR                                ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   ;------> EOR  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000000001000000000000000000000
+   BEQ      DT_ALU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_MOV                                ;_R8 = "O"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'V'
+   BNE      DT_Unknown
+   LDRB     R8,[R10]
+   CMP      R8,#'T'
+   CMPNE    R8,#'t'
+   ADDEQ    R10,R10,#1
+   ;------> MOVT Cond        imm4[Rd][  imm12   ]
+   MOVEQ    R9,#%00000011010000000000000000000000
+   BEQ      DT_MOVT_MOVW
+   CMP      R8,#'W'
+   CMPNE    R8,#'w'
+   ADDEQ    R10,R10,#1
+   ;------> MOVW Cond        imm4[Rd][  imm12   ]
+   MOVEQ    R9,#%00000011000000000000000000000000
+   BEQ      DT_MOVT_MOVW
+   ;------> MOV  Cond  I    S    [Rd][ Operand2 ]
+   MOV      R9,#%00000001101000000000000000000000
+   B        DT_ALU_D2
+
+; >-------------------------------------------------------------<
+
+.DT_MOVT_MOVW                          ;_R8 = "W"
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Immediate
+   CMP      R0,#&10000
+   MOVHS    R0,#&2A                    ; Asm_Error #&2A = Value exceeds 16 bit
+   BHS      Asm_Error
+   MOV      R1,R0,LSR #12
+   AND      R0,R0,#&FFF
+   ORR      R0,R0,R1,LSL #16
+   ORR      R9,R9,R0
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_MVF_MVN                            ;_R8 = "V"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'N'
+   ;------> MVN  Cond  I    S    [Rd][ Operand2 ]
+   MOVEQ    R9,#%00000001111000000000000000000000
+   BEQ      DT_ALU_D2
+   CMP      R8,#'F'
+   ;------> MVF  Cond    abcde   jFd     fgh iFm
+   MOVEQ    R9,#%00001110000000001000000100000000
+   BEQ      DT_FPU_D2
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_NEG                                ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'G'
+   ; NEG<cond> Rd, Rn (RSB<cond> Rd, Rn, #0)
+   ;
+   ;------> NEG  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000000011000000000000000000000
+   BEQ      DT_ALU_D1
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ORR                                ;_R8 = "R"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'R'
+   ;------> ORR  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000001100000000000000000000000
+   BEQ      DT_ALU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_RSB_RSC_RSF                        ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   ;------> RSB  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000000011000000000000000000000
+   BEQ      DT_ALU_D12
+   CMP      R8,#'C'
+   ;------> RSC  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000000111000000000000000000000
+   BEQ      DT_ALU_D12
+   CMP      R8,#'F'
+   ;------> RSF  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110001100000000000100000000
+   BEQ      DT_FPU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_SUB_SUF                            ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'B'
+   ;------> SUB  Cond  I    S[Rn][Rd][ Operand2 ]
+   MOVEQ    R9,#%00000000010000000000000000000000
+   BEQ      DT_ALU_D12
+   CMP      R8,#'F'
+   ;------> SUF  Cond    abcdeFn jFd     fgh iFm
+   MOVEQ    R9,#%00001110001000000000000100000000
+   BEQ      DT_FPU_D12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_TEMP_TEQ                           ;_R8 = "E"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'M'
+   BEQ      DT_TEMP
+   CMP      R8,#'Q'
+   ;------> TEQ  Cond  I    S[Rn]    [ Operand2 ]
+   MOVEQ    R9,#%00000001001000000000000000000000
+   BEQ      DT_ALU_12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_TST                                ;_R8 = "S"
+   LDRB     R8,[R10],#1
+   BIC      R8,R8,#32
+   CMP      R8,#'T'
+   ;------> TST  Cond  I    S[Rn]    [ Operand2 ]
+   MOVEQ    R9,#%00000001000000000000000000000000
+   BEQ      DT_ALU_12
+   B        DT_Unknown
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_D1
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   CMP      R8,#'S'
+   CMPNE    R8,#'s'
+   ORREQ    R9,R9,#Update_PSR_Bit
+   LDREQB   R8,[R10],#1
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Rn_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_D2_Register
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Two_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_D2
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DTAD2_No_Stat
+   ADR      R0,Code_Counters
+   AND      R1,R9,#&F << ALU_Opcode_Pos
+   LDR      R2,[R0,R1,LSR #19]
+   ADD      R2,R2,#1
+   STR      R2,[R0,R1,LSR #19]
+
+.DTAD2_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = "S" or CC or Blank
+   BL       Decode_ConditionCode
+   CMP      R8,#'S'
+   CMPNE    R8,#'s'
+   ORREQ    R9,R9,#Update_PSR_Bit
+   LDREQB   R8,[R10],#1
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Two
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_D12_Register
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Rn_Register
+   BL       Decode_Operand_Two_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_D12
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DTAD12_No_Stat
+   ADR      R0,Code_Counters
+   AND      R1,R9,#&F << ALU_Opcode_Pos
+   LDR      R2,[R0,R1,LSR #19]
+   ADD      R2,R2,#1
+   STR      R2,[R0,R1,LSR #19]
+
+.DTAD12_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = "S" or CC or Blank
+   BL       Decode_ConditionCode
+   CMP      R8,#'S'
+   CMPNE    R8,#'s'
+   ORREQ    R9,R9,#Update_PSR_Bit
+   LDREQB   R8,[R10],#1
+   BL       Decode_Destination_Register
+   BL       Decode_Operand_Rn_Register
+   BL       Decode_Operand_Two
+   B        DT_End
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_12
+   LDR      R0,Options
+   TST      R0,#Option_CodeStat
+   BEQ      DTA12_No_Stat
+   ADR      R0,Code_Counters
+   AND      R1,R9,#&F << ALU_Opcode_Pos
+   LDR      R2,[R0,R1,LSR #19]
+   ADD      R2,R2,#1
+   STR      R2,[R0,R1,LSR #19]
+
+.DTA12_No_Stat
+   LDRB     R8,[R10],#1                ; R8 = "S" or CC or Blank
+   BL       Decode_ConditionCode
+   CMP      R8,#'S'
+   CMPNE    R8,#'s'
+   LDREQB   R8,[R10],#1
+   ORR      R9,R9,#Update_PSR_Bit      ; Always set the "S" bit
+   CMP      R8,#'P'                    ; "P" bit option ?
+   CMPNE    R8,#'p'
+   ORREQ    R9,R9,#&F << Rd_Pos        ; Set Rd=PC (hidden feature... Rd not used!)
+   LDREQB   R8,[R10],#1
+   BL       Ensure_Blank
+
+   BL       Decode_Rn_Register
+   MOV      R4,R0
+
+   BL       Decode_Operand_Two_Value   ;_R0 = Operand 2 bits [12+1]
+   TST      R9,#Immediate_Bit
+   BNE      DTA12_Not_Write_Instruction
+   ORR      R9,R9,R0
+   B        DT_Write_Instruction
+
+.DTA12_Not_Write_Instruction
+   BL       Code_Immediate             ;_R0 = Immediate value
+   CMN      R14,#1                     ; Check if coded value is okay
+   BEQ      DTA12_Not_Write_Instruction2
+   ORR      R9,R9,R0
+   B        DT_Write_Instruction
+
+.DTA12_Not_Write_Instruction2
+   ;------> Alter opcode if possible
+   MOV      R5,R0
+   MOV      R6,R9
+   BL       Immediate_Turnaround       ; Try to switch instruction
+   BL       Code_Immediate             ;_R0 = Immediate value
+   CMN      R14,#1                     ; Check if coded value is okay
+   BEQ      DTA12_Not_Write_Instruction3
+   ORR      R9,R9,R0
+   B        DT_Write_Instruction
+
+.DTA12_Not_Write_Instruction3
+   ; Immediate failed, 1 Instruction is not enough!
+   ;
+   BL       Push_Temp_Info
+   MOV      R9,R6
+   MOV      R1,#1
+   MOV      R0,R1,LSL R4               ; NEED Rn
+   STR      R0,TEMP_Needed
+   LDR      R7,TEMP_Stacked
+   BL       Get_Temp_Reg
+   MOV      R6,R0
+   LDR      R0,TEMP_Stacked
+   CMP      R0,R7
+   MOVEQ    R0,#&13                    ; Asm_Warning #&13 = Auto-expansion, using TEMP register (ALU)
+   MOVNE    R0,#&16                    ; Asm_Warning #&16 = Auto-expansion, using stacked register (ALU)
+   STR      R0,AutoExpand_Number
+   ADD      R4,R11,#4
+   BL       Push_Temp_Reg
+   AND      R0,R9,#%1111 << ALU_Opcode_Pos
+   CMP      R0,#%1001 << ALU_Opcode_Pos
+   BEQ      DTA12_TEQ
+   BIC      R9,R9,#Immediate_Bit
+   ORR      R7,R9,R6
+
+   AND      R9,R9,#&F0000000           ; Make MOV or MVN instruction
+   ;------> OpCode  Cond  I    S[Rn][Rd][ Operand2 ]
+   ORR      R9,R9,#%00000011101000000000000000000000
+   ORR      R9,R9,R6,LSL #Rd_Pos
+   MOV      R0,R5
+   BL       AutoExpand
+   MOV      R9,R7
+   BL       Write_Instruction
+
+.DTA12_End
+   BL       Pop_Temp_Reg
+   BL       Pop_Temp_Info
+
+   LDR      R0,Options
+   TST      R0,#Option_AutoExpand
+   LDRNE    R0,AutoExpand_Number
+   SUBNE    R2,R11,R4
+   BLNE     AutoExpand_Message
+   B        DT_End
+
+.DTA12_TEQ
+   BIC      R9,R9,#1 << 24             ; Change TEQ to EORS
+   ORR      R9,R9,R6,LSL #Rd_Pos
+   MOV      R0,R5
+   BL       AutoExpand
+   B        DTA12_End
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_Rn_Rm_Rs
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Rn_Register
+   BL       Decode_Operand_Rm_Register
+   BL       Decode_Operand_Rs_Register
+   B        DT_Write_Instruction
+
+; >-------------------------------------------------------------<
+
+.DT_ALU_Rn_Rm_Rs_Rd
+   LDRB     R8,[R10],#1
+   BL       Decode_ConditionCode
+   BL       Ensure_Blank
+   BL       Decode_Rn_Register
+   BL       Decode_Operand_Rm_Register
+   BL       Decode_Operand_Rs_Register
+   BL       Decode_Operand_Rd_Register
+   B        DT_Write_Instruction

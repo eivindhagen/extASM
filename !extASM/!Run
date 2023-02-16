@@ -1,0 +1,13 @@
+| !Run file for extASM
+
+Obey <Obey$Dir>.!Boot
+RMEnsure FPEmulator 3.90 Error You need version 3.90 or higher of FPEmulator ('FPE400' is included in the !extASM directory)
+Set extASM$Dir <Obey$Dir>
+|Set Not_Found 0
+|RMEnsure DDEUtils 0.00 Set Not_Found 1
+|If Not_Found=0 Then RMKill DDEUtils
+|Unset Not_Found
+|RMEnsure DDEUtilsEm 1.00 RMLoad <extASM$Dir>.Resources.DDEUtilsEm
+|RMEnsure DragMod 1.00 RMLoad <extASM$Dir>.Resources.DragMod
+WimpSlot -min 128k -max 128k
+Run <extASM$Dir>.!RunImage
